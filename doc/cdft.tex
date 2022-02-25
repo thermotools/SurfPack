@@ -1,0 +1,356 @@
+\documentclass[12pt, letterpaper]{article}
+\pdfminorversion=4
+\usepackage[utf8]{inputenc}
+\usepackage{textcomp}
+\usepackage{listings}
+\usepackage{babel}
+\usepackage[square,numbers]{natbib}
+\usepackage{amsmath}
+\usepackage{pslatex}
+%\usepackage{bm}% better \boldsymbol
+\usepackage{array}% improves tabular environment.
+\usepackage{dcolumn}% also improves tabular environment, with decimal centring.
+%\usepackage{lastpage}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathmorphing}
+%\usepackage{pgfplots}
+%\usepackage{cleveref}
+\usepackage{pgf,pgfarrows,pgfnodes}
+
+\usepackage[final]{pdfpages}
+\usepackage{hyperref}
+\usepackage{doi}
+
+%\usepackage[altbullet,expert]{lucidabr}
+%\usepackage[charter]{mathdesign}
+\usepackage{cleveref}
+\usepackage{ifthen}
+%\usepackage{nomencl}
+\usepackage{parskip}
+\usepackage{psfrag}
+\usepackage{booktabs}
+\usepackage{pifont}
+%\usepackage{subfig,caption}
+\usepackage{microtype}% for pdflatex; medisin mot overfull \vbox
+\usepackage{xspace}% for pdflatex; medisin mot overfull \vbox
+\usepackage[font=footnotesize]{subcaption}
+\usepackage{siunitx}
+\usepackage{todonotes}
+\presetkeys%
+    {todonotes}%
+    {inline,backgroundcolor=orange}{}
+
+%% Formattering av figur- og tabelltekster
+%
+%
+% Egendefinerte
+%
+\newcommand*{\unit}[1]{\ensuremath{\,\mathrm{#1}}}
+\newcommand*{\uunit}[1]{\ensuremath{\mathrm{#1}}}
+%\newcommand*{\od}[3][]{\frac{\mathrm{d}^{#1}#2}{\mathrm{d}{#3}^{#1}}}% ordinary derivative
+\newcommand*{\od}[3][]{\frac{\dif^{#1}#2}{\dif{#3}^{#1}}}% ordinary derivative
+\newcommand*{\pd}[3][]{\frac{\partial^{#1}#2}{\partial{#3}^{#1}}}% partial derivative
+\newcommand*{\pdt}[3][]{{\partial^{#1}#2}/{\partial{#3}^{#1}}}% partial
+                                % derivative for inline use.
+\newcommand{\pone}[3]{\frac{\partial #1}{\partial #2}_{#3}}% partial
+                                % derivative with information of
+                                % constant variables
+\newcommand{\ponel}[3]{\frac{\partial #1}{\partial #2}\bigg|_{#3}} % partial derivative with informatio of constant variable. A line is added.
+\newcommand{\ptwo}[3]{\frac{\partial^{2} #1}{\partial #2 \partial
+    #3}} % partial differential in two different variables
+\newcommand{\pdn}[3]{\frac{\partial^{#1}#2}{\partial{#3}^{#1}}}% partial derivative
+
+% Total derivative:
+\newcommand*{\ttd}[2]{\frac{\mathrm{D} #1}{\mathrm{D} #2}}
+\newcommand*{\td}[2]{\frac{\mathrm{d} #1}{\mathrm{d} #2}}
+\newcommand*{\ddt}{\frac{\partial}{\partial t}}
+\newcommand*{\ddx}{\frac{\partial}{\partial x}}
+% Vectors etc:
+% For Computer Modern:
+
+\DeclareMathAlphabet{\mathsfsl}{OT1}{cmss}{m}{sl}
+%\renewcommand*{\vec}[1]{\boldsymbol{#1}}%
+\newcommand*{\vc}[1]{\vec{\mathbf{#1}}}%
+\newcommand*{\tensor}[1]{\mathsfsl{#1}}% 2. order tensor
+\newcommand*{\matr}[1]{\tensor{#1}}% matrix
+\renewcommand*{\div}{\boldsymbol{\nabla\cdot}}% divergence
+\newcommand*{\grad}{\boldsymbol{\nabla}}% gradient
+% fancy differential from Claudio Beccari, TUGboat:
+% adjusts spacing automatically
+\makeatletter
+\newcommand*{\dif}{\@ifnextchar^{\DIfF}{\DIfF^{}}}
+\def\DIfF^#1{\mathop{\mathrm{\mathstrut d}}\nolimits^{#1}\gobblesp@ce}
+\def\gobblesp@ce{\futurelet\diffarg\opsp@ce}
+\def\opsp@ce{%
+  \let\DiffSpace\!%
+  \ifx\diffarg(%
+    \let\DiffSpace\relax
+  \else
+    \ifx\diffarg[%
+      \let\DiffSpace\relax
+    \else
+      \ifx\diffarg\{%
+        \let\DiffSpace\relax
+      \fi\fi\fi\DiffSpace}
+\makeatother
+%
+\newcommand*{\me}{\mathrm{e}}% e is not a variable (2.718281828...)
+%\newcommand*{\mi}{\mathrm{i}}%  nor i (\sqrt{-1})
+\newcommand*{\mpi}{\uppi}% nor pi (3.141592...) (works for for Lucida)
+%
+% lav tekst-indeks/subscript/pedex
+\newcommand*{\ped}[1]{\ensuremath{_{\text{#1}}}}
+% hy tekst-indeks/superscript/apex
+\newcommand*{\ap}[1]{\ensuremath{^{\text{#1}}}}
+\newcommand*{\apr}[1]{\ensuremath{^{\mathrm{#1}}}}
+\newcommand*{\pedr}[1]{\ensuremath{_{\mathrm{#1}}}}
+%
+\newcommand*{\volfrac}{\alpha}% volume fraction
+\newcommand*{\surften}{\sigma}% coeff. of surface tension
+\newcommand*{\curv}{\kappa}% curvature
+\newcommand*{\ls}{\phi}% level-set function
+\newcommand*{\ep}{\Phi}% electric potential
+\newcommand*{\perm}{\varepsilon}% electric permittivity
+\newcommand*{\visc}{\mu}% molecular (dymamic) viscosity
+\newcommand*{\kvisc}{\nu}% kinematic viscosity
+\newcommand*{\cfl}{C}% CFL number
+
+% Grid
+\newcommand{\jj}{j}
+\newcommand{\jph}{{j+1/2}}
+\newcommand{\jmh}{{j-1/2}}
+\newcommand{\jp}{{j+1}}
+\newcommand{\jm}{{j-1}}
+\newcommand{\nn}{n}
+\newcommand{\nph}{{n+1/2}}
+\newcommand{\nmh}{{n-1/2}}
+\newcommand{\np}{{n+1}}
+%
+\newcommand{\lf}{\text{LF}}
+\newcommand{\lw}{\text{Ri}}
+%
+\newcommand*{\cons}{\vec U}
+\newcommand*{\flux}{\vec F}
+\newcommand*{\dens}{\rho}
+\newcommand*{\svol}{\ensuremath v}
+\newcommand*{\temp}{\ensuremath T}
+\newcommand*{\vel}{\ensuremath u}
+\newcommand*{\mom}{\dens\vel}
+\newcommand*{\toten}{\ensuremath E}
+\newcommand*{\inten}{\ensuremath e}
+\newcommand*{\press}{\ensuremath p}
+\renewcommand*{\ss}{\ensuremath a}
+\newcommand*{\jac}{\matr A}
+%
+\newcommand*{\abs}[1]{\lvert#1\rvert}
+\newcommand*{\bigabs}[1]{\bigl\lvert#1\bigr\rvert}
+\newcommand*{\biggabs}[1]{\biggl\lvert#1\biggr\rvert}
+\newcommand*{\norm}[1]{\lVert#1\rVert}
+%
+\newcommand*{\e}[1]{\times 10^{#1}}
+\newcommand*{\ex}[1]{\times 10^{#1}}%shorthand -- for use e.g. in tables
+\newcommand*{\exi}[1]{10^{#1}}%shorthand -- for use e.g. in tables
+\newcommand*{\nondim}[1]{\ensuremath{\mathit{#1}}}% italic iflg. ISO. (???)
+\newcommand*{\rey}{\nondim{Re}}
+\newcommand*{\acro}[1]{\textsc{\MakeLowercase{#1}}}%acronyms etc.
+
+\newcommand{\nto}{\ensuremath{\mbox{N}_{\mbox{\scriptsize 2}}}}
+\newcommand{\chfire}{\ensuremath{\mbox{CH}_{\mbox{\scriptsize 4}}}}
+%\newcommand*{\checked}{\ding{51}}
+\newcommand{\coto}{\ensuremath{\text{CO}_{\text{\scriptsize 2}}}}
+\newcommand{\celsius}{\ensuremath{^\circ\text{C}}}
+%\newcommand{\clap}{Clapeyron~}
+\newcommand{\subl}{\ensuremath{\text{sub}}}
+\newcommand{\spec}{\text{spec}}
+\newcommand{\sat}{\text{sat}}
+\newcommand{\sol}{\text{sol}}
+\newcommand{\liq}{\text{liq}}
+\newcommand{\vap}{\text{vap}}
+\newcommand{\amb}{\text{amb}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\crit}{\text{crit}}
+\newcommand{\entr}{\ensuremath{\text{s}}}
+\newcommand{\fus}{\text{fus}}
+\newcommand{\flash}[1]{\ensuremath{#1\text{-flash}}}
+\newcommand{\spce}[2]{\ensuremath{#1\, #2\text{ space}}}
+\newcommand{\spanwagner}{\text{Span--Wagner}}
+\newcommand{\triplepoint}{\text{TP triple point}}
+\newcommand{\wrpt}{\text{with respec to~}}
+%\sisetup{input-symbols = {( )}}
+% \newcommand*{\red}{\ensuremath{\text{R}}\xspace}
+% \newcommand*{\crit}{\ensuremath{\text{c}}\xspace}
+% \newcommand*{\mix}{\ensuremath{\text{m}}\xspace}
+\newcommand*{\lb}{\ensuremath{\left(}}
+\newcommand*{\rb}{\ensuremath{\right)}}
+\newcommand{\LEFT}{\ensuremath{\text{L}}\xspace}
+\newcommand{\RIGTH}{\ensuremath{\text{R}}\xspace}
+\newcommand{\cdft}{\ensuremath{\text{classical DFT}}\xspace}
+\newcommand{\RF}{\ensuremath{\text{RF}}\xspace}
+\newcommand{\WB}{\ensuremath{\text{WB}}\xspace}
+\newcommand{\WBII}{\ensuremath{\text{WBII}}\xspace}
+
+\graphicspath{{gfx/}}
+
+\title{Classical Density Functional Theory (cDFT) for Thermopack}
+\author{Morten Hammer}
+\date{\today}
+
+\begin{document}
+%\tableofcontents
+%\printnomenclature
+
+
+\begin{titlepage}
+\maketitle
+\end{titlepage}
+
+\section{Introduction}
+
+The Jupiter notebooks of Mary K. Coe
+\href{https://github.com/marykcoe/cDFT_Package}{cDFT} is a great recourse for
+understanding \cdft. Her PhD thesis also contains a lot of information
+\cite{coe2021}.
+
+\section{Fundamental Measure Theory}
+Fundamental measure theory for hard sphere mixtures was developed by
+\citet{rosenfeld1989}. The name "measure" relates to the fundamental
+geometrical measures (volume, surface area, mean radius of curvature
+and the Euler characteristic) of a sphere particle. The fundamental
+geometrical measures are recovered when integrating the weight
+functions defined in Section~\ref{sec:weight}.
+
+For bulk phases this functional reduces to the Percus-Yevick (PY)
+compressibility equation \cite{percus1958}, equivalent to scaled
+particle theory.
+
+\subsection{The Rosenfeld functional}
+
+\begin{equation}
+  \Phi^\RF = -n_0 \ln \lb 1 - n_3 \rb +
+  \frac{n_1 n_2 - \vc{n}_1 \cdot \vc{n}_2}{1 - n_3} +
+  \frac{n_2^3 - 3 n_2 \vc{n}_2 \cdot \vc{n}_2}{24\pi \lb 1 - n_3 \rb^2}
+\end{equation}
+
+The differentials needed when searching for the Grand potential:
+\begin{align}
+  \pd{\Phi^\RF}{n_0} &= -\ln \lb 1 - n_3 \rb \\
+  \pd{\Phi^\RF}{n_1} &= \frac{n_2}{1 - n_3} \\
+  \pd{\Phi^\RF}{n_2} &= \frac{n_1}{1 - n_3} + \frac{n_2^2 - \vc{n}_2 \cdot \vc{n}_2}{8\pi \lb 1 - n_3 \rb^2} \\
+  \pd{\Phi^\RF}{n_3} &= \frac{n_0}{1 - n_3} +
+  \frac{n_1 n_2 - \vc{n}_1 \cdot \vc{n}_2}{\lb 1 - n_3 \rb^2} +
+  \frac{n_2^3 - 3 n_2 \vc{n}_2 \cdot \vc{n}_2}{12\pi \lb 1 - n_3 \rb^3} \\
+  \pd{\Phi^\RF}{\vc{n}_1} &=  - \frac{\vc{n}_2}{1 - n_3} \\
+  \pd{\Phi^\RF}{\vc{n}_2} &=  -\frac{\vc{n}_1}{1 - n_3} - \frac{n_2 \vc{n}_2}{4\pi \lb 1 - n_3 \rb^2}
+\end{align}
+
+\subsection{Weight functions}
+\label{sec:weight}
+Weight functions given by
+
+\begin{align}
+  w_3^i \lb \mathbf{r} \rb &=  \Theta \lb R_i - \abs{\mathbf{r}} \rb \\
+  w_2^i \lb \mathbf{r} \rb &=  \delta \lb R_i - \abs{\mathbf{r}} \rb \\
+  w_1^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i} w_2^i \lb \mathbf{r} \rb \\
+  w_0^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i^2} w_2^i \lb \mathbf{r} \rb \\
+  \mathbf{w}_2^i \lb \mathbf{r} \rb &=  \frac{\mathbf{r}}{\abs{\mathbf{r}}}\delta \lb R_i - \abs{\mathbf{r}} \rb \\
+  \mathbf{w}_1^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i} \mathbf{w}_2^i.
+\end{align}
+Where $\Theta$ is the Heaviside function, and $\delta$ are the Dirac delta function.
+
+\subsubsection{Weight functions for planar geometry}
+For the planar geometry $\rho \lb \mathbf{r} \rb = \rho \lb z \rb $,
+and the weigth functions can be integrated for the $x,y$ dimensions.
+
+\begin{equation}
+  W_v \lb z \rb = \underset{-\infty}{\overset{\infty}{\int}} \underset{-\infty}{\overset{\infty}{\int}} dx dy w_v \lb \sqrt{x^2 + y^2 + z^2} \rb = 2 \pi \underset{\abs{z}}{\overset{\infty}{\int}} dr r  w_v \lb r \rb
+\end{equation}
+
+This can be integrated analytically to
+\begin{align}
+  w_3^i \lb z \rb &=  \pi \lb R_i^2 - z^2 \rb \Theta \lb R_i - \abs{z} \rb \\
+  w_2^i \lb z \rb &=  2 \pi R_i \Theta \lb R_i - \abs{z} \rb \\
+  \mathbf{w}_2^i \lb z \rb &= 2 \pi z \mathbf{e}_z  \Theta \lb R_i - \abs{z} \rb
+\end{align}
+
+\subsubsection{Weight functions for spherical geometry}
+
+For the shperical geometry $\rho \lb \mathbf{r} \rb = \rho \lb r \rb $,
+and the weigth functions can be integrated for the angle dimensions.
+
+\begin{equation}
+  W_v \lb r \rb = \underset{-\infty}{\overset{\infty}{\int}} \underset{-\infty}{\overset{\infty}{\int}} dx dy w_v \lb \sqrt{x^2 + y^2 + z^2} \rb = 4 \pi \underset{\abs{r}}{\overset{\infty}{\int}} dr r^2  w_v \lb r \rb
+\end{equation}
+
+\todo{TODO}
+
+\subsection{Alternative FMT functionals}
+For the White Bear functional \cite{roth2002}, the bulk phase
+properties are consistent with additive hard-sphere mixture
+compressibillity of \citet{boublik1970} and
+Mansoori-Carnahan-Starling-Leland (MCSL) \cite{mansoori1971}.
+
+The BMCSL equation of state leads to a excess free energy density that
+is slightly inconsistent, and a new generalization of the Carnahan-
+Starling \cite{carnahan1969} equation of state to mixtures was derived,
+the White Bear Mark II \cite{hansen-goos2006a}.
+
+\subsection{The White Bear functional}
+
+\begin{align}
+  \Phi^\WB =& -n_0 \ln \lb 1 - n_3 \rb +
+              \frac{n_1 n_2 - \vc{n}_1 \cdot \vc{n}_2}{1 - n_3}\nonumber \\
+  &+ \lb n_2^3 - 3 n_2 \vc{n}_2 \cdot \vc{n}_2 \rb \frac{ n_3 + \lb 1 - n_3 \rb ^2 \ln \lb 1 - n_3 \rb}{36\pi n_3^2 \lb 1 - n_3 \rb^2}
+\end{align}
+
+\begin{align}
+  \pd{\Phi^\WB}{n_0} &= -\ln \lb 1 - n_3 \rb \\
+  \pd{\Phi^\WB}{n_1} &= \frac{n_2}{1 - n_3} \\
+  \pd{\Phi^\WB}{n_2} &= \frac{n_1}{1 - n_3} + \lb n_2^2 - \vc{n}_2 \cdot \vc{n}_2 \rb \frac{ n_3 + \lb 1 - n_3 \rb ^2 \ln \lb 1 - n_3 \rb}{12\pi n_3^2 \lb 1 - n_3 \rb^2} \\
+  \pd{\Phi^\WB}{n_3} &= \frac{n_0}{1 - n_3} +
+  \frac{n_1 n_2 - \vc{n}_1 \cdot \vc{n}_2}{\lb 1 - n_3 \rb^2} \nonumber \\
+  & + \lb n_2^3 - 3 n_2 \vc{n}_2 \cdot \vc{n}_2 \rb \biggl( \frac{n_3 \lb 5 - n_3 \rb - 2}{36\pi n_3^2 \lb 1 - n_3 \rb^3} - \frac{\ln \lb 1 - n_3 \rb}{18\pi n_3^3} \biggr) \\
+  \pd{\Phi^\WB}{\vc{n}_1} &=  - \frac{\vc{n}_2}{1 - n_3} \\
+  \pd{\Phi^\WB}{\vc{n}_2} &=  -\frac{\vc{n}_1}{1 - n_3} - n_2 \vc{n}_2 \frac{ n_3 + \lb 1 - n_3 \rb ^2 \ln \lb 1 - n_3 \rb}{6\pi n_3^2 \lb 1 - n_3 \rb^2}
+\end{align}
+
+\subsection{The White Bear Mark II functional}
+\begin{align}
+  \Phi^\WBII =& -n_0 \ln \lb 1 - n_3 \rb +
+  \lb n_1 n_2 - \vc{n}_1 \cdot \vc{n}_2 \rb \frac{1 + \frac{1}{3} \phi_2\lb n_3 \rb}{1 - n_3} \nonumber \\
+  &+ \lb n_2^3 - 3 n_2 \vc{n}_2 \cdot \vc{n}_2 \rb\frac{ 1 - \frac{1}{3} \phi_3\lb n_3 \rb }{24\pi n_3^2 \lb 1 - n_3 \rb^2}
+\end{align}
+with,
+\begin{align}
+  \phi_2\lb n_3 \rb =& \frac{1}{n_3}\lb 2 n_3 - n_3^2 + 2\lb 1-n_3 \rb\ln \lb 1 - n_3 \rb \rb \\
+  \phi_3\lb n_3 \rb =& \frac{1}{n_3^2}\lb 2 n_3 - 3n_3^2 + 2n_3^3 + 2\lb 1-n_3 \rb^2\ln \lb 1 - n_3 \rb \rb
+\end{align}
+
+\begin{align}
+  \od{\phi_2}{n_3} =&  - 1 - \frac{2}{n_3} - \frac{2\ln \lb 1 - n_3 \rb}{n_3^2} \\
+  \od{\phi_3}{n_3} =& -\frac{4 (1 - n_3) \ln \lb 1 - n_3\rb}{n_3^3}  - \frac{4}{n_3^2} + \frac{2}{n_3} + 2
+\end{align}
+
+
+\begin{align}
+  \pd{\Phi^\WBII}{n_0} &= -\ln \lb 1 - n_3 \rb \\
+  \pd{\Phi^\WBII}{n_1} &= \frac{n_2 \lb 1 + \frac{1}{3} \phi_2 \rb}{1 - n_3} \\
+  \pd{\Phi^\WBII}{n_2} &= \frac{n_1 \lb 1 + \frac{1}{3} \phi_2 \rb}{1 - n_3} + \frac{\lb n_2^2 - \vc{n}_2 \cdot \vc{n}_2 \rb \lb 1 - \frac{1}{3} \phi_3 \rb}{8\pi \lb 1 - n_3 \rb^2} \\
+  \pd{\Phi^\WBII}{n_3} &= \frac{n_0}{1 - n_3} +
+                         \lb n_1 n_2 - \vc{n}_1 \cdot \vc{n}_2 \rb \biggl( \frac{\frac{1}{3} \od{\phi_2}{n_3}}{1 - n_3}  + \frac{1 + \frac{1}{3} \phi_2}{\lb 1 - n_3 \rb^2} \biggr) \nonumber \\
+                         &+\frac{\lb n_2^3 - 3 n_2 \vc{n}_2 \cdot \vc{n}_2\rb}{24\pi n_3^2 \lb 1 - n_3 \rb^2} \biggl( - \frac{1}{3} \od{\phi_3}{n_3}  + \biggl[\frac{ 1}{1 - n_3} - \frac{1}{n_3}\biggr] 2 \lb 1 - \frac{1}{3} \phi_3 \rb \biggr) \\
+  \pd{\Phi^\WBII}{\vc{n}_1} &=  - \frac{\vc{n}_2 \lb 1 + \frac{1}{3} \phi_2 \rb}{1 - n_3} \\
+  \pd{\Phi^\WBII}{\vc{n}_2} &=  - \frac{\vc{n}_1 \lb 1 + \frac{1}{3} \phi_2 \rb}{1 - n_3} - \frac{n_2 \vc{n}_2\lb 1 - \frac{1}{3} \phi_3 \rb}{4\pi n_3^2 \lb 1 - n_3 \rb^2}
+\end{align}
+
+\clearpage
+\bibliographystyle{plainnat}
+\bibliography{./DFT.bib,./HardSphere.bib}
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% ispell-local-dictionary: "british"
+%%% End: 

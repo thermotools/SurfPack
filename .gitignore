@@ -1,0 +1,22 @@
+syntax: glob
+
+.cache
+*.bak
+*.bk
+*.orig
+*.dat
+*.aux
+*.log
+*.dat
+*.nlo
+*.toc
+*.out
+*.el
+*.bbl
+*.blg
+
+TAGS
+.tags
+*tags
+*~
+*\#
