@@ -3,7 +3,7 @@ import numpy as np
 from cdft import cdft1D
 import matplotlib.pyplot as plt
 from utility import boundary_condition, density_from_packing_fraction, \
-    load_file, get_data_container
+    load_file, get_data_container, plot_data_container
 import sys
 
 class picard_geometry_solver():
@@ -162,7 +162,7 @@ class picard_geometry_solver():
         """
         Generate case name from specifications
         """
-        self.case_name = f'Planar_{self.cDFT.wall}_{str(self.cDFT.eta)}'
+        self.case_name = f'Planar_{self.cDFT.wall}_{"{:.3f}".format(self.cDFT.eta)}'
         self.case_name += '_' + self.cDFT.functional.short_name
 
     def save_equilibrium_density_profile(self):
@@ -197,13 +197,7 @@ class picard_geometry_solver():
                 self.density[self.domain_mask]/self.cDFT.bulk_density,
                 lw=2, color="k", label="cDFT")
         if data_dict is not None:
-            data = load_file(data_dict["filename"])
-            label = None
-            for yi, y in enumerate(data_dict["y"]):
-                if data_dict["labels"] is not None:
-                    label = data_dict["labels"][yi]
-                ax.plot(data[:,data_dict["x"]], data[:,y], lw=2,
-                        color=data_dict["colors"][yi], label=label)
+            plot_data_container(data_dict, ax)
             leg = plt.legend(loc="best", numpoints=1)
             leg.get_frame().set_linewidth(0.0)
 
@@ -306,12 +300,12 @@ class picard_geometry_solver():
 
 if __name__ == "__main__":
     bulk_density = density_from_packing_fraction(eta=0.2)
-    dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="HardWall", grid_dr=0.001)
+    dft = cdft1D(bulk_density=bulk_density, functional="RF", domain_length=50.0, wall="HardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="SlitHardWall", grid_dr=0.5)
     solver = picard_geometry_solver(cDFT=dft)
     solver.minimise(print_frequency=40,
                     plot_profile=True)
 
-    #data_dict = get_data_container("../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
+    #data_dict = get_data_container("../testWBII.dat", labels=["WBII"], x_index=0, y_indices=[2])
     #solver.plot_equilibrium_density_profile(data_dict=data_dict)
