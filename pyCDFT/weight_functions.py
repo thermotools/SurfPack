@@ -85,7 +85,6 @@ class planar_weights():
         self.R = R
         NinP = 2 * round(R / dr) + 1
         self.quad = quadrature(NinP)
-        print("NinP", NinP, R, dr)
         if CONVOLUTIONS == CONVNOFFT:
             self.w3 = np.zeros(NinP)
             self.w2 = np.zeros(NinP)
@@ -165,6 +164,14 @@ class planar_weights():
         plt.xlim([-0.51, 0.51])
         plt.xticks([-0.5, -0.25, 0.0, 0.25, 0.5])
         plt.show()
+
+    def print(self):
+        """
+            Print weights multiplied by quadrature
+        """
+        print("w2", self.w2)
+        print("w3", self.w3)
+        print("w2c", self.w2vec)
 
 
 if __name__ == "__main__":

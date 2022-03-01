@@ -31,7 +31,8 @@ class Rosenfeld:
         """
         No init required
         """
-        self.functional = "Rosenfeld"
+        self.name = "Rosenfeld"
+        self.short_name = "RF"
 
     def excess_free_energy(self, dens):
         """
@@ -109,7 +110,7 @@ class Rosenfeld:
         return diff
 
     def test_differentials(self, dens0):
-        print("Testing functional " + self.functional)
+        print("Testing functional " + self.name)
         dFdn = differentials_1D(1, 1.0)
         dFdn = self.differentials(dens, dFdn)
         eps = 1.0e-5
@@ -138,7 +139,8 @@ class WhitebearPureFluid(Rosenfeld):
         """
         """
         super(WhitebearPureFluid, self).__init__()
-        self.functional = "White Bear"
+        self.name = "White Bear"
+        self.short_name = "WB"
         self.numerator = None
         self.denumerator = None
 
@@ -244,7 +246,8 @@ class WhitebearMarkIIPureFluid(WhitebearPureFluid):
         """
         """
         super(WhitebearMarkIIPureFluid, self).__init__()
-        self.functional = "White Bear Mark II"
+        self.name = "White Bear Mark II"
+        self.short_name = "WBII"
         self.phi2_div3 = None
         self.dphi2dn3_div3 = None
         self.phi3_div3 = None

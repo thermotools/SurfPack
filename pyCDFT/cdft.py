@@ -2,7 +2,7 @@
 import numpy as np
 import fmt_functionals
 from utility import weighted_densities_1D, differentials_1D,\
-    packing_fraction_from_density
+    packing_fraction_from_density, boundary_condition
 from weight_functions import planar_weights
 import sys
 
@@ -12,14 +12,14 @@ class cdft1D:
     Base classical DFT class for 1D problems
     """
 
-    def __init__(self, bulk_density, wall, domain_length=40.0, functional="Rosenfeld", grid_dr=0.001, temperature=1.0):
+    def __init__(self, bulk_density, wall="HW", domain_length=40.0, functional="Rosenfeld", grid_dr=0.001, temperature=1.0):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
 
         Args:
             bulk_density (float): Bulk fluid density ()
-            wall (str): Wall type
+            wall (str): Wall type (HardWall, SlitHardWall)
             domain_length (float): Length of domain
             functional (str): Name of hard sphere functional: Rosenfeld, WhiteBear, WhiteBear Mark II, Default Rosenfeld
             grid_dr (float) : Grid spacing
@@ -61,13 +61,27 @@ class cdft1D:
         self.red_pressure = self.bulk_density * self.T * self.functional.compressibility(self.eta)
         self.excess_mu = self.functional.excess_chemical_potential(self.eta)
 
-        # Left wall setup
-        self.Vext = np.zeros(self.N)
-        self.Vext[:self.NinP] = np.inf
-        if wall.upper() == "SLIT":
-            # Add right wall setup
-            self.Vext[self.end:] = np.inf
+        # Set up wall
+        self.wall_setup(wall)
 
+    def wall_setup(self, wall):
+        self.left_boundary = boundary_condition["OPEN"]
+        self.right_boundary = boundary_condition["OPEN"]
+        # Wall setup
+        self.Vext = np.zeros(self.N)
+        hw = ("HW", "HARDWALL", "SHW")
+        is_hard_wall = len([w for w in hw if w in wall.upper()]) > 0
+        slit = ("SLIT", "SHW")
+        is_slit = len([s for s in slit if s in wall.upper()]) > 0
+        if is_hard_wall:
+            self.Vext[:self.NinP] = np.inf
+            self.left_boundary = boundary_condition["WALL"]
+            self.wall = "HW"
+            if is_slit:
+                # Add right wall setup
+                self.Vext[self.end:] = np.inf
+                self.right_boundary = boundary_condition["WALL"]
+                self.wall = "SHW"
 
 if __name__ == "__main__":
     pass

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import numpy as np
 
+boundary_condition = {"OPEN": 0,
+                      "WALL": 1}
+
 
 def density_from_packing_fraction(eta, d=1.0):
     """
@@ -32,6 +35,49 @@ def packing_fraction_from_density(density, d=1.0):
     eta = density * (np.pi * d ** 3) / 6
 
     return eta
+
+
+def get_data_container(filename, labels=None, x_index=0, y_indices=[1], colors=["r", "g", "b"]):
+    """
+    ¨
+    Args:
+        filename (str):  Name of file
+        labels (str): Label of data
+        x_index (int): x index to plot against
+        y_indices (list of int): Array of indices to plot
+        colors (list of str): Color list
+    Returns:
+        data (dict): Container with information of data to plot
+    """
+    data = {}
+    data["filename"] = filename
+    data["labels"] = labels
+    data["x"] = x_index
+    data["y"] = y_indices
+    data["colors"] = colors
+    return data
+
+
+def load_file(filename):
+    """
+
+    Args:
+        filename (str): File to be read
+
+    Returns:
+        data (np.ndarray): Data read from file
+    """
+    file = open(filename, 'r')
+    # Parse header
+    n_lines = 0
+    for line in file:
+        words = line.split()
+        if words[0][0] == '#':
+            n_lines += 1
+        else:
+            break
+    data = np.loadtxt(filename, skiprows=n_lines)
+    return data
 
 
 class weighted_densities_1D():
