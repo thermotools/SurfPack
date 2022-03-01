@@ -45,13 +45,12 @@ class Rosenfeld:
             array_like: Excess HS Helmholtz free energy ()
 
         """
+        f = np.zeros(dens.N)
+        f[:] = -dens.n0[:] * dens.logn3neg[:] + \
+               (dens.n1[:] * dens.n2[:] - dens.n1v[:] * dens.n2v[:]) / dens.n3neg[:] + \
+               ((dens.n2[:] ** 3) - 3.0 * dens.n2[:] * dens.n2v[:] ** 2) / (24.0 * np.pi * dens.n3neg[:] ** 2)
 
-        dens.n3neg = 1.0 - dens.n3
-        F = -dens.n0 * np.log(dens.n3neg) + \
-            (dens.n1 * dens.n2 - dens.n1v * dens.n2v) / (dens.n3neg) + \
-            ((dens.n2 ** 3) - 3.0 * dens.n2 * dens.n2v ** 2) / (24.0 * np.pi * dens.n3neg ** 2)
-
-        return F
+        return f
 
     def compressibility(self, eta):
         """
@@ -59,7 +58,7 @@ class Rosenfeld:
         Multiply by rho*kB*T to get pressure
 
         Args:
-        eta (array_like): Packing fractions
+        eta (float): Packing fractions
 
         Returns:
         float: compressibility
@@ -72,10 +71,10 @@ class Rosenfeld:
         Calculates the reduced HS excess chemical potential from the packing fraction
 
         Args:
-        eta (array_like): Packing fraction
+        eta (float): Packing fraction
 
         Returns:
-        array_like: Excess reduced HS chemical potential ()
+        float: Excess reduced HS chemical potential ()
 
         """
         mu = (14.0 * eta - 13.0 * eta * eta + 5.0 * eta ** 3) / (2.0 * (1 - eta) ** 3)
@@ -92,17 +91,14 @@ class Rosenfeld:
         diff (array_like): Functional differentials
 
         """
-        dens.n3neg = 1.0 - dens.n3
-        dens.n3neg2 = dens.n3neg ** 2
-        dens.n2v2 = dens.n2v ** 2
-
-        diff.d0 = -np.log(dens.n3neg)
-        diff.d1 = dens.n2 / dens.n3neg
-        diff.d2 = dens.n1 / dens.n3neg + (dens.n2 ** 2 - dens.n2v2) / (8 * np.pi * dens.n3neg2)
-        diff.d3 = dens.n0 / dens.n3neg + (dens.n1 * dens.n2 - dens.n1v * dens.n2v) / (dens.n3neg2) + \
-                  (dens.n2 ** 3 - 3 * dens.n2 * dens.n2v2) / (12 * np.pi * dens.n3neg ** 3)
-        diff.d1v = -dens.n2v / dens.n3neg
-        diff.d2v = -(dens.n1v / dens.n3neg + dens.n2 * dens.n2v / (4 * np.pi * dens.n3neg2))
+        diff.d0[:] = -np.log(dens.n3neg[:])
+        diff.d1[:] = dens.n2[:] / dens.n3neg[:]
+        diff.d2[:] = dens.n1[:] / dens.n3neg[:] + (dens.n2[:] ** 2 - dens.n2v2[:]) / (8 * np.pi * dens.n3neg2[:])
+        diff.d3[:] = dens.n0[:] / dens.n3neg[:] + (dens.n1[:] * dens.n2[:] - dens.n1v[:] * dens.n2v[:]) / \
+                     dens.n3neg2[:] + (dens.n2[:] ** 3 - 3 * dens.n2[:] * dens.n2v2[:]) / \
+                     (12 * np.pi * dens.n3neg[:] ** 3)
+        diff.d1v[:] = -dens.n2v[:] / dens.n3neg[:]
+        diff.d2v[:] = -(dens.n1v[:] / dens.n3neg[:] + dens.n2[:] * dens.n2v[:] / (4 * np.pi * dens.n3neg2[:]))
 
         # Combining differentials
         diff.combine_differentials()
@@ -118,10 +114,13 @@ class Rosenfeld:
             ni0 = dens0.get_density(i)
             dni = eps * ni0
             dens0.set_density(i, ni0 - dni)
+            dens0.update_utility_variables()
             F1 = self.excess_free_energy(dens0)
             dens0.set_density(i, ni0 + dni)
+            dens0.update_utility_variables()
             F2 = self.excess_free_energy(dens0)
             dens0.set_density(i, ni0)
+            dens0.update_utility_variables()
             dFdn_num = (F2 - F1) / (2 * dni)
             print("Differential: ", i, dFdn_num, dFdn.get_differential(i))
 
@@ -155,16 +154,16 @@ class WhitebearPureFluid(Rosenfeld):
         array_like: Excess HS Helmholtz free energy ()
 
         """
+        # Avoid dividing with zero value of n3 in boundary grid points
+        pn3m = dens.n3 > 0.0  # Positive value n3 mask
+        f = np.zeros(dens.N)
+        f[pn3m] = -dens.n0[pn3m] * dens.logn3neg[pn3m] + \
+                  (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) / dens.n3neg[pn3m] + \
+                  ((dens.n2[pn3m] ** 3) - 3.0 * dens.n2[pn3m] * dens.n2v[pn3m] ** 2) * \
+                  (dens.n3[pn3m] + dens.n3neg2[pn3m] * dens.logn3neg[pn3m]) / \
+                  (36.0 * np.pi * dens.n3[pn3m] ** 2 * dens.n3neg2[pn3m])
 
-        dens.n3neg = 1.0 - dens.n3
-        dens.n3neg2 = dens.n3neg ** 2
-        dens.logn3neg = np.log(dens.n3neg)
-        F = -dens.n0 * dens.logn3neg + \
-            (dens.n1 * dens.n2 - dens.n1v * dens.n2v) / (dens.n3neg) + \
-            ((dens.n2 ** 3) - 3.0 * dens.n2 * dens.n2v ** 2) * \
-            (dens.n3 + dens.n3neg2 * dens.logn3neg) / (36.0 * np.pi * dens.n3 ** 2 * dens.n3neg2)
-
-        return F
+        return f
 
     def compressibility(self, eta):
         """
@@ -206,29 +205,38 @@ class WhitebearPureFluid(Rosenfeld):
         diff (array_like): Functional differentials
 
         """
-        dens.n3neg = 1.0 - dens.n3
-        dens.n3neg2 = dens.n3neg ** 2
-        dens.n2v2 = dens.n2v ** 2
-        dens.logn3neg = np.log(dens.n3neg)
         if self.numerator is None or np.shape(self.numerator) != np.shape(dens.n0):
             self.numerator = np.zeros_like(dens.n0)
-        self.numerator = dens.n3 + dens.n3neg2 * dens.logn3neg
+        self.numerator[:] = dens.n3[:] + dens.n3neg2[:] * dens.logn3neg[:]
         if self.denumerator is None or np.shape(self.denumerator) != np.shape(dens.n0):
             self.denumerator = np.zeros_like(dens.n0)
-        self.denumerator = (36.0 * np.pi * dens.n3 ** 2 * dens.n3neg2)
+        self.denumerator[:] = (36.0 * np.pi * dens.n3[:] ** 2 * dens.n3neg2[:])
 
-        diff.d0 = -dens.logn3neg
-        diff.d1 = dens.n2 / dens.n3neg
-        diff.d2 = dens.n1 / dens.n3neg + 3 * (dens.n2 ** 2 - dens.n2v2) * self.numerator / self.denumerator
-        diff.d3 = dens.n0 / dens.n3neg + (dens.n1 * dens.n2 - dens.n1v * dens.n2v) / dens.n3neg2 + \
-                  (dens.n2 ** 3 - 3 * dens.n2 * dens.n2v2) * \
-                  ((dens.n3 * (5 - dens.n3) - 2) / (self.denumerator * dens.n3neg) - dens.logn3neg / (
-                          18 * np.pi * dens.n3 ** 3))
-        diff.d1v = -dens.n2v / dens.n3neg
-        diff.d2v = -dens.n1v / dens.n3neg - 6 * dens.n2 * dens.n2v * self.numerator / self.denumerator
+        # Avoid dividing with zero value of n3 in boundary grid points
+        pn3m = dens.n3 > 0.0  # Positive value n3 mask
+        non_pn3m = np.invert(pn3m)  # Mask for zero and negative value of n3
+
+        diff.d0[pn3m] = -dens.logn3neg[pn3m]
+        diff.d1[pn3m] = dens.n2[pn3m] / dens.n3neg[pn3m]
+        diff.d2[pn3m] = dens.n1[pn3m] / dens.n3neg[pn3m] + 3 * (dens.n2[pn3m] ** 2 - dens.n2v2[pn3m]) * \
+                        self.numerator[pn3m] / self.denumerator[pn3m]
+        diff.d3[pn3m] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
+                        (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) / dens.n3neg2[pn3m] + \
+                        (dens.n2[pn3m] ** 3 - 3 * dens.n2[pn3m] * dens.n2v2[pn3m]) * \
+                        ((dens.n3[pn3m] * (5 - dens.n3[pn3m]) - 2) /
+                         (self.denumerator[pn3m] * dens.n3neg[pn3m]) - dens.logn3neg[pn3m] / (
+                                 18 * np.pi * dens.n3[pn3m] ** 3))
+        diff.d1v[pn3m] = -dens.n2v[pn3m] / dens.n3neg[pn3m]
+        diff.d2v[pn3m] = -dens.n1v[pn3m] / dens.n3neg[pn3m] - 6 * dens.n2[pn3m] * dens.n2v[pn3m] * \
+                         self.numerator[pn3m] / self.denumerator[pn3m]
 
         # Combining differentials
         diff.combine_differentials()
+
+        # Set non positive n3 grid points to zero
+        diff.d3[non_pn3m] = 0.0
+        diff.d2eff[non_pn3m] = 0.0
+        diff.d2veff[non_pn3m] = 0.0
 
         return diff
 
@@ -253,12 +261,13 @@ class WhitebearMarkIIPureFluid(WhitebearPureFluid):
         self.phi3_div3 = None
         self.dphi3dn3_div3 = None
 
-    def update_phi2_and_phi3(self, dens):
+    def update_phi2_and_phi3(self, dens, mask=None):
         """
         Calculates function Phi2 from n3
 
         Args:
         dens (array_like): Weighted densities
+        mask (np.ndarray boolean): Mask for updating phi2 and phi3
         """
         if self.phi2_div3 is None or np.shape(self.phi2_div3) != np.shape(dens.n3):
             self.phi2_div3 = np.zeros_like(dens.n3)
@@ -268,15 +277,17 @@ class WhitebearMarkIIPureFluid(WhitebearPureFluid):
             self.phi3_div3 = np.zeros_like(dens.n3)
         if self.dphi3dn3_div3 is None or np.shape(self.dphi3dn3_div3) != np.shape(dens.n3):
             self.dphi3dn3_div3 = np.zeros_like(dens.n3)
-
+        if mask is None:
+            mask = np.full(dens.N, True, dtype=bool)
         prefac = 1.0 / 3.0
-        dens.n32 = dens.n3 ** 2
-        self.phi2_div3 = prefac * (2 - dens.n3 + 2 * dens.n3neg * dens.logn3neg / dens.n3)
-        self.dphi2dn3_div3 = prefac * (- 1 - 2 / dens.n3 - 2 * dens.logn3neg / dens.n32)
-        self.phi3_div3 = prefac * (
-                2 * dens.n3 - 3 * dens.n32 + 2 * dens.n3 * dens.n32 + 2 * dens.n3neg2 * dens.logn3neg) / dens.n32
-        self.dphi3dn3_div3 = prefac * (
-                - 4 * dens.logn3neg * dens.n3neg / (dens.n32 * dens.n3) - 4 / dens.n32 + 2 / dens.n3 + 2)
+        self.phi2_div3[mask] = prefac * (2 - dens.n3[mask] + 2 * dens.n3neg[mask] * dens.logn3neg[mask] / dens.n3[mask])
+        self.dphi2dn3_div3[mask] = prefac * (- 1 - 2 / dens.n3[mask] - 2 * dens.logn3neg[mask] / dens.n32[mask])
+        self.phi3_div3[mask] = prefac * (
+                2 * dens.n3[mask] - 3 * dens.n32[mask] + 2 * dens.n3[mask] * dens.n32[mask] +
+                2 * dens.n3neg2[mask] * dens.logn3neg[mask]) / dens.n32[mask]
+        self.dphi3dn3_div3[mask] = prefac * (
+                - 4 * dens.logn3neg[mask] * dens.n3neg[mask] / (dens.n32[mask] * dens.n3[mask])
+                - 4 / dens.n32[mask] + 2 / dens.n3[mask] + 2)
 
     def excess_free_energy(self, dens):
         """
@@ -289,17 +300,17 @@ class WhitebearMarkIIPureFluid(WhitebearPureFluid):
         array_like: Excess HS Helmholtz free energy ()
 
         """
+        # Avoid dividing with zero value of n3 in boundary grid points
+        pn3m = dens.n3 > 0.0  # Positive value n3 mask
+        self.update_phi2_and_phi3(dens, pn3m)
+        f = np.zeros(dens.N)
+        f[pn3m] = -dens.n0[pn3m] * dens.logn3neg[pn3m] + \
+                  (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) * \
+                  (1 + self.phi2_div3) / (dens.n3neg[pn3m]) + \
+                  ((dens.n2[pn3m] ** 3) - 3.0 * dens.n2[pn3m] * dens.n2v[pn3m] ** 2) * \
+                  (1 - self.phi3_div3[pn3m]) / (24.0 * np.pi * dens.n3neg2[pn3m])
 
-        dens.n3neg = 1.0 - dens.n3
-        dens.n3neg2 = dens.n3neg ** 2
-        dens.logn3neg = np.log(dens.n3neg)
-        self.update_phi2_and_phi3(dens)
-        F = -dens.n0 * dens.logn3neg + \
-            (dens.n1 * dens.n2 - dens.n1v * dens.n2v) * (1 + self.phi2_div3) / (dens.n3neg) + \
-            ((dens.n2 ** 3) - 3.0 * dens.n2 * dens.n2v ** 2) * \
-            (1 - self.phi3_div3) / (24.0 * np.pi * dens.n3 ** 2 * dens.n3neg2)
-
-        return F
+        return f
 
     def differentials(self, dens, diff):
         """
@@ -310,34 +321,38 @@ class WhitebearMarkIIPureFluid(WhitebearPureFluid):
         diff (array_like): Functional differentials
 
         """
-        dens.n3neg = 1.0 - dens.n3
-        dens.n3neg2 = dens.n3neg ** 2
-        dens.n2v2 = dens.n2v ** 2
-        dens.logn3neg = np.log(dens.n3neg)
-        self.update_phi2_and_phi3(dens)
+        # Avoid dividing with zero value of n3 in boundary grid points
+        pn3m = dens.n3 > 0.0  # Positive value n3 mask
+        non_pn3m = np.invert(pn3m)  # Mask for zero and negative value of n3
+        self.update_phi2_and_phi3(dens, pn3m)
         if self.numerator is None or np.shape(self.numerator) != np.shape(dens.n0):
             self.numerator = np.zeros_like(dens.n0)
-        self.numerator = 1 - self.phi3_div3
+        self.numerator[:] = 1 - self.phi3_div3[:]
         if self.denumerator is None or np.shape(self.denumerator) != np.shape(dens.n0):
             self.denumerator = np.zeros_like(dens.n0)
-        self.denumerator = (24.0 * np.pi * dens.n3 ** 2 * dens.n3neg2)
+        self.denumerator[:] = (24.0 * np.pi * dens.n3neg2[:])
 
-        diff.d0 = -dens.logn3neg
-        diff.d1 = dens.n2 * (1 + self.phi2_div3) / dens.n3neg
-        diff.d2 = dens.n1 * (1 + self.phi2_div3) / dens.n3neg + 3 * (
-                dens.n2 ** 2 - dens.n2v2) * self.numerator / self.denumerator
-        diff.d3 = dens.n0 / dens.n3neg + (dens.n1 * dens.n2 - dens.n1v * dens.n2v) * \
-                  ((1 + self.phi2_div3) / dens.n3neg2 + self.dphi2dn3_div3 / dens.n3neg) + \
-                  (dens.n2 ** 3 - 3 * dens.n2 * dens.n2v2) / self.denumerator * \
-                  (-self.dphi3dn3_div3 - 2 * self.numerator / dens.n3 + 2 * self.numerator / dens.n3neg)
-
-        diff.d1v = -dens.n2v * (1 + self.phi2_div3) / dens.n3neg
-        diff.d2v = -dens.n1v * (
-                1 + self.phi2_div3) / dens.n3neg - 6 * dens.n2 * dens.n2v * self.numerator / self.denumerator
+        diff.d0[pn3m] = -dens.logn3neg[pn3m]
+        diff.d1[pn3m] = dens.n2[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m]
+        diff.d2[pn3m] = dens.n1[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] + 3 * (
+                dens.n2[pn3m] ** 2 - dens.n2v2[pn3m]) * self.numerator[pn3m] / self.denumerator[pn3m]
+        diff.d3[pn3m] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
+                        (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) * \
+                        ((1 + self.phi2_div3[pn3m]) / dens.n3neg2[pn3m] +
+                         self.dphi2dn3_div3[pn3m] / dens.n3neg[pn3m]) + \
+                        (dens.n2[pn3m] ** 3 - 3 * dens.n2[pn3m] * dens.n2v2[pn3m]) / self.denumerator[pn3m] * \
+                        (-self.dphi3dn3_div3[pn3m] + 2 * self.numerator[pn3m] / dens.n3neg[pn3m])
+        diff.d1v[pn3m] = -dens.n2v[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m]
+        diff.d2v[pn3m] = -dens.n1v[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] \
+                         - 6 * dens.n2[pn3m] * dens.n2v[pn3m] * self.numerator[pn3m] / self.denumerator[pn3m]
 
         # Combining differentials
         diff.combine_differentials()
 
+        # Set non positive n3 grid points to zero
+        diff.d3[non_pn3m] = 0.0
+        diff.d2eff[non_pn3m] = 0.0
+        diff.d2veff[non_pn3m] = 0.0
         return diff
 
 
@@ -374,9 +389,11 @@ if __name__ == "__main__":
     # Model testing
     dens = weighted_densities_1D(1, 0.5)
     dens.set_testing_values()
+    dens.print(print_utilities=True)
     RF_functional = Rosenfeld()
     RF_functional.test_differentials(dens)
     WB_functional = WhitebearPureFluid()
     WB_functional.test_differentials(dens)
     WBII_functional = WhitebearMarkIIPureFluid()
     WBII_functional.test_differentials(dens)
+
