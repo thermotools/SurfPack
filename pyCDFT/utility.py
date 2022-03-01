@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
+import matplotlib.pyplot as plt
 
 boundary_condition = {"OPEN": 0,
                       "WALL": 1}
@@ -37,12 +38,12 @@ def packing_fraction_from_density(density, d=1.0):
     return eta
 
 
-def get_data_container(filename, labels=None, x_index=0, y_indices=[1], colors=["r", "g", "b"]):
+def get_data_container(filename, labels=None, x_index=0, y_indices=None, colors=None):
     """
     ¨
     Args:
         filename (str):  Name of file
-        labels (str): Label of data
+        labels (list of str): Label of data
         x_index (int): x index to plot against
         y_indices (list of int): Array of indices to plot
         colors (list of str): Color list
@@ -53,9 +54,61 @@ def get_data_container(filename, labels=None, x_index=0, y_indices=[1], colors=[
     data["filename"] = filename
     data["labels"] = labels
     data["x"] = x_index
-    data["y"] = y_indices
-    data["colors"] = colors
+    if y_indices is None:
+        data["y"] = [1]
+    else:
+        data["y"] = y_indices
+    if colors is None:
+        data["colors"] = ["r", "g", "b"]
+    else:
+        data["colors"] = colors
     return data
+
+
+def plot_data_container(data_dict, ax):
+    """
+
+    Args:
+        data_dict (dict):
+        ax (plt.axis): Matplotlib axis
+
+    Returns:
+
+    """
+    data = load_file(data_dict["filename"])
+    label = None
+    for yi, y in enumerate(data_dict["y"]):
+        if data_dict["labels"] is not None:
+            label = data_dict["labels"][yi]
+        ax.plot(data[:, data_dict["x"]], data[:, y], lw=2,
+                color=data_dict["colors"][yi], label=label)
+
+
+def plot_data_container_list(data_dict_list, ylabel, xlabel="$z$", filename=None):
+    """
+    
+    Args:
+        data_dict_list (list of dict): List of data-dicts to plot
+        ylabel (str): y-label 
+        xlabel (str): x-label
+        filename (str): File name 
+
+    Returns:
+
+    """
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlabel(xlabel)
+    #ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+    ax.set_ylabel(ylabel)
+
+    for data_dict in data_dict_list:
+        plot_data_container(data_dict, ax)
+
+    leg = plt.legend(loc="best", numpoints=1)
+    leg.get_frame().set_linewidth(0.0)
+    if filename is not None:
+        plt.savefig(filename)
+    plt.show()
 
 
 def load_file(filename):
@@ -102,26 +155,36 @@ class weighted_densities_1D():
         self.logn3neg = np.zeros(N)
         self.n32 = np.zeros(N)
 
+    def update_utility_variables(self):
+        """
+        """
+        self.n3neg[:] = 1.0 - self.n3[:]
+        self.n3neg2[:] = self.n3neg[:] ** 2
+        self.n2v2[:] = self.n2v[:] ** 2
+        self.logn3neg[:] = np.log(self.n3neg[:])
+        self.n32[:] = self.n3[:] ** 2
+
     def update_after_convolution(self):
-        self.n1v = self.n2v / (4 * np.pi * self.R)
-        self.n0 = self.n2 / (4 * np.pi * self.R ** 2)
-        self.n1 = self.n2 / (4 * np.pi * self.R)
-        self.n3neg = 1.0 - self.n3
-        self.n3neg2 = self.n3neg ** 2
-        self.n2v2 = self.n2v ** 2
-        self.logn3neg = np.log(self.n3neg)
-        self.n32 = self.n3 ** 2
+        """
+        """
+        self.n1v[:] = self.n2v[:] / (4 * np.pi * self.R)
+        self.n0[:] = self.n2[:] / (4 * np.pi * self.R ** 2)
+        self.n1[:] = self.n2[:] / (4 * np.pi * self.R)
+        self.update_utility_variables()
 
     def set_testing_values(self):
         """
         Set some dummy values for testing differentials
         """
-        self.n0 = 1.0
-        self.n1 = 2.0
-        self.n2 = 3.0
-        self.n3 = 0.5
-        self.n1v = 5.0
-        self.n2v = 6.0
+        self.n2[:] = 3.0
+        self.n3[:] = 0.5
+        self.n2v[:] = 6.0
+        self.n0[:] = 1.0
+        self.n1[:] = 2.0
+        self.n1v[:] = 5.0
+        self.N = 1
+        self.R = 0.5
+        self.update_utility_variables()
 
     def get_density(self, i):
         """
@@ -160,8 +223,11 @@ class weighted_densities_1D():
         elif i == 5:
             self.n2v = n
 
-    def print(self):
+    def print(self, print_utilities=False):
         """
+
+        Args:
+            print_utilities (bool): Print also utility variables
         """
         print("\nWeighted densities:")
         print("n0: ", self.n0)
@@ -170,6 +236,13 @@ class weighted_densities_1D():
         print("n3: ", self.n3)
         print("n1v: ", self.n1v)
         print("n2v: ", self.n2v)
+
+        if print_utilities:
+            print("n3neg: ", self.n3neg)
+            print("n3neg2: ", self.n3neg2)
+            print("n2v2: ", self.n2v2)
+            print("logn3neg: ", self.logn3neg)
+            print("n32: ", self.n32)
 
 
 class differentials_1D():
@@ -198,14 +271,14 @@ class differentials_1D():
         self.corr = np.zeros(self.N)
 
     def update_after_convolution(self):
-        self.corr = -(self.d3_conv + self.d2eff_conv + self.d2veff_conv)
+        self.corr[:] = -(self.d3_conv[:] + self.d2eff_conv[:] + self.d2veff_conv[:])
 
     def combine_differentials(self):
         """
         Combining differentials to reduce number of convolution integrals
         """
-        self.d2eff = self.d0 / (4 * np.pi * self.R ** 2) + self.d1 / (4 * np.pi * self.R) + self.d2
-        self.d2veff = self.d1v / (4 * np.pi * self.R) + self.d2v
+        self.d2eff[:] = self.d0[:] / (4 * np.pi * self.R ** 2) + self.d1[:] / (4 * np.pi * self.R) + self.d2[:]
+        self.d2veff[:] = self.d1v[:] / (4 * np.pi * self.R) + self.d2v[:]
 
     def get_differential(self, i):
         """
