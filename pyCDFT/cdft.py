@@ -12,7 +12,13 @@ class cdft1D:
     Base classical DFT class for 1D problems
     """
 
-    def __init__(self, bulk_density, wall="HW", domain_length=40.0, functional="Rosenfeld", grid_dr=0.001, temperature=1.0):
+    def __init__(self,
+                 bulk_density,
+                 wall="HW",
+                 domain_length=40.0,
+                 functional="Rosenfeld",
+                 grid_dr=0.001,
+                 temperature=1.0):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
