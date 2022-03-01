@@ -90,9 +90,9 @@ class planar_weights():
             self.w2 = np.zeros(NinP)
             self.w2vec = np.zeros(NinP)
             self.x = np.linspace(-self.R, self.R, NinP)
-            self.w3 = np.pi * (self.R ** 2 - self.x ** 2)
-            self.w2 = np.pi * np.ones(NinP)
-            self.w2vec = 2 * np.pi * self.x
+            self.w3[:] = np.pi * (self.R ** 2 - self.x[:] ** 2)
+            self.w2[:] = np.pi * np.ones(NinP)[:]
+            self.w2vec[:] = 2 * np.pi * self.x[:]
 
         # Multiply with quadrature weights
         quad_w = self.quad.get_quadrature_weights(quad)
@@ -111,9 +111,9 @@ class planar_weights():
 
         """
         if CONVOLUTIONS == CONVNOFFT:
-            densities.n3 = convolve1d(rho, weights=self.w3, mode='nearest')
-            densities.n2 = convolve1d(rho, weights=self.w2, mode='nearest')
-            densities.n2v = convolve1d(rho, weights=self.w2vec, mode='nearest')
+            densities.n3[:] = convolve1d(rho, weights=self.w3, mode='nearest')
+            densities.n2[:] = convolve1d(rho, weights=self.w2, mode='nearest')
+            densities.n2v[:] = convolve1d(rho, weights=self.w2vec, mode='nearest')
             densities.update_after_convolution()
 
     def correlation_convolution(self, diff: differentials_1D):
@@ -126,9 +126,9 @@ class planar_weights():
 
         """
         if CONVOLUTIONS == CONVNOFFT:
-            diff.d3_conv = convolve1d(diff.d3, weights=self.w3, mode='nearest')
-            diff.d2eff_conv = convolve1d(diff.d2eff, weights=self.w2, mode='nearest')
-            diff.d2veff_conv = -convolve1d(diff.d2veff, weights=self.w2vec, mode='nearest')
+            diff.d3_conv[:] = convolve1d(diff.d3, weights=self.w3, mode='nearest')
+            diff.d2eff_conv[:] = convolve1d(diff.d2eff, weights=self.w2, mode='nearest')
+            diff.d2veff_conv[:] = -convolve1d(diff.d2veff, weights=self.w2vec, mode='nearest')
             diff.update_after_convolution()
 
     def plot_weights(self):
