@@ -4,6 +4,7 @@ import fmt_functionals
 from utility import weighted_densities_1D, differentials_1D,\
     packing_fraction_from_density, boundary_condition
 from weight_functions import planar_weights
+from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS
 import sys
 
 
@@ -50,18 +51,24 @@ class cdft1D:
         # Get functional
         self.functional = fmt_functionals.get_functional(functional)
 
+        # FFT padding of grid
+        if CONVOLUTIONS == CONV_FFTW:
+            self.padding = 1
+        else:
+            self.padding = 0
         # Get grid info
         self.N = round(domain_length / grid_dr) + 1
         self.NinP = 2*round(self.R / grid_dr)  # Number of grid points within particle
-        self.N = self.N + 2 * self.NinP  # Add boundary to grid
-        self.end = self.N - 1 * self.NinP  # End of domain
+        self.padding *= self.NinP
+        self.N = self.N + 2 * self.NinP + 2*self.padding  # Add boundary and padding to grid
+        self.end = self.N - self.NinP - self.padding  # End of domain
 
         # Allocate weighted densities
         self.weighted_densities = weighted_densities_1D(self.N, self.R)
         # Allocate differentials container
         self.differentials = differentials_1D(self.N, self.R)
         # Allocate weights
-        self.weights = planar_weights(self.dr, self.R)
+        self.weights = planar_weights(self.dr, self.R, self.N)
 
         # Calculate reduced pressure and excess chemical potential
         self.red_pressure = self.bulk_density * self.T * self.functional.compressibility(self.eta)

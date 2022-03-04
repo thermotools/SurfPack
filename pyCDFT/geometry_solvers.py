@@ -3,8 +3,10 @@ import numpy as np
 from cdft import cdft1D
 import matplotlib.pyplot as plt
 from utility import boundary_condition, density_from_packing_fraction, \
-    load_file, get_data_container, plot_data_container
+    get_data_container, plot_data_container, allocate_real_convolution_variable
+from constants import DEBUG
 import sys
+
 
 class picard_geometry_solver():
     """
@@ -31,13 +33,13 @@ class picard_geometry_solver():
         if self.cDFT.left_boundary == boundary_condition["WALL"]:
             self.wall_mask[self.NiWall] = True
         if self.cDFT.right_boundary == boundary_condition["WALL"]:
-            self.wall_mask[self.cDFT.end-1] = True
+            self.wall_mask[self.cDFT.end - 1] = True
         self.left_boundary_mask = np.full(self.cDFT.N, False, dtype=bool)
         self.left_boundary_mask[:self.NiWall] = True
         self.right_boundary_mask = np.full(self.cDFT.N, False, dtype=bool)
-        self.right_boundary_mask[self.cDFT.N-self.NiWall:] = True
+        self.right_boundary_mask[self.cDFT.N - self.NiWall:] = True
         # Set radius for plotting
-        self.r = np.linspace(-self.NiWall*self.cDFT.dr, (self.cDFT.end-1)*self.cDFT.dr, self.cDFT.N)
+        self.r = np.linspace(-self.NiWall * self.cDFT.dr, (self.cDFT.end - 1) * self.cDFT.dr, self.cDFT.N)
 
         # Density profile
         self.density = np.zeros(self.cDFT.N)
@@ -49,16 +51,23 @@ class picard_geometry_solver():
         self.old_density = np.zeros(self.cDFT.N)
         self.old_density[:] = self.density[:]
         self.new_density = np.zeros(self.cDFT.N)
-        self.mod_density = np.zeros(self.cDFT.N)
+        self.mod_density = allocate_real_convolution_variable(self.cDFT.N)
+
+        # Set up FFT objects if required
+        self.cDFT.weights.setup_fft(self.cDFT.weighted_densities,
+                                    self.cDFT.differentials,
+                                    self.mod_density)
+        # Configure PyFFTW to use multiple threads
+        # fftw.config.NUM_THREADS = 2
 
         # Set state of solver
         self.converged = False
 
-        # Set Picard paramater for relaxed successive substitution
+        # Set Picard parameter for relaxed successive substitution
         self.new_fraction = new_fraction
 
         # Error norm (np.inf: Max norm, None: 2 norm, ....)
-        self. norm = np.inf
+        self.norm = np.inf
 
         self.generate_case_name()
 
@@ -71,20 +80,25 @@ class picard_geometry_solver():
             have_failed (bool): Fail indicator
         """
 
+        if DEBUG: self.cDFT.weights.print()
         # Calculate weighted densities
         self.mod_density[:] = self.density[:]
         self.mod_density[self.wall_mask] *= 0.5  # todo find explanation for 0.5 trick
         self.cDFT.weights.convolutions(self.cDFT.weighted_densities, self.mod_density)
+        if DEBUG: self.cDFT.weighted_densities.print()
 
         # Calculate one-body direct correlation function
         self.cDFT.functional.differentials(self.cDFT.weighted_densities, self.cDFT.differentials)
         self.cDFT.weights.correlation_convolution(self.cDFT.differentials)
-        corrHS = self.cDFT.differentials.corr
+        if DEBUG: self.cDFT.differentials.print()
 
         # Calculate new density profile using the variations of the functional
         self.new_density[self.domain_mask] = self.cDFT.bulk_density * \
-                                             np.exp(corrHS[self.domain_mask] + self.cDFT.beta *
+                                             np.exp(self.cDFT.differentials.corr[self.domain_mask]
+                                                    + self.cDFT.beta *
                                                     (self.cDFT.excess_mu - self.cDFT.Vext[self.domain_mask]))
+        if DEBUG: print("new_density", self.new_density)
+
         # Set old density profile
         self.old_density[:] = self.density[:]
 
@@ -96,7 +110,7 @@ class picard_geometry_solver():
 
         # Picard update
         self.density[self.domain_mask] = (1.0 - self.new_fraction) * self.density[self.domain_mask] + \
-                                       self.new_fraction * self.new_density[self.domain_mask]
+                                         self.new_fraction * self.new_density[self.domain_mask]
 
         # Calculate deviation between new and old density profiles
         error = np.linalg.norm(self.density - self.old_density, ord=self.norm)
@@ -107,10 +121,10 @@ class picard_geometry_solver():
         ax.set_xlabel("$z$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
         d_plot, = ax.plot(self.r[self.domain_mask],
-                          self.density[self.domain_mask]/self.cDFT.bulk_density,
+                          self.density[self.domain_mask] / self.cDFT.bulk_density,
                           lw=2, color="k")
         d_plot_old, = ax.plot(self.r[self.domain_mask],
-                              self.old_density[self.domain_mask]/self.cDFT.bulk_density,
+                              self.old_density[self.domain_mask] / self.cDFT.bulk_density,
                               lw=2, color="k", ls="--")
         plt.show()
 
@@ -177,7 +191,7 @@ class picard_geometry_solver():
         np.savetxt(filename,
                    np.c_[self.r[self.domain_mask],
                          self.density[self.domain_mask],
-                         self.density[self.domain_mask]/self.cDFT.bulk_density],
+                         self.density[self.domain_mask] / self.cDFT.bulk_density],
                    header="# r, rho, rho/rho_bulk")
 
     def plot_equilibrium_density_profile(self, data_dict=None):
@@ -194,7 +208,7 @@ class picard_geometry_solver():
         ax.set_xlabel("$z$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
         ax.plot(self.r[self.domain_mask],
-                self.density[self.domain_mask]/self.cDFT.bulk_density,
+                self.density[self.domain_mask] / self.cDFT.bulk_density,
                 lw=2, color="k", label="cDFT")
         if data_dict is not None:
             plot_data_container(data_dict, ax)
@@ -302,10 +316,10 @@ if __name__ == "__main__":
     bulk_density = density_from_packing_fraction(eta=0.2)
     dft = cdft1D(bulk_density=bulk_density, functional="RF", domain_length=50.0, wall="HardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
-    # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="SlitHardWall", grid_dr=0.5)
+    # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="HardWall", grid_dr=0.5)
     solver = picard_geometry_solver(cDFT=dft)
     solver.minimise(print_frequency=40,
                     plot_profile=True)
 
-    #data_dict = get_data_container("../testWBII.dat", labels=["WBII"], x_index=0, y_indices=[2])
-    #solver.plot_equilibrium_density_profile(data_dict=data_dict)
+    data_dict = get_data_container("../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
+    solver.plot_equilibrium_density_profile(data_dict=data_dict)

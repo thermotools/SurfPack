@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 
 # How to do convolution integrals
-CONVFFT = 1
-CONVNOFFT = 2
-CONVOLUTIONS = CONVNOFFT
+CONV_FFTW = 1
+CONV_SCIPY_FFT = 2
+CONV_NO_FFT = 3
+CONVOLUTIONS = CONV_FFTW
+
+# Debug flag
+DEBUG = False
 
 # Avogadro's number
 NA = 6.02214076e23

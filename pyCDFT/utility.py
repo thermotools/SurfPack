@@ -1,9 +1,51 @@
 #!/usr/bin/env python3
 import numpy as np
 import matplotlib.pyplot as plt
+from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS
+import pyfftw as fftw
 
 boundary_condition = {"OPEN": 0,
                       "WALL": 1}
+
+
+def allocate_real_convolution_variable(N):
+    """
+
+    Args:
+        N (int): Sice of array
+
+    Returns:
+        variable (array_like): Variable allocated using proper type
+    """
+    if CONVOLUTIONS == CONV_FFTW:
+        variable = fftw.empty_aligned(N, dtype='float64')
+        variable[:] = 0.0
+    elif CONVOLUTIONS == CONV_SCIPY_FFT:
+        variable = np.zeros(N)
+    elif CONVOLUTIONS == CONV_NO_FFT:
+        variable = np.zeros(N)
+    else:
+        raise ValueError("Wrong flag for CONVOLUTIONS")
+    return variable
+
+def allocate_fourier_convolution_variable(N):
+    """
+
+    Args:
+        N (int): Sice of array
+
+    Returns:
+        variable (array_like): Variable allocated using proper type
+    """
+    if CONVOLUTIONS == CONV_FFTW:
+        variable = fftw.empty_aligned(int(N//2)+1, dtype='complex128')
+    elif CONVOLUTIONS == CONV_SCIPY_FFT:
+        variable = np.zeros(N, dtype=np.cdouble)
+    elif CONVOLUTIONS == CONV_NO_FFT:
+        variable = None
+    else:
+        raise ValueError("Wrong flag for CONVOLUTIONS when allocating fourier variable")
+    return variable
 
 
 def density_from_packing_fraction(eta, d=1.0):
@@ -137,23 +179,40 @@ class weighted_densities_1D():
     """
     """
 
-    def __init__(self, N, R):
+    def __init__(self, N, R, mask_conv_results=None):
         """
         """
         self.N = N
         self.R = R
         self.n0 = np.zeros(N)
         self.n1 = np.zeros(N)
-        self.n2 = np.zeros(N)
-        self.n3 = np.zeros(N)
+        self.n2 = allocate_real_convolution_variable(N)
+        self.n3 = allocate_real_convolution_variable(N)
         self.n1v = np.zeros(N)
-        self.n2v = np.zeros(N)
+        self.n2v = allocate_real_convolution_variable(N)
         # Utilities
         self.n3neg = np.zeros(N)
         self.n3neg2 = np.zeros(N)
         self.n2v2 = np.zeros(N)
         self.logn3neg = np.zeros(N)
         self.n32 = np.zeros(N)
+        # Fourier space weighted density
+        self.fn2 = allocate_fourier_convolution_variable(N)
+        self.fn3 = allocate_fourier_convolution_variable(N)
+        self.fn2v = allocate_fourier_convolution_variable(N)
+        # Mask results from convolution
+        if mask_conv_results is None:
+            self.mask_conv_results = np.full(N, False, dtype=bool)
+        else:
+            self.mask_conv_results = mask_conv_results
+
+    def set_convolution_result_mask(self, mask_conv_results):
+        """
+
+        Args:
+            mask_conv_results: Mask for setting zeros in output from convolution
+        """
+        self.mask_conv_results[:] = mask_conv_results[:]
 
     def update_utility_variables(self):
         """
@@ -167,6 +226,9 @@ class weighted_densities_1D():
     def update_after_convolution(self):
         """
         """
+        self.n2[self.mask_conv_results] = 0.0
+        self.n3[self.mask_conv_results] = 0.0
+        self.n2v[self.mask_conv_results] = 0.0
         self.n1v[:] = self.n2v[:] / (4 * np.pi * self.R)
         self.n0[:] = self.n2[:] / (4 * np.pi * self.R ** 2)
         self.n1[:] = self.n2[:] / (4 * np.pi * self.R)
@@ -249,7 +311,7 @@ class differentials_1D():
     """
     """
 
-    def __init__(self, N, R):
+    def __init__(self, N, R, mask_conv_results=None):
         """
         """
         self.N = N
@@ -257,20 +319,43 @@ class differentials_1D():
         self.d0 = np.zeros(N)
         self.d1 = np.zeros(N)
         self.d2 = np.zeros(N)
-        self.d3 = np.zeros(N)
+        self.d3 = allocate_real_convolution_variable(N)
         self.d1v = np.zeros(N)
         self.d2v = np.zeros(N)
         # Utilities
-        self.d2eff = np.zeros(N)
-        self.d2veff = np.zeros(N)
+        self.d2eff = allocate_real_convolution_variable(N)
+        self.d2veff = allocate_real_convolution_variable(N)
         # Utilities
-        self.d3_conv = np.zeros(N)
-        self.d2eff_conv = np.zeros(N)
-        self.d2veff_conv = np.zeros(N)
+        self.d3_conv = allocate_real_convolution_variable(N)
+        self.d2eff_conv = allocate_real_convolution_variable(N)
+        self.d2veff_conv = allocate_real_convolution_variable(N)
         # One - body direct correlation function
         self.corr = np.zeros(self.N)
+        # Fourier space differentials
+        self.fd2eff = allocate_fourier_convolution_variable(N)
+        self.fd3 = allocate_fourier_convolution_variable(N)
+        self.fd2veff = allocate_fourier_convolution_variable(N)
+        self.fd3_conv = allocate_fourier_convolution_variable(N)
+        self.fd2eff_conv = allocate_fourier_convolution_variable(N)
+        self.fd2veff_conv = allocate_fourier_convolution_variable(N)
+        # Mask results from convolution
+        if mask_conv_results is None:
+            self.mask_conv_results = np.full(N, False, dtype=bool)
+        else:
+            self.mask_conv_results = mask_conv_results
+
+    def set_convolution_result_mask(self, mask_conv_results):
+        """
+
+        Args:
+            mask_conv_results: Mask for setting zeros in output from convolution
+        """
+        self.mask_conv_results[:] = mask_conv_results[:]
 
     def update_after_convolution(self):
+        self.d3_conv[self.mask_conv_results] = 0.0
+        self.d2eff_conv[self.mask_conv_results] = 0.0
+        self.d2veff_conv[self.mask_conv_results] = 0.0
         self.corr[:] = -(self.d3_conv[:] + self.d2eff_conv[:] + self.d2veff_conv[:])
 
     def combine_differentials(self):
@@ -312,6 +397,11 @@ class differentials_1D():
         print("d2v: ", self.d2v)
         print("d2_eff: ", self.d2eff)
         print("d2v_eff: ", self.d2veff)
+        print("\nConvolution results")
+        print("d2eff_conv: ", self.d2eff_conv)
+        print("d3_conv: ", self.d3_conv)
+        print("d2veff_conv: ", self.d2veff_conv)
+        print("corr: ", self.corr)
 
 
 if __name__ == "__main__":
