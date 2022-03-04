@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from utility import boundary_condition, density_from_packing_fraction, \
     get_data_container, plot_data_container, allocate_real_convolution_variable
 from constants import DEBUG
+import ng_extrapolation
 import sys
 
 
@@ -13,13 +14,14 @@ class picard_geometry_solver():
     Base solver class for minimisation objects.
     """
 
-    def __init__(self, cDFT: cdft1D, new_fraction=0.1):
+    def __init__(self, cDFT: cdft1D, new_fraction=0.1, ng_extrapolations=None):
         """
         Initialises arrays and fourier objects required for minimisation procedure.
 
         Args:
             cDFT (cDFT1D object):    DFT object to be minimised
-
+            new_fraction (float): Picard parameter
+            ng_extrapolations (int): Extrapolation with method of Ng? Value set update frequency.
         Returns:
             None
         """
@@ -63,13 +65,21 @@ class picard_geometry_solver():
         # Set state of solver
         self.converged = False
 
+        # Set state of solver
+        self.iteration = 0
+        self.error = 1.0
+
         # Set Picard parameter for relaxed successive substitution
         self.new_fraction = new_fraction
 
         # Error norm (np.inf: Max norm, None: 2 norm, ....)
         self.norm = np.inf
 
+        # Set case name to be used for output files etc.
         self.generate_case_name()
+
+        # Extrapolations according to Ng 1974
+        self.ng = ng_extrapolation.ng_extrapolation(self.cDFT.N, ng_extrapolations, self.domain_mask)
 
     def picard_update(self):
         """
@@ -108,13 +118,19 @@ class picard_geometry_solver():
         else:
             have_failed = False
 
-        # Picard update
-        self.density[self.domain_mask] = (1.0 - self.new_fraction) * self.density[self.domain_mask] + \
-                                         self.new_fraction * self.new_density[self.domain_mask]
+        # Update Ng history
+        self.ng.push_back(self.density, self.new_density, self.iteration)
+
+        if self.error < 1.0e-3 and self.ng.time_to_update(self.iteration):
+            self.density[self.domain_mask] = self.ng.extrapolate()
+        else:
+            # Picard update
+            self.density[self.domain_mask] = (1.0 - self.new_fraction) * self.density[self.domain_mask] + \
+                                             self.new_fraction * self.new_density[self.domain_mask]
 
         # Calculate deviation between new and old density profiles
-        error = np.linalg.norm(self.density - self.old_density, ord=self.norm)
-        return error, have_failed
+        self.error = np.linalg.norm(self.density - self.old_density, ord=self.norm)
+        return have_failed
 
     def iteration_plot_profile(self):
         fig, ax = plt.subplots(1, 1)
@@ -137,33 +153,37 @@ class picard_geometry_solver():
 
         Args:
             tolerance (float): Solver tolerance
-            maximum_iterations
-            print_frequency
+            maximum_iterations (int): Maximum number of iteration
+            print_frequency (int): HOw often should solver status be printed?
+            plot_profile (bool): Plot density profile while iterating?
         Returns:
             None
         """
 
         if plot_profile:
             self.iteration_plot_profile()
-        error = 1.0
+
+        self.iteration = 0
         for iteration in range(maximum_iterations):
-            error, have_failed = self.picard_update()
+            have_failed = self.picard_update()
+            self.iteration = iteration + 1
             if have_failed:
                 print("Solver got invalid number and failed")
                 break
-            if error < tolerance:
+            if self.error < tolerance:
                 self.converged = True
                 if plot_profile:
                     self.iteration_plot_profile()
                 break
-
-            if iteration % print_frequency == 0:
-                print("{} complete. Deviation: {}\n".format(iteration, error))
+            if self.iteration % print_frequency == 0:
+                print(f"{self.iteration} complete. Deviation: {self.error}\n")
                 if plot_profile:
                     self.iteration_plot_profile()
 
-        if not self.converged:
-            print("Solver did not converge. Deviation at exit {}\n".format(error))
+        if self.converged:
+            print(f"Solver converged after {self.iteration} iterations\n")
+        else:
+            print(f"Solver did not converge. Deviation at exit {self.error}\n")
 
     def print_perform_minimization_message(self):
         """
@@ -317,8 +337,8 @@ if __name__ == "__main__":
     dft = cdft1D(bulk_density=bulk_density, functional="RF", domain_length=50.0, wall="HardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="HardWall", grid_dr=0.5)
-    solver = picard_geometry_solver(cDFT=dft)
-    solver.minimise(print_frequency=40,
+    solver = picard_geometry_solver(cDFT=dft, ng_extrapolations=10)
+    solver.minimise(print_frequency=20,
                     plot_profile=True)
 
     data_dict = get_data_container("../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
