@@ -6,6 +6,7 @@ from utility import boundary_condition, density_from_packing_fraction, \
     get_data_container, plot_data_container, allocate_real_convolution_variable
 from constants import DEBUG
 import ng_extrapolation
+from matplotlib.animation import FuncAnimation
 import sys
 
 
@@ -80,6 +81,10 @@ class picard_geometry_solver():
 
         # Extrapolations according to Ng 1974
         self.ng = ng_extrapolation.ng_extrapolation(self.cDFT.N, ng_extrapolations, self.domain_mask)
+
+        # Solver defaults
+        self.tolerance = 1.0e-12
+        self.print_frequency = 50
 
     def picard_update(self):
         """
@@ -160,30 +165,73 @@ class picard_geometry_solver():
             None
         """
 
+        self.tolerance = tolerance
         if plot_profile:
             self.iteration_plot_profile()
 
         self.iteration = 0
+        self.print_frequency = print_frequency
         for iteration in range(maximum_iterations):
-            have_failed = self.picard_update()
-            self.iteration = iteration + 1
+            have_failed = self.single_iteration()
             if have_failed:
                 print("Solver got invalid number and failed")
                 break
-            if self.error < tolerance:
-                self.converged = True
-                if plot_profile:
-                    self.iteration_plot_profile()
+            if self.converged:
                 break
             if self.iteration % print_frequency == 0:
-                print(f"{self.iteration} complete. Deviation: {self.error}\n")
                 if plot_profile:
                     self.iteration_plot_profile()
 
         if self.converged:
+            if plot_profile:
+                self.iteration_plot_profile()
             print(f"Solver converged after {self.iteration} iterations\n")
         else:
             print(f"Solver did not converge. Deviation at exit {self.error}\n")
+
+    def single_iteration(self):
+        """
+        Method to calculate the equilibrium density profile.
+
+        Args:
+            tolerance (float): Solver tolerance
+            maximum_iterations (int): Maximum number of iteration
+            print_frequency (int): HOw often should solver status be printed?
+            plot_profile (bool): Plot density profile while iterating?
+        Returns:
+            None
+        """
+
+        have_failed = self.picard_update()
+        self.iteration += 1
+        if self.error < self.tolerance:
+            self.converged = True
+        if self.iteration % self.print_frequency == 0:
+            print(f"{self.iteration} complete. Deviation: {self.error}\n")
+        return have_failed
+
+    def animate(self,
+                tolerance=1e-12,
+                maximum_iterations=10000000,
+                print_frequency=1000,
+                z_max=None):
+        """
+        Method to calculate the equilibrium density profile.
+
+        Args:
+            tolerance (float): Solver tolerance
+            maximum_iterations (int): Maximum number of iteration
+            print_frequency (int): HOw often should solver status be printed?
+            z_max (float): Limit plot range
+        Returns:
+            None
+        """
+        self.tolerance = tolerance
+        self.iteration = 0
+        self.print_frequency = print_frequency
+        anim = anim_solver(self, z_max=z_max)
+        plt.show()
+
 
     def print_perform_minimization_message(self):
         """
@@ -332,14 +380,58 @@ class picard_geometry_solver():
         """
 
 
+class anim_solver():
+    def __init__(self, solver, z_max=None, **kw):
+        self.solver = solver
+        self.fig, self.ax = plt.subplots()
+        self.line = None
+        self.z_max = z_max
+        self.ani = FuncAnimation(self.fig,
+                                 self.animate,
+                                 frames=1000,
+                                 repeat=False,
+                                 init_func=self.init_plot,
+                                 interval=10,
+                                 blit=False,
+                                 **kw)
+
+    def animate(self, frame):
+        have_failed = self.solver.single_iteration()
+        if have_failed or self.solver.converged:
+            if have_failed: print(f"Simulation failed")
+            if self.solver.converged: print(f"Simulation converged after {solver.iteration} iterations")
+            self.ani.event_source.stop()
+        self.line.set_data(self.solver.r[self.solver.domain_mask],
+                           self.solver.density[self.solver.domain_mask] / self.solver.cDFT.bulk_density)
+        #self.line, = self.ax.plot(self.solver.r[self.solver.domain_mask],
+        #                          self.solver.density[self.solver.domain_mask] / self.solver.cDFT.bulk_density,
+        #                          lw=2, color="k")
+        self.ax.relim()
+        self.ax.autoscale_view()
+        if self.z_max is not None:
+            self.ax.set_xlim(0, self.z_max)
+        #self.ax.set_ylim(-1, 1)
+        return self.line,
+
+    def init_plot(self):
+        self.line, = self.ax.plot(self.solver.r[self.solver.domain_mask],
+                                  self.solver.density[self.solver.domain_mask] / self.solver.cDFT.bulk_density,
+                                  lw=2, color="k")
+        self.ax.set_xlabel("$z$")
+        self.ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+        return self.line,
+
 if __name__ == "__main__":
     bulk_density = density_from_packing_fraction(eta=0.2)
     dft = cdft1D(bulk_density=bulk_density, functional="RF", domain_length=50.0, wall="HardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="HardWall", grid_dr=0.5)
     solver = picard_geometry_solver(cDFT=dft, ng_extrapolations=10)
-    solver.minimise(print_frequency=20,
-                    plot_profile=True)
+    #solver.minimise(print_frequency=20,
+    #                plot_profile=True)
+    solver.animate(z_max=4.0)
+    #anim_solver(solver, z_max=4.0)
+    #plt.show()
 
     data_dict = get_data_container("../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
     solver.plot_equilibrium_density_profile(data_dict=data_dict)
