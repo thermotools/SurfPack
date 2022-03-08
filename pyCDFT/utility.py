@@ -403,6 +403,44 @@ class differentials_1D():
         print("d2veff_conv: ", self.d2veff_conv)
         print("corr: ", self.corr)
 
+class quadratic_polynomial():
+    """
+    """
+
+    def __init__(self, x, y):
+        """
+
+        Args:
+            x: Abscissa values
+            y: Ordinate values
+        """
+        a = np.zeros((len(x), 3))
+        for i in range(len(x)):
+            a[i, 0] = 1.0
+            a[i, 1] = x[i]
+            a[i, 2] = x[i]**2
+        self.c = np.linalg.solve(a, y)
+
+    def get_extrema(self):
+        """
+
+        Returns:
+            (float): x at extrema
+        """
+        x_extrema = -self.c[1]/(2*self.c[2])
+        return x_extrema
+
+    def evaluate(self, x):
+        """
+
+        Args:
+            x (np.ndarray): Abscissa values
+        Returns:
+            (np.ndarray): p(x of x)
+        """
+        p_of_x = np.zeros_like(x)
+        p_of_x[:] = self.c[0] + self.c[1] * x[:] + self.c[2] * x[:]**2
+        return p_of_x
 
 if __name__ == "__main__":
     pass
