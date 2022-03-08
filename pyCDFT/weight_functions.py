@@ -109,6 +109,9 @@ class planar_weights():
         self.fw2vec = allocate_fourier_convolution_variable(N)
         self.frho = allocate_fourier_convolution_variable(N)
 
+        # Real space variables used for convolution
+        self.rho = None
+
         if CONVOLUTIONS == CONV_FFTW:
             w3_temp = allocate_real_convolution_variable(N)
             w2_temp = allocate_real_convolution_variable(N)
@@ -131,6 +134,8 @@ class planar_weights():
             del w3_temp
             del w2_temp
             del w2vec_temp
+            # Real space variables used for convolution
+            self.rho = allocate_real_convolution_variable(N)
         elif CONVOLUTIONS == CONV_SCIPY_FFT:
             w3_temp = allocate_real_convolution_variable(N)
             w2_temp = allocate_real_convolution_variable(N)
@@ -172,6 +177,7 @@ class planar_weights():
             densities.n2[:] = convolve1d(rho, weights=self.w2, mode='nearest')
             densities.n2v[:] = convolve1d(rho, weights=self.w2vec, mode='nearest')
         elif CONVOLUTIONS == CONV_FFTW:
+            self.rho[:] = rho[:]
             self.fftw_rho()
             # 2d weighted density
             densities.fn2[:] = self.frho[:] * self.fw2[:]
@@ -200,17 +206,39 @@ class planar_weights():
 
         densities.update_after_convolution()
 
-    def setup_fft(self, densities: weighted_densities_1D, diff: differentials_1D, rho):
+    def convolution_n3(self, densities: weighted_densities_1D, rho: np.ndarray):
+        """
+
+            Args:
+                densities:
+                rho (np.ndarray): Density profile
+
+            Returns:
+
+            """
+        if CONVOLUTIONS == CONV_NO_FFT:
+            densities.n3[:] = convolve1d(rho, weights=self.w3, mode='nearest')
+        elif CONVOLUTIONS == CONV_FFTW:
+            self.fftw_rho()
+            # 3d weighted density
+            densities.fn3[:] = self.frho[:] * self.fw3[:]
+            self.ifftw_n3()
+        elif CONVOLUTIONS == CONV_SCIPY_FFT:
+            self.frho[:] = sfft.fft(rho)
+            # 3d weighted density
+            densities.fn3[:] = self.frho[:] * self.fw3[:]
+            densities.n3[:] = sfft.ifft(densities.fn3).real
+
+    def setup_fft(self, densities: weighted_densities_1D, diff: differentials_1D):
         """
         Args:
             densities: Weighted densities
             diff: Functional differentials'
-            rho: Density profile
 
         """
         if CONVOLUTIONS == CONV_FFTW:
             # FFTW objects to perform the fourier transforms
-            self.fftw_rho = fftw.FFTW(rho, self.frho,
+            self.fftw_rho = fftw.FFTW(self.rho, self.frho,
                                       direction='FFTW_FORWARD',
                                       flags=('FFTW_ESTIMATE',))
 
@@ -243,7 +271,6 @@ class planar_weights():
             self.ifftw_d2veff = fftw.FFTW(diff.fd2veff_conv, diff.d2veff_conv,
                                           direction='FFTW_BACKWARD',
                                           flags=('FFTW_ESTIMATE',))
-
 
     def correlation_convolution(self, diff: differentials_1D):
         """
