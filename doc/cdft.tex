@@ -183,12 +183,15 @@
 % \newcommand*{\mix}{\ensuremath{\text{m}}\xspace}
 \newcommand*{\lb}{\ensuremath{\left(}}
 \newcommand*{\rb}{\ensuremath{\right)}}
+\newcommand*{\lbf}{\ensuremath{\left[}}
+\newcommand*{\rbf}{\ensuremath{\right]}}
 \newcommand{\LEFT}{\ensuremath{\text{L}}\xspace}
 \newcommand{\RIGTH}{\ensuremath{\text{R}}\xspace}
 \newcommand{\cdft}{\ensuremath{\text{classical DFT}}\xspace}
 \newcommand{\RF}{\ensuremath{\text{RF}}\xspace}
 \newcommand{\WB}{\ensuremath{\text{WB}}\xspace}
 \newcommand{\WBII}{\ensuremath{\text{WBII}}\xspace}
+\newcommand{\excess}{\ensuremath{\text{ex}}\xspace}
 
 \graphicspath{{gfx/}}
 
@@ -284,6 +287,23 @@ and the weigth functions can be integrated for the angle dimensions.
 
 \todo{TODO}
 
+\subsection{The one body correlation function}
+The one body correlation functions is given from the Helmholtz free energy functional as,
+
+\begin{equation}
+  c^{(1)}\lb \mathbf{r} \rb = \beta \pd{\mathcal{F}_{\excess} \lbf \rho \rbf}{\rho \lb \mathbf{r} \rb} =  -\underset{\alpha}{\sum} \int d \mathbf{r}^\prime \pd{\Phi_\alpha}{n_\alpha} \pd{n_\alpha}{\rho}.
+\end{equation}
+
+In a planar geometry, the one body correlation function simply becomes,
+\begin{equation}
+  \label{eq:dndrho}
+  \pd{n_\alpha \lb z^\prime \rb}{\rho \lb z \rb} = \frac{\partial}{\partial \rho \lb z \rb} \int dz^{\prime\prime} \rho \lb z^{\prime\prime} \rb w_\alpha \lb z^\prime - z^{\prime\prime} \rb = w_\alpha \lb z^\prime - z\rb,
+\end{equation}
+\begin{equation}
+  \label{eq:c1_1d}
+  c^{(1)}\lb z \rb = -\underset{\alpha}{\sum} \int d z^\prime \pd{\Phi_\alpha}{n_\alpha} w_\alpha \lb z^\prime - z\rb.
+\end{equation}
+
 \subsection{Alternative FMT functionals}
 For the White Bear functional \cite{roth2002}, the bulk phase
 properties are consistent with additive hard-sphere mixture
@@ -343,6 +363,65 @@ with,
   \pd{\Phi^\WBII}{\vc{n}_2} &=  - \frac{\vc{n}_1 \lb 1 + \frac{1}{3} \phi_2 \rb}{1 - n_3} - \frac{n_2 \vc{n}_2\lb 1 - \frac{1}{3} \phi_3 \rb}{4\pi \lb 1 - n_3 \rb^2}
 \end{align}
 
+\section{Numerics}
+
+Solving of the convolution integrals in the FMT and cDFT in real space
+uses $\mathcal{O}\lb N^2 \rb$ operations, however according to the
+convolution theorem the integrals can be done by Fourier
+transformations, leading to only $\mathcal{O}\lb N \ln N \rb$
+operations \cite{roth2010, knepley2010}. Different options for solving
+the discrete fast Fourier transform (FFT) is available, FFTW (GNU
+General Public License), FFTPACK (MIT) and Python FFT.
+
+The common approach used when solving \cdft problems is Picard
+iterations. Instead of using a successive substituting iteration,
+$\tilde{\rho}^{(i)} \rightarrow \rho^{(i)}$, a mixing of the new
+density with the original density is used to dampen the effect of the
+new value, accordign to,
+\begin{equation}
+  \tilde{\rho}^{(i+1)}\lb z \rb = \alpha \rho^{(i)}\lb z \rb + \lb 1 - \alpha \rb \tilde{\rho}^{(i)}\lb z \rb.
+\end{equation}
+The main reason is to avoid $n_3$ values exceeding unity.
+
+Often the Picard parameter is set to a fixed low value, typically
+$\alpha=0.1$, resulting in slow convergence. However using a line
+search requiring some decay in error is probably the best way to
+implement the Picard iterations. \citet{roth2010} suggest using a
+simple quadratic line search. \citet{roth2010} used the Grand
+Potential $\Omega$, when evaluating the line
+search. \cite{knepley2010} evaluated the
+$\| \tilde{\rho}^{(i)} - \rho^{(i)} \|$ as a function of $\alpha$ and
+found the minimum of a quadratic polynomial.
+
+One simple way of accelerate the solution of the equilibrium density
+profile is by extrapolation as used by \citet{ng1974}.
+
+\cite{knepley2010} tested a Newton solver (using numerical
+approximations for the differentials), but they report linear
+convergence through most of the iteration steps. The use of
+inefficient generation of differentials was also reported as an issue.
+
+Looking at Equation \ref{eq:dndrho} and \ref{eq:c1_1d} we see that
+differentiating Equation \ref{eq:c1_1d} will require convolution of
+the $\Phi_{\alpha\gamma}$ with
+$w_\alpha \lb z^\prime - z_1\rb w_\gamma \lb z^\prime - z_2\rb$. The
+latter will become a matrix constant matrix requiering a convolution
+integral per element in the banded Jacobian. The matrix is constant
+and only the inverse Fourier transform will require computuational
+effort. Each of these elements will require CPU time similar to one
+half Picard iteration. For example if there are 1000 grid cells over
+the diameter of a particle, the generation of one Jacobian instance
+will be similar to 500 Picard iterations.
+
+Parallel solution for the Fourier transforms are simple using the FFTW library....
+
+\subsubsection{Quadratures for the weight functions}
+Integrating on a regular grid the integral can be made more accurate using a qudrature formula \todo{Cite},
+\begin{align}
+  \underset{z_N}{\overset{z_1}{\int}} dz^\prime f \lb z^\prime \rb g \lb z^\prime - z \rb =& \Delta z \biggl( \frac{3}{8} f_1 g_{i-1} + \frac{7}{6} f_2 g_{i-2} + \frac{23}{24} f_3 g_{i-3} + f_4 g_{i-4} \nonumber \\&+ \dots  + f_{N-3} g_{i-N+3} + \frac{23}{24} f_{N-2} g_{i-N+2} \nonumber \\&+ \frac{7}{6} f_{N-1} g_{i-N+1} + \frac{3}{8} f_{N-2} g_{i-N+2}.
+\end{align}
+The qudarature is implemeted by multipying the end weights with by the
+quadrature weights.
 \clearpage
 \bibliographystyle{plainnat}
 \bibliography{./DFT.bib,./HardSphere.bib}
