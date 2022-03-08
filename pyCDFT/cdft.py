@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 import fmt_functionals
-from utility import weighted_densities_1D, differentials_1D,\
+from utility import weighted_densities_1D, differentials_1D, \
     packing_fraction_from_density, boundary_condition
 from weight_functions import planar_weights
 from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS
@@ -39,7 +39,7 @@ class cdft1D:
         self.R = 0.5
         # Temperature
         self.T = temperature
-        self.beta = 1.0/temperature
+        self.beta = 1.0 / temperature
         # Bulk density
         self.bulk_density = bulk_density
         self.eta = packing_fraction_from_density(bulk_density)
@@ -58,9 +58,9 @@ class cdft1D:
             self.padding = 0
         # Get grid info
         self.N = round(domain_length / grid_dr) + 1
-        self.NinP = 2*round(self.R / grid_dr)  # Number of grid points within particle
+        self.NinP = 2 * round(self.R / grid_dr)  # Number of grid points within particle
         self.padding *= self.NinP
-        self.N = self.N + 2 * self.NinP + 2*self.padding  # Add boundary and padding to grid
+        self.N = self.N + 2 * self.NinP + 2 * self.padding  # Add boundary and padding to grid
         self.end = self.N - self.NinP - self.padding  # End of domain
 
         # Allocate weighted densities
@@ -76,6 +76,11 @@ class cdft1D:
 
         # Set up wall
         self.wall_setup(wall)
+
+        # Mask for updating density on inner domain
+        self.NiWall = self.N - self.end
+        self.domain_mask = np.full(self.N, False, dtype=bool)
+        self.domain_mask[self.NiWall:self.end] = True
 
     def wall_setup(self, wall):
         self.left_boundary = boundary_condition["OPEN"]
@@ -95,6 +100,45 @@ class cdft1D:
                 self.Vext[self.end:] = np.inf
                 self.right_boundary = boundary_condition["WALL"]
                 self.wall = "SHW"
+
+    def grand_potential(self, density, update_convolutions=True):
+        """
+        Calculates the grand potential in the system.
+
+        Args:
+            density (array_like): Density profile
+            update_convolutions (bool): Flag telling if convolutions should be calculated
+
+        Returns:
+            (float): Grand potential
+            (array): Grand potential contribution for each grid point
+        """
+
+        # Make sure weighted densities are up-to-date
+        if update_convolutions:
+            self.weights.convolutions(self.weighted_densities, density)
+
+        # Calculate chemical potential (excess + ideal)
+        mu = self.excess_mu + self.T * np.log(self.bulk_density)
+
+        # FMT hard-sphere part
+        omega_a = self.T * self.functional.excess_free_energy(self.weighted_densities)
+
+        # Ideal part
+        omega_a[self.domain_mask] += self.T * density[self.domain_mask] * \
+                                   (np.log(density[self.domain_mask]) - 1.0)
+
+        # Extrinsic part
+        omega_a[self.domain_mask] += density[self.domain_mask] \
+                                   * (self.Vext[self.domain_mask] - mu)
+
+        omega_a[:] *= self.dr
+
+        # Integrate using trapezoidal method
+        omega = np.sum(omega_a[self.domain_mask]) - 0.5*omega_a[self.NiWall] - 0.5*omega_a[self.end]
+
+        return omega, omega_a[:]
+
 
 if __name__ == "__main__":
     pass
