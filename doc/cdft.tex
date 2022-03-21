@@ -192,6 +192,11 @@
 \newcommand{\WB}{\ensuremath{\text{WB}}\xspace}
 \newcommand{\WBII}{\ensuremath{\text{WBII}}\xspace}
 \newcommand{\excess}{\ensuremath{\text{ex}}\xspace}
+\newcommand{\rvec}{\ensuremath{\mathbf{r}}\xspace}
+\newcommand{\pvec}{\ensuremath{\mathbf{p}}\xspace}
+\newcommand{\attractive}{\ensuremath{\text{att}}\xspace}
+\newcommand{\kB}{\ensuremath{\text{k}_{\text{B}}}\xspace}
+\newcommand{\external}{\ensuremath{\text{ext}}\xspace}
 
 \graphicspath{{gfx/}}
 
@@ -212,7 +217,7 @@
 
 The Jupiter notebooks of Mary K. Coe
 \href{https://github.com/marykcoe/cDFT_Package}{cDFT} is a great recourse for
-understanding \cdft. Her PhD thesis also contains a lot of information
+understanding \cdft. Her PhD thesis also contsin's a lot of information
 \cite{coe2021}.
 
 \section{Fundamental Measure Theory}
@@ -223,7 +228,7 @@ and the Euler characteristic) of a sphere particle. The fundamental
 geometrical measures are recovered when integrating the weight
 functions defined in Section~\ref{sec:weight}.
 
-For bulk phases this functional reduces to the Percus-Yevick (PY)
+For bulk phases this functional reduces to the Pick's-Yevick (PY)
 compressibility equation \cite{percus1958}, equivalent to scaled
 particle theory.
 
@@ -262,6 +267,7 @@ Weight functions given by
 Where $\Theta$ is the Heaviside function, and $\delta$ are the Dirac delta function.
 
 \subsubsection{Weight functions for planar geometry}
+\label{sec:planar_weights}
 For the planar geometry $\rho \lb \mathbf{r} \rb = \rho \lb z \rb $,
 and the weigth functions can be integrated for the $x,y$ dimensions.
 
@@ -275,6 +281,15 @@ This can be integrated analytically to
   w_2^i \lb z \rb &=  2 \pi R_i \Theta \lb R_i - \abs{z} \rb \\
   \mathbf{w}_2^i \lb z \rb &= 2 \pi z \mathbf{e}_z  \Theta \lb R_i - \abs{z} \rb
 \end{align}
+
+The planar weight functions are visualized in Figure
+\ref{fig:planar_weights}.
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.49\textwidth]{gfx/planar_weights}
+  \caption{Planar weight functions.}
+  \label{fig:planar_weights}
+\end{figure}
 
 \subsubsection{Weight functions for spherical geometry}
 
@@ -422,9 +437,171 @@ Integrating on a regular grid the integral can be made more accurate using a qud
 \end{align}
 The qudarature is implemeted by multipying the end weights with by the
 quadrature weights.
+
+The actual planar weight functions are visualized in Figure
+\ref{fig:actual_planar_weights}.
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.49\textwidth]{gfx/actual_planar_weights}
+  \caption{Actual planar weight functions.}
+  \label{fig:actual_planar_weights}
+\end{figure}
+
+\section{Perturbation theory}
+The canonical partition function,
+\begin{equation}
+  Q_N = \frac{1}{h^{3N}N!}\int d \mathbf{p}^N \int d \rvec^N e^{-\beta \mathcal{H}}
+\end{equation}
+Relation between Helmholtz energy and partition function,
+\begin{equation}
+  \label{eq:helm_statmec}
+  F = -\kB T \ln Q_N
+\end{equation}
+Using a Hamiltonian,
+\begin{equation}
+  \mathcal{H} = \Phi \lb \rvec^N \rb + K\lb \pvec^N \rb + V_\external \lb \rvec^N \rb,
+\end{equation}
+where the kinetic energies is given from the moments,
+\begin{equation}
+  K\lb \pvec^N \rb = \overset{N}{\underset{i=1}{\sum}} \frac{\abs{\pvec_i}^2}{2 m}
+\end{equation}
+the partition function can be integrated with respect to the moments,
+\begin{align}
+  Q_N &= \frac{1}{h^{3N}N!}\int d \mathbf{p}^N e^{-beta + K\lb \pvec^N \rb } \int d \rvec^N e^{-\beta \lb \Phi \lb \rvec^N \rb + V_\external \lb \rvec^N \rb \rb} \nonumber \\
+      &= \frac{1}{\Lambda^{3N}N!} \int d \rvec^N e^{-\beta \lb \Phi \lb \rvec^N \rb + V_\external \lb \rvec^N \rb \rb} \nonumber\\
+  &= \frac{Z_N}{\Lambda^{3N}N!}
+\end{align}
+where $Z_N$ is the configurational integral, and $\Lambda$ is the
+thermal de Broglie wavelength.
+
+Having the perturbation potential
+\begin{equation}
+  \phi_\lambda \lb \rvec, \rvec^\prime \rb = \phi_0 \lb \rvec, \rvec^\prime \rb + \lambda \phi_\attractive \lb \rvec, \rvec^\prime \rb \quad 0 \le \lambda \le 1,
+\end{equation}
+where $\lambda$ is the perturbation strength, the potential energy felt between all particles is given by
+\begin{equation}
+\Phi \lb \rvec^N \rb = \overset{N}{\underset{j=1}{\sum}} \overset{N}{\underset{k>j}{\sum}} \phi_\lambda \lb \rvec, \rvec^\prime \rb
+\end{equation}
+The excess Helmholtz energy can be differentiated with respect to $\lambda$ using Equation \ref{eq:helm_statmec},
+\begin{equation}
+  \label{eq:helm_expancion}
+\beta \pd{F_\excess}{\lambda} = -\frac{1}{Z_N} \pd{Z_N}{\lambda} = \frac{\beta}{2} \int d \rvec \int d \rvec^\prime \rho_\lambda^{(2)}\lb \rvec, \rvec^\prime \rb \phi_\attractive \lb \rvec, \rvec^\prime \rb
+\end{equation}
+we can also describe the Helmholtz energy using ensemble average, $\langle \dots \rangle_\lambda$, for a system described by $\phi_\lambda$,
+\begin{equation}
+\beta \pd{F_\excess}{\lambda} = \langle \Phi^\prime \rangle_\lambda
+\end{equation}
+where $\pd{\Phi_\lambda}{\lambda} = \Phi_\lambda^\prime$. Integration yields,
+\begin{equation}
+\beta F_\excess = \beta F_0 + \overset{\lambda=1}{\underset{\lambda=0}{\int}} d \lambda \langle \Phi^\prime \rangle_\lambda
+\end{equation}
+
+In order to get ensemble averages over the reference system
+$\lambda = 0$, the average can be expanded in $\lambda$ around
+$\lambda = 0$.
+
+Leading to
+\begin{equation}
+\beta F_\excess = \beta F_0 + \beta F_1 + \beta F_2 + \beta F_3 + \mathcal{O}\lb \beta^4 \rb
+\end{equation}
+where
+\begin{align}
+  \beta F_1 &= \beta \langle \Phi_\attractive  \rangle_0\\
+  \beta F_2 &= -\frac{\beta^2}{2} \biggl[ \langle \Phi_\attractive^2  \rangle_0 - \langle \Phi_\attractive  \rangle_0^2 \biggr] \\
+  \beta F_3 &= \frac{\beta^3}{3!} \bigg\langle \Phi_\attractive - \langle \Phi_\attractive  \rangle_0 \bigg\rangle^3
+\end{align}
+
+For pair-wise additive potentials we have,
+\begin{equation}
+  \label{eq:first_order_pert}
+\frac{\beta F_1}{N} = \frac{\beta \rho}{2} \int  g_\lambda \lb r \rb \phi_\attractive \lb r \rb d r
+\end{equation}
+and to first order $g_\lambda = g_0$.
+
+\section{Approaches used when extending \cdft to attractive fluids}
+
+\subsection{Mean Field Theory (MFT)}
+Under the MFT approximation, $g_ \approx 1$, and Equation
+\ref{eq:first_order_pert} simply becomes
+\begin{equation}
+  \label{eq:mft}
+  \frac{\beta F_1}{N} = \frac{\beta \rho}{2} \phi_\attractive \lb r \rb d r
+\end{equation}
+
+For some reason it is common to use the WCA perturbation potential,
+however the hard-sphere diameter seem to be independent of density.
+\todo{Check if cDFT\_Package uses sigma=1 with WCA simulation....}
+
+\subsection{Local density approximation (LDA)}
+Under the LDA assumption the Helmholtz energy density of an
+inhomogeneous system with density profile $\rho \lb r\rb$ is
+calculated using the bulk phase Helmholtz energy density evaluated at
+the value of the local density. This often work for surface tension
+calculations, however adjacent to walls where the density oscillate
+strongly and the local density can exceed the maximum packing fractions
+this will be a problem.
+
+\subsection{Weighted density approximation (WDA)}
+The WDA uses locally weighted densities and evaluates the Helmholtz
+energy functional with these densities. This methodology have proven
+successful even for fluid to wall interacting systems.
+
+\citet{sauer2017}
+\citet{tarazona1984, tarazona1984a}
+
+\subsection{Nonlocal perturbation theory (NLP)}
+\citet{gloor2004}
+\citet{gross2009}
+
+\section{The PCP-SAFT \cdft}
+
+\citet{sauer2017}
+
+PC-SAFT \citet{gross2001}
+Polar extensions
+Quadruplole-Quadruplole:\citet{gross2005}
+Dipole-dipole:\citet{gross2006}
+Dipole-Quadruplole: \citet{vrabec2008}
+
+
+\section{Analytial Fourier transforms of the weight functions}
+\citet[Appendix B]{knepley2010} derives the analytical Fourier
+transform for the weight functions.
+
+\subsection{Planar geometry}
+The weight functions in a planar geometry is derived in section
+\ref{sec:planar_weights}. The weight functions can be transformed to
+Fourier space according to the definition,
+\begin{align}
+  \label{eq:fourier}
+  \hat{w}_\alpha^i \lb k \rb = \mathcal{F}\lb w_\alpha^i \lb z \rb \rb =& \overset{\infty}{\underset{-\infty}{\int}} dz w_\alpha^i \lb z \rb e^{-i k z} \nonumber \\
+  =& \overset{\infty}{\underset{-\infty}{\int}} dz w_\alpha^i \lb z \rb \cos \lb k z \rb + i \overset{\infty}{\underset{-\infty}{\int}} dz w_\alpha^i \lb z \rb \sin \lb k z \rb
+\end{align}
+
+Since $w_3^i$ and $w_2^i$ are even functions, the Fourier transform
+will be purely real valued, while $\mathbf{w}_2^i$ is odd and
+therefore purly imaginary,
+\begin{align}
+  \hat{w}_3^i &=  \overset{\infty}{\underset{-\infty}{\int}} dz  \pi \lb R_i^2 - z^2 \rb \Theta \lb R_i - \abs{z} \rb \cos \lb k z \rb \nonumber \\
+              &=  \pi \overset{R_i}{\underset{-R_i}{\int}} dz  \lb R_i^2 - z^2 \rb \cos \lb k z \rb  \nonumber \\
+              &=  \frac{4 \pi}{k^3} \biggl( \sin \lb k R_i \rb - k R\cos \lb k R_i \rb \biggr) \label{eq:w_hat_3}
+\end{align}
+
+\begin{align}
+  \hat{w}_2^i &=  \overset{\infty}{\underset{-\infty}{\int}} dz 2 \pi R_i \Theta \lb R_i - \abs{z} \rb \cos \lb k z \rb \nonumber \\
+              &=  2 \pi R_i \overset{R_i}{\underset{-R_i}{\int}} dz  \cos \lb k z \rb  \nonumber \\
+              &=  \frac{4 \pi R_i}{k} \sin \lb k R_i \rb \label{eq:w_hat_2}
+\end{align}
+
+\begin{align}
+  \hat{\mathbf{w}}_2^i &=  i \overset{\infty}{\underset{-\infty}{\int}} dz 2 \pi \mathbf{z}  \Theta \lb R_i - \abs{z} \rb \cos \lb \mathbf{k} \cdot \mathbf{z} \rb \nonumber \\
+                       &=  2 \pi i  \overset{R_i}{\underset{-R_i}{\int}} dz \mathbf{z}  \cos \lb \mathbf{k} \cdot \mathbf{z} \rb =  - 2 \pi i \mathbf{e}_k  \overset{R_i}{\underset{-R_i}{\int}} dz z  \cos \lb k z \rb \nonumber \\
+                       &=  -\frac{4 \pi i}{k^2} \biggl( \sin \lb k R_i \rb - k R_i \cos \lb k R_i \rb \biggr) \mathbf{e}_k \label{eq:w_hat_2v}
+\end{align}
+Comparing equations \ref{eq:w_hat_3}, \ref{eq:w_hat_2} and \ref{eq:w_hat_2v}, we see that the equation s
 \clearpage
 \bibliographystyle{plainnat}
-\bibliography{./DFT.bib,./HardSphere.bib}
+\bibliography{./DFT.bib,./HardSphere.bib,./PC-SAFT.bib}
 
 \end{document}
 
