@@ -7,6 +7,7 @@ from utility import weighted_densities_1D, differentials_1D, \
 import matplotlib.pyplot as plt
 import pyfftw as fftw
 import scipy.fft as sfft
+from scipy.special import spherical_jn
 
 
 class quadrature():
@@ -30,10 +31,10 @@ class quadrature():
         Returns:
             weights (np.ndarray):
         """
-        if self.N == 3:
-            self.set_simpsons_weights()
-        elif quad.upper() == "NONE":
+        if quad.upper() == "NONE":
             self.weights = np.ones(self.N)
+        elif self.N == 3:
+            self.set_simpsons_weights()
         elif quad.upper() == "ROTH":
             self.set_roth_weights()
         elif quad.upper() in ("TRAPEZE", "TRAPEZOIDAL"):
@@ -87,6 +88,7 @@ class planar_weights():
         """
         self.dr = dr
         self.R = R
+        self.N = N
         NinP = 2 * round(R / dr) + 1
         self.quad = quadrature(NinP)
         self.w3 = np.zeros(NinP)
@@ -96,13 +98,11 @@ class planar_weights():
         self.w3[:] = np.pi * (self.R ** 2 - self.x[:] ** 2)
         self.w2[:] = np.pi * np.ones(NinP)[:]
         self.w2vec[:] = 2 * np.pi * self.x[:]
-
         # Multiply with quadrature weights
         quad_w = self.quad.get_quadrature_weights(quad)
         self.w3 *= quad_w * self.dr
         self.w2 *= quad_w * self.dr
         self.w2vec *= quad_w * self.dr
-
         # Fourier space variables
         self.fw3 = allocate_fourier_convolution_variable(N)
         self.fw2 = allocate_fourier_convolution_variable(N)
@@ -149,6 +149,8 @@ class planar_weights():
             self.fw2[:] = sfft.fft(w2_temp)
             self.fw3[:] = sfft.fft(w3_temp)
             self.fw2vec[:] = sfft.fft(w2vec_temp)
+
+            self.analytical_fourier_weigts()
 
         # Fourier transformation objects. Allocated in separate method.
         self.fftw_rho = None
@@ -336,6 +338,9 @@ class planar_weights():
         leg.get_frame().set_linewidth(0.0)
         plt.xlim([-0.51, 0.51])
         plt.xticks([-0.5, -0.25, 0.0, 0.25, 0.5])
+        plt.ylabel(r"$w_\alpha$")
+        plt.xlabel(r"$z/(2R_i)$")
+        plt.savefig("planar_weights.pdf")
         plt.show()
 
     def plot_actual_weights(self):
@@ -350,6 +355,9 @@ class planar_weights():
         leg.get_frame().set_linewidth(0.0)
         plt.xlim([-0.51, 0.51])
         plt.xticks([-0.5, -0.25, 0.0, 0.25, 0.5])
+        plt.ylabel(r"$w_\alpha$")
+        plt.xlabel(r"$z/(2R_i)$")
+        plt.savefig("actual_planar_weights.pdf")
         plt.show()
 
     def print(self):
@@ -366,8 +374,34 @@ class planar_weights():
         if self.fw2vec is not None:
             print("fw2vec", self.fw2vec)
 
+    def analytical_fourier_weigts(self):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        Returns:
+
+        """
+        # Fourier space variables
+        if CONVOLUTIONS == CONV_SCIPY_FFT:
+            kz = np.zeros(self.N)
+            for k in range(int(self.N/2)):
+                kz[k] = k
+                kz[self.N - k - 1] = -k - 1
+            kz /= self.dr*self.N
+            kz_abs = np.zeros(self.N)
+            kz_abs[:] = np.abs(kz[:])
+            kz_abs *= 2 * np.pi * self.R
+            self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
+            self.fw3.imag = 0.0
+            self.fw2.real = 4 * np.pi * self.R**2 * spherical_jn(0, kz_abs)
+            self.fw2.imag = 0.0
+            self.fw2vec.real = 0.0
+            self.fw2vec.imag = -2 * np.pi * kz * self.fw3.real
 
 if __name__ == "__main__":
-    plw = planar_weights(dr=0.01, R=0.5, N=200)
+    plw = planar_weights(dr=0.25, R=0.5, N=8, quad="None")
     plw.plot_weights()
     plw.plot_actual_weights()
