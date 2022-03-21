@@ -19,7 +19,8 @@ class cdft1D:
                  domain_length=40.0,
                  functional="Rosenfeld",
                  grid_dr=0.001,
-                 temperature=1.0):
+                 temperature=1.0,
+                 quadrature="None"):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
@@ -31,7 +32,7 @@ class cdft1D:
             functional (str): Name of hard sphere functional: Rosenfeld, WhiteBear, WhiteBear Mark II, Default Rosenfeld
             grid_dr (float) : Grid spacing
             temperature (float): Reduced temperature
-
+            quadrature (str): Quadrature to use during integration
         Returns:
             None
         """
@@ -57,7 +58,7 @@ class cdft1D:
         else:
             self.padding = 0
         # Get grid info
-        self.N = round(domain_length / grid_dr) + 1
+        self.N = round(domain_length / grid_dr)  # Should be evens
         # Number of grid points within particle
         self.NinP = 2 * round(self.R / grid_dr)
         self.padding *= self.NinP
@@ -70,7 +71,7 @@ class cdft1D:
         # Allocate differentials container
         self.differentials = differentials_1D(self.N, self.R)
         # Allocate weights
-        self.weights = planar_weights(self.dr, self.R, self.N)
+        self.weights = planar_weights(self.dr, self.R, self.N, quad=quadrature)
 
         # Calculate reduced pressure and excess chemical potential
         self.red_pressure = self.bulk_density * self.T * \

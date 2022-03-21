@@ -641,9 +641,9 @@ if __name__ == "__main__":
     # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="HardWall", grid_dr=0.5)
     solver = picard_geometry_solver(cDFT=dft, ng_extrapolations=10, line_search="ERROR")
-    solver.minimise(print_frequency=20,
-                    plot_profile=False)
-    #solver.animate(z_max=4.0)
+    #solver.minimise(print_frequency=20,
+    #                plot_profile=False)
+    solver.animate(z_max=4.0)
 
     # data_dict = get_data_container("../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
     # solver.plot_equilibrium_density_profile(data_dict=data_dict)
