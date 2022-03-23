@@ -28,6 +28,7 @@ def allocate_real_convolution_variable(N):
         raise ValueError("Wrong flag for CONVOLUTIONS")
     return variable
 
+
 def allocate_fourier_convolution_variable(N):
     """
 
@@ -44,38 +45,41 @@ def allocate_fourier_convolution_variable(N):
     elif CONVOLUTIONS == CONV_NO_FFT:
         variable = None
     else:
-        raise ValueError("Wrong flag for CONVOLUTIONS when allocating fourier variable")
+        raise ValueError(
+            "Wrong flag for CONVOLUTIONS when allocating fourier variable")
     return variable
 
 
-def density_from_packing_fraction(eta, d=1.0):
+def density_from_packing_fraction(eta, d=np.array([1.0])):
     """
     Calculates the reduced density of hard-sphere fluid from the packing fraction.
 
     Args:
-        eta (float): Hard-sphere packing fraction
-        d (float): Reduced hard-sphere diameter
+        eta (ndarray): Hard-sphere packing fraction
+        d (ndarray): Reduced hard-sphere diameter
     Returns:
-        density(float): reduced density
+        density(ndarray): reduced density
     """
 
-    density = 6 * eta / (np.pi * d ** 3)
+    densities = np.zeros_like(eta)
+    densities[:] = 6 * eta[:] / (np.pi * d[:] ** 3)
 
-    return density
+    return densities
 
 
-def packing_fraction_from_density(density, d=1.0):
+def packing_fraction_from_density(densities, d=np.array([1.0])):
     """
     Calculates the hard-sphere fluid packing fraction from reduced density.
 
     Args:
-        density(float): reduced density
-        d (float): Reduced hard-sphere diameter
+        densities(ndarray): reduced density
+        d (ndarray): Reduced hard-sphere diameter
     Returns:
-        eta (float): Hard-sphere packing fraction
+        eta (ndarray): Hard-sphere packing fraction
     """
 
-    eta = density * (np.pi * d ** 3) / 6
+    eta = np.zeros_like(densities)
+    eta[:] = densities[:] * (np.pi * d[:] ** 3) / 6
 
     return eta
 
@@ -128,7 +132,7 @@ def plot_data_container(data_dict, ax):
 
 def plot_data_container_list(data_dict_list, ylabel, xlabel="$z$", filename=None):
     """
-    
+
     Args:
         data_dict_list (list of dict): List of data-dicts to plot
         ylabel (str): y-label 
@@ -140,7 +144,7 @@ def plot_data_container_list(data_dict_list, ylabel, xlabel="$z$", filename=None
     """
     fig, ax = plt.subplots(1, 1)
     ax.set_xlabel(xlabel)
-    #ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+    # ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
     ax.set_ylabel(ylabel)
 
     for data_dict in data_dict_list:
@@ -174,6 +178,138 @@ def load_file(filename):
     data = np.loadtxt(filename, skiprows=n_lines)
     return data
 
+
+class densities():
+    """
+    Utility class. List of np.ndarrays.
+    """
+
+    def __init__(self, nc, N, is_conv_var=False):
+        """
+        
+        Args:
+            nc (int): Number of components
+            N (int): Number of grid points
+            is_conv_var (bool): Allocate using specific method for convolution variables
+        """
+        self.nc = nc
+        self.N = N
+        self.densities = []
+        for i in range(nc):
+            if is_conv_var:
+                self.densities.append(allocate_real_convolution_variable(N))
+            else:
+                self.densities.append(np.zeros(N))
+
+    def __setitem__(self, ic, rho):
+        self.densities[ic][:] = rho[:]
+
+    def __getitem__(self, ic):
+        return self.densities[ic]
+
+    def assign_elements(self, other, mask=None):
+        """
+        Assign all arrays ot other instance of densities. Apply mask if given.
+        Args:
+            other (densities): Other densities
+            mask (bool ndarray): Array values to be changes
+
+        """
+        for i in range(self.nc):
+            if mask is None:
+                self.densities[i][:] = other.densities[i][:]
+            else:
+                self.densities[i][mask] = other.densities[i][mask]
+
+    def assign_components(self, rho):
+        """
+        Assign all arrays ot other instance of densities. Apply mask if given.
+        Args:
+            rho (ndarray): Other densities
+
+        """
+        for i in range(self.nc):
+            self.densities[i][:] = rho[i]
+
+    def set_mask(self, mask, value=0.0):
+        """
+        Assign all arrays with value. Apply mask.
+        Args:
+            mask (bool ndarray): Array values to be changes
+            value (float): Set masked array to value
+
+        """
+        for i in range(self.nc):
+            self.densities[i][mask[i]] = value
+
+    def mult_mask(self, mask, value):
+        """
+        Multiply arrays with value. Apply mask.
+        Args:
+            mask (bool ndarray): Array values to be changes
+            value (float): Multiply masked array with value
+
+        """
+        for i in range(self.nc):
+            self.densities[i][mask] *= value
+
+    def is_valid_reals(self):
+        """
+
+        Returns:
+            bool: True if no elements are NaN of Inf
+        """
+        is_valid = True
+        for i in range(self.nc):
+            if np.any(np.isnan(self.densities[i])) or np.any(np.isinf(self.densities[i])):
+                is_valid = False
+                break
+        return is_valid
+
+    def diff_norms(self, other, ord=np.inf):
+        """
+
+        Args:
+            other (densities): Other densities
+            ord: Order of norm
+
+        Returns:
+
+        """
+        nms = np.zeros(self.nc)
+        for i in range(self.nc):
+            nms[i] = np.linalg.norm(
+                self.densities[i] - other.densities[i], ord=ord)
+        return nms
+
+    def diff_norm_scaled(self, other, scale, mask, ord=np.inf):
+        """
+
+        Args:
+            other (densities): Other densities
+            scale (ndarray): Column scale
+            ord: Order of norm
+
+        Returns:
+
+        """
+        nd_copy = self.get_nd_copy()[:, mask]
+        nd_copy_other = other.get_nd_copy()[:, mask]
+        nd_copy -= nd_copy_other
+        nd_copy = (nd_copy.T / scale).T
+        norm = np.linalg.norm(nd_copy, ord=ord)
+        return norm
+
+    def get_nd_copy(self):
+        """
+        Make ndarray with component densities as columns
+        Returns:
+            ndarray: nc x N array.
+        """
+        nd_copy = np.zeros((self.nc, self.N))
+        for i in range(self.nc):
+            nd_copy[i, :] = self.densities[i][:]
+        return nd_copy
 
 class weighted_densities_1D():
     """
@@ -234,6 +370,29 @@ class weighted_densities_1D():
         self.n1[:] = self.n2[:] / (4 * np.pi * self.R)
         self.update_utility_variables()
 
+    def set_zero(self):
+        """
+        Set weights to zero
+        """
+        self.n2[:] = 0.0
+        self.n3[:] = 0.0
+        self.n2v[:] = 0.0
+        self.n0[:] = 0.0
+        self.n1[:] = 0.0
+        self.n1v[:] = 0.0
+
+    def __iadd__(self, other):
+        """
+        Add weights
+        """
+        self.n2[:] += other.n2[:]
+        self.n3[:] += other.n3[:]
+        self.n2v[:] += other.n2v[:]
+        self.n0[:] += other.n0[:]
+        self.n1[:] += other.n1[:]
+        self.n1v[:] += other.n1v[:]
+        return self
+
     def set_testing_values(self):
         """
         Set some dummy values for testing differentials
@@ -285,26 +444,41 @@ class weighted_densities_1D():
         elif i == 5:
             self.n2v = n
 
-    def print(self, print_utilities=False):
+    def print(self, print_utilities=False, index=None):
         """
 
         Args:
             print_utilities (bool): Print also utility variables
         """
         print("\nWeighted densities:")
-        print("n0: ", self.n0)
-        print("n1: ", self.n1)
-        print("n2: ", self.n2)
-        print("n3: ", self.n3)
-        print("n1v: ", self.n1v)
-        print("n2v: ", self.n2v)
+        if index is None:
+            print("n0: ", self.n0)
+            print("n1: ", self.n1)
+            print("n2: ", self.n2)
+            print("n3: ", self.n3)
+            print("n1v: ", self.n1v)
+            print("n2v: ", self.n2v)
+        else:
+            print("n0: ", self.n0[index])
+            print("n1: ", self.n1[index])
+            print("n2: ", self.n2[index])
+            print("n3: ", self.n3[index])
+            print("n1v: ", self.n1v[index])
+            print("n2v: ", self.n2v[index])
 
         if print_utilities:
-            print("n3neg: ", self.n3neg)
-            print("n3neg2: ", self.n3neg2)
-            print("n2v2: ", self.n2v2)
-            print("logn3neg: ", self.logn3neg)
-            print("n32: ", self.n32)
+            if index is None:
+                print("n3neg: ", self.n3neg)
+                print("n3neg2: ", self.n3neg2)
+                print("n2v2: ", self.n2v2)
+                print("logn3neg: ", self.logn3neg)
+                print("n32: ", self.n32)
+            else:
+                print("n3neg: ", self.n3neg[index])
+                print("n3neg2: ", self.n3neg2[index])
+                print("n2v2: ", self.n2v2[index])
+                print("logn3neg: ", self.logn3neg[index])
+                print("n32: ", self.n32[index])
 
 
 class differentials_1D():
@@ -356,13 +530,15 @@ class differentials_1D():
         self.d3_conv[self.mask_conv_results] = 0.0
         self.d2eff_conv[self.mask_conv_results] = 0.0
         self.d2veff_conv[self.mask_conv_results] = 0.0
-        self.corr[:] = -(self.d3_conv[:] + self.d2eff_conv[:] + self.d2veff_conv[:])
+        self.corr[:] = -(self.d3_conv[:] +
+                         self.d2eff_conv[:] + self.d2veff_conv[:])
 
     def combine_differentials(self):
         """
         Combining differentials to reduce number of convolution integrals
         """
-        self.d2eff[:] = self.d0[:] / (4 * np.pi * self.R ** 2) + self.d1[:] / (4 * np.pi * self.R) + self.d2[:]
+        self.d2eff[:] = self.d0[:] / (4 * np.pi * self.R ** 2) + \
+            self.d1[:] / (4 * np.pi * self.R) + self.d2[:]
         self.d2veff[:] = self.d1v[:] / (4 * np.pi * self.R) + self.d2v[:]
 
     def get_differential(self, i):
@@ -403,6 +579,7 @@ class differentials_1D():
         print("d2veff_conv: ", self.d2veff_conv)
         print("corr: ", self.corr)
 
+
 class quadratic_polynomial():
     """
     """
@@ -441,6 +618,7 @@ class quadratic_polynomial():
         p_of_x = np.zeros_like(x)
         p_of_x[:] = self.c[0] + self.c[1] * x[:] + self.c[2] * x[:]**2
         return p_of_x
+
 
 if __name__ == "__main__":
     pass

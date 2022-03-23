@@ -1,6 +1,54 @@
 #!/usr/bin/env python3
 import numpy as np
 
+class ng_nc_wrapper():
+    """
+    Wrap ng_extrapolation for nc components
+    """
+
+    def __init__(self, nc, N, n_update,  array_mask=None):
+        """
+
+        Args:
+            nc (int): Number of components
+            N (int): Size of arrays
+            n_update (int): Update only every n_update iteration
+            array_mask (np.ndarray of bool): Mask array calculations
+        """
+        self.nc = nc
+        self.ng = []
+        for _ in range(nc):
+            self.ng.append(ng_extrapolation(N=N, n_update=n_update, array_mask=array_mask))
+
+    def push_back(self, fn, gn, iteration):
+        """
+
+        Args:
+            fn (np.ndarray): Variable of iterative method
+            gn (np.ndarray): gn = A fn
+            iteration (int): Current iteration
+        """
+        for i in range(self.nc):
+            self.ng[i].push_back(fn[i], gn[i], iteration)
+
+    def time_to_update(self, iteration):
+        """
+
+        Args:
+            iteration (int): Iteration index
+
+        Returns:
+            (bool): True if it is time to update
+        """
+        return self.ng[0].time_to_update(iteration)
+
+    def extrapolate(self):
+        """
+        """
+        extrapolation = []
+        for i in range(self.nc):
+            extrapolation.append(self.ng[i].extrapolate())
+        return extrapolation
 
 class ng_extrapolation():
     """
@@ -12,7 +60,7 @@ class ng_extrapolation():
         doi: 10.1063/1.1682399
     """
 
-    def __init__(self, N, n_update,  array_mask=None):
+    def __init__(self, N, n_update, array_mask=None):
         """
 
         Args:

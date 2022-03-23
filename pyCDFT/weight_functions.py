@@ -73,6 +73,87 @@ class quadrature():
         self.weights[-1] = 1.0 / 2.0
 
 
+class planar_weights_system_mc():
+    """
+    Multicomponent planar weigts
+    """
+
+    def __init__(self, functional, dr: float, R: float, N: int, quad="Roth"):
+        """
+
+        Args:
+            functional: Functional
+            dr (float): Grid spacing
+            R (ndarray): Particle radius
+            N (int): Grid size
+            quad (str): Quadrature for integral
+        """
+        self.functional = functional
+        self.pl_weights = []
+        self.comp_weighted_densities = []
+        self.differentials = []
+        self.nc = np.shape(R)[0]
+        for i in range(self.nc):
+            self.pl_weights.append(planar_weights(
+                dr=dr, R=R[i], N=N, quad=quad))
+            self.comp_weighted_densities.append(
+                weighted_densities_1D(N=N, R=R[i]))
+            self.differentials.append(differentials_1D(N=N, R=R[i]))
+
+        # Overall weighted densities
+        self.weighted_densities = weighted_densities_1D(N=N, R=0.5)
+        self.setup_fft()
+
+    def convolutions(self, rho):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        self.weighted_densities.set_zero()
+        for i in range(self.nc):
+            self.pl_weights[i].convolutions(
+                self.comp_weighted_densities[i], rho[i])
+            self.weighted_densities += self.comp_weighted_densities[i]
+        self.weighted_densities.update_utility_variables()
+
+    def convolution_n3(self, rho):
+        """
+
+            Args:
+                densities:
+                rho (array_like): Density profile
+
+            Returns:
+
+            """
+        self.weighted_densities.set_zero()
+        for i in range(self.nc):
+            self.pl_weights[i].convolution_n3(
+                self.comp_weighted_densities[i], rho[i])
+            self.weighted_densities += self.comp_weighted_densities[i]
+        self.weighted_densities.update_after_convolution()
+
+    def setup_fft(self):
+        """
+        Allocate memory and setup object for FFT
+        """
+        for i in range(self.nc):
+            self.pl_weights[i].setup_fft(self.comp_weighted_densities[i],
+                                         self.differentials[i])
+
+    def correlation_convolution(self):
+        """
+        Calculate functional differentials and perform convolutions with the
+        appropriate weight functions.
+        """
+        for i in range(self.nc):
+            self.functional.differentials(
+                self.weighted_densities, self.differentials[i])
+            self.pl_weights[i].correlation_convolution(self.differentials[i])
+
+
 class planar_weights():
     """
     """
@@ -123,7 +204,8 @@ class planar_weights():
                 w2_temp[j] = self.w2[i]
                 w2vec_temp[j] = self.w2vec[i]
             # Calculates weight functions in fourier transforms
-            fftw_weights = fftw.FFTW(w3_temp, self.fw3, direction='FFTW_FORWARD', flags=('FFTW_ESTIMATE',))
+            fftw_weights = fftw.FFTW(
+                w3_temp, self.fw3, direction='FFTW_FORWARD', flags=('FFTW_ESTIMATE',))
             fftw_weights.execute()
             fftw_weights.update_arrays(w2_temp, self.fw2)
             fftw_weights.execute()
@@ -171,13 +253,12 @@ class planar_weights():
             densities:
             rho (np.ndarray): Density profile
 
-        Returns:
-
         """
         if CONVOLUTIONS == CONV_NO_FFT:
             densities.n3[:] = convolve1d(rho, weights=self.w3, mode='nearest')
             densities.n2[:] = convolve1d(rho, weights=self.w2, mode='nearest')
-            densities.n2v[:] = convolve1d(rho, weights=self.w2vec, mode='nearest')
+            densities.n2v[:] = convolve1d(
+                rho, weights=self.w2vec, mode='nearest')
         elif CONVOLUTIONS == CONV_FFTW:
             self.rho[:] = rho[:]
             self.fftw_rho()
@@ -221,6 +302,7 @@ class planar_weights():
         if CONVOLUTIONS == CONV_NO_FFT:
             densities.n3[:] = convolve1d(rho, weights=self.w3, mode='nearest')
         elif CONVOLUTIONS == CONV_FFTW:
+            self.rho[:] = rho[:]
             self.fftw_rho()
             # 3d weighted density
             densities.fn3[:] = self.frho[:] * self.fw3[:]
@@ -284,9 +366,12 @@ class planar_weights():
 
         """
         if CONVOLUTIONS == CONV_NO_FFT:
-            diff.d3_conv[:] = convolve1d(diff.d3, weights=self.w3, mode='nearest')
-            diff.d2eff_conv[:] = convolve1d(diff.d2eff, weights=self.w2, mode='nearest')
-            diff.d2veff_conv[:] = -convolve1d(diff.d2veff, weights=self.w2vec, mode='nearest')
+            diff.d3_conv[:] = convolve1d(
+                diff.d3, weights=self.w3, mode='nearest')
+            diff.d2eff_conv[:] = convolve1d(
+                diff.d2eff, weights=self.w2, mode='nearest')
+            diff.d2veff_conv[:] = - \
+                convolve1d(diff.d2veff, weights=self.w2vec, mode='nearest')
         elif CONVOLUTIONS == CONV_FFTW:
             # Fourier transform derivatives
             self.fftw_d2eff()
@@ -394,12 +479,14 @@ class planar_weights():
             kz_abs = np.zeros(self.N)
             kz_abs[:] = np.abs(kz[:])
             kz_abs *= 2 * np.pi * self.R
-            self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
+            self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * \
+                (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
             self.fw3.imag = 0.0
             self.fw2.real = 4 * np.pi * self.R**2 * spherical_jn(0, kz_abs)
             self.fw2.imag = 0.0
             self.fw2vec.real = 0.0
             self.fw2vec.imag = -2 * np.pi * kz * self.fw3.real
+
 
 if __name__ == "__main__":
     plw = planar_weights(dr=0.25, R=0.5, N=8, quad="None")

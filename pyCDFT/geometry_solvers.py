@@ -3,21 +3,27 @@ import numpy as np
 from cdft import cdft1D
 import matplotlib.pyplot as plt
 from utility import boundary_condition, density_from_packing_fraction, \
-    get_data_container, plot_data_container, allocate_real_convolution_variable, \
-    quadratic_polynomial
+    get_data_container, plot_data_container, \
+    quadratic_polynomial, densities
 from constants import DEBUG
 import ng_extrapolation
 from matplotlib.animation import FuncAnimation
-import copy
+from fmt_functionals import bulk_weighted_densities
 import sys
-
 
 class picard_geometry_solver():
     """
     Base solver class for minimisation objects.
     """
 
-    def __init__(self, cDFT: cdft1D, alpha_min=0.1, alpha_max=0.9, ng_extrapolations=None, line_search="None"):
+    def __init__(self,
+                 cDFT: cdft1D,
+                 alpha_min=0.1,
+                 alpha_max=0.9,
+                 alpha_initial=0.1,
+                 n_alpha_initial=1,
+                 ng_extrapolations=None,
+                 line_search="None"):
         """
         Initialises arrays and fourier objects required for minimisation procedure.
 
@@ -40,29 +46,35 @@ class picard_geometry_solver():
             self.wall_mask[self.NiWall] = True
         if self.cDFT.right_boundary == boundary_condition["WALL"]:
             self.wall_mask[self.cDFT.end - 1] = True
-        self.left_boundary_mask = np.full(self.cDFT.N, False, dtype=bool)
-        self.left_boundary_mask[:self.NiWall] = True
-        self.right_boundary_mask = np.full(self.cDFT.N, False, dtype=bool)
-        self.right_boundary_mask[self.cDFT.N - self.NiWall:] = True
+        self.left_boundary_mask = []
+        self.right_boundary_mask = []
+        for i in range(self.cDFT.nc):
+            self.left_boundary_mask.append(np.full(self.cDFT.N, False, dtype=bool))
+            self.right_boundary_mask.append(np.full(self.cDFT.N, False, dtype=bool))
+            self.left_boundary_mask[i][:self.cDFT.NiWallArrayLeft[i]] = True
+            self.right_boundary_mask[i][self.cDFT.N - self.cDFT.NiWallArrayRight[i]:] = True
         # Set radius for plotting
-        self.r = np.linspace(-self.NiWall * self.cDFT.dr, (self.cDFT.end - 1) * self.cDFT.dr, self.cDFT.N)
+        self.r = np.linspace(-self.NiWall * self.cDFT.dr,
+                             (self.cDFT.end - 1) * self.cDFT.dr, self.cDFT.N)
 
-        # Density profile
-        self.density = np.zeros(self.cDFT.N)
-        self.density[:] = self.cDFT.bulk_density
+        # Density profiles
+        self.densities = densities(self.cDFT.nc, self.cDFT.N)
+        self.old_densities = densities(self.cDFT.nc, self.cDFT.N)
+        self.new_densities = densities(self.cDFT.nc, self.cDFT.N)
+        self.mod_densities = densities(
+            self.cDFT.nc, self.cDFT.N, is_conv_var=True)
+        self.temp_densities = densities(self.cDFT.nc, self.cDFT.N)
+
+        self.densities.assign_components(self.cDFT.bulk_densities)
         if self.cDFT.left_boundary == boundary_condition["WALL"]:
-            self.density[self.left_boundary_mask] = 0.0
+            self.densities.set_mask(self.left_boundary_mask)
         if self.cDFT.right_boundary == boundary_condition["WALL"]:
-            self.density[self.right_boundary_mask] = 0.0
-        self.old_density = np.zeros(self.cDFT.N)
-        self.old_density[:] = self.density[:]
-        self.new_density = np.zeros(self.cDFT.N)
-        self.mod_density = allocate_real_convolution_variable(self.cDFT.N)
-        self.temp_density = np.zeros(self.cDFT.N)
+            self.densities.set_mask(self.right_boundary_mask)
+        self.old_densities.assign_elements(self.densities)
 
         # Set up FFT objects if required
-        self.cDFT.weights.setup_fft(self.cDFT.weighted_densities,
-                                    self.cDFT.differentials)
+        # self.cDFT.weights.setup_fft(self.cDFT.weighted_densities,
+        #                            self.cDFT.differentials)
         # Configure PyFFTW to use multiple threads
         # fftw.config.NUM_THREADS = 2
 
@@ -71,11 +83,13 @@ class picard_geometry_solver():
 
         # Set state of solver
         self.iteration = 0
-        self.error = 1.0
+        self.error = np.ones(self.cDFT.nc)
 
         # Set Picard parameter for relaxed successive substitution
         self.alpha_min = alpha_min
         self.alpha_max = alpha_max
+        self.alpha_initial = alpha_initial
+        self.n_alpha_initial = n_alpha_initial
 
         # Error norm (np.inf: Max norm, None: 2 norm, ....)
         self.norm = np.inf
@@ -84,40 +98,42 @@ class picard_geometry_solver():
         self.generate_case_name()
 
         # Extrapolations according to Ng 1974
-        self.ng = ng_extrapolation.ng_extrapolation(self.cDFT.N, ng_extrapolations, self.domain_mask)
+        self.ng = ng_extrapolation.ng_nc_wrapper(self.cDFT.nc,
+            self.cDFT.N, ng_extrapolations, self.domain_mask)
 
         # Line search
         self.do_line_search = not line_search.upper() == "NONE"
         self.line_search_eval = line_search.upper()
-        self.ls_density = np.zeros(self.cDFT.N)
+        self.ls_densities = densities(self.cDFT.nc, self.cDFT.N)
 
         # Solver defaults
         self.tolerance = 1.0e-12
         self.print_frequency = 50
         self.maximum_iterations = 10000000
 
-    def picard_density(self, mix_density, alpha, new_density=None, old_density=None):
+    def picard_density(self, mix_densities, alpha, new_densities=None, old_densities=None):
         """
         Mix new_density and density
         Args:
             alpha (float): Fraction of new density
-            mix_density (np.ndarray): Array to be mixed (output)
-            new_density (np.ndarray): New density
-            old_density (np.ndarray): Old density
+            mix_densities (densities): Array to be mixed (output)
+            new_densities (densities): New density
+            old_densities (densities): Old density
 
         """
-        if new_density is None:
-            new_density = self.new_density
-        if old_density is None:
-            old_density = self.density
+        if new_densities is None:
+            new_densities = self.new_densities
+        if old_densities is None:
+            old_densities = self.densities
 
-        mix_density[self.left_boundary_mask] = old_density[self.left_boundary_mask]
-        mix_density[self.right_boundary_mask] = old_density[self.right_boundary_mask]
-        mix_density[self.cDFT.domain_mask] = (1 - alpha) * old_density[self.cDFT.domain_mask] + \
-                                             alpha * new_density[self.cDFT.domain_mask]
+        for i in range(self.cDFT.nc):
+            #mix_densities[i][self.left_boundary_mask[i]] = old_densities[i][self.left_boundary_mask[i]]
+            #mix_densities[i][self.right_boundary_mask[i]] = old_densities[i][self.right_boundary_mask[i]]
+            mix_densities[i][self.cDFT.domain_mask] = (1 - alpha) * \
+                old_densities[i][self.cDFT.domain_mask] + \
+                alpha * new_densities[i][self.cDFT.domain_mask]
 
-
-    def successive_substitution(self, density):
+    def successive_substitution(self, densities):
         """
         Updates density profile using Picard procedures.
 
@@ -126,24 +142,34 @@ class picard_geometry_solver():
             have_failed (bool): Fail indicator
         """
 
-        if DEBUG: self.cDFT.weights.print()
+        #if DEBUG:
+        #    self.cDFT.weights_system.w.print()
         # Calculate weighted densities
-        self.mod_density[:] = density[:]
-        self.mod_density[self.wall_mask] *= 0.5  # todo find explanation for 0.5 trick
-        self.cDFT.weights.convolutions(self.cDFT.weighted_densities, self.mod_density)
-        if DEBUG: self.cDFT.weighted_densities.print()
-
+        self.mod_densities.assign_elements(densities)
+        # todo find explanation for 0.5 trick
+        self.mod_densities.mult_mask(self.wall_mask, 0.5)
+        # Convolution integrals for densities
+        self.cDFT.weights_system.convolutions(self.mod_densities)
         # Calculate one-body direct correlation function
-        self.cDFT.functional.differentials(self.cDFT.weighted_densities, self.cDFT.differentials)
-        self.cDFT.weights.correlation_convolution(self.cDFT.differentials)
-        if DEBUG: self.cDFT.differentials.print()
+        self.cDFT.weights_system.correlation_convolution()
+
+        # index = 30000
+        # print(self.mod_densities[0][index], self.mod_densities[1][index])
+        # self.cDFT.weights_system.comp_weighted_densities[0].print(index=index)
+        # self.cDFT.weights_system.comp_weighted_densities[1].print(index=index)
+        # self.cDFT.weights_system.weighted_densities.print(index=index)
+        # bd = bulk_weighted_densities(self.cDFT.bulk_densities, self.cDFT.R)
+        # bd.print()
+        # sys.exit()
 
         # Calculate new density profile using the variations of the functional
-        self.new_density[self.domain_mask] = self.cDFT.bulk_density * \
-                                             np.exp(self.cDFT.differentials.corr[self.domain_mask]
-                                                    + self.cDFT.beta *
-                                                    (self.cDFT.excess_mu - self.cDFT.Vext[self.domain_mask]))
-        if DEBUG: print("new_density", self.new_density)
+        for i in range(self.cDFT.nc):
+            self.new_densities[i][self.domain_mask] = self.cDFT.bulk_densities[i] * \
+                np.exp(self.cDFT.weights_system.differentials[i].corr[self.domain_mask]
+                       + self.cDFT.beta *
+                       (self.cDFT.excess_mu[i] - self.cDFT.Vext[i][self.domain_mask]))
+        if DEBUG:
+            print("new_density", self.new_densities)
 
     def picard_update(self):
         """
@@ -154,46 +180,61 @@ class picard_geometry_solver():
             have_failed (bool): Fail indicator
         """
         # Do successive substitution to get new_density
-        self.successive_substitution(self.density)
+        self.successive_substitution(self.densities)
         # Check for valid floats
-        if np.any(np.isnan(self.new_density)) or np.any(np.isinf(self.new_density)):
+        if not self.new_densities.is_valid_reals():
             have_failed = True
             return have_failed
         else:
             have_failed = False
 
         # Set old density profile
-        self.old_density[:] = self.density[:]
+        self.old_densities.assign_elements(self.densities)
 
         # Update Ng history
-        self.ng.push_back(self.density, self.new_density, self.iteration)
+        self.ng.push_back(self.densities, self.new_densities, self.iteration)
 
-        if self.error < 1.0e-3 and self.ng.time_to_update(self.iteration):
-            self.density[self.domain_mask] = self.ng.extrapolate()
+        if np.max(self.error) < 1.0e-3 and \
+                self.ng.time_to_update(self.iteration) and \
+                self.iteration > self.n_alpha_initial:
+            self.densities.assign_elements(
+                self.ng.extrapolate(), self.domain_mask)
         else:
             # Picard update
-            # Do line search?
-            if self.do_line_search:
-                #self.plot_line_search()
-                alpha = self.line_search(debug=False)
+            if self.iteration <= self.n_alpha_initial:
+                alpha = self.alpha_initial
             else:
-                alpha = self.alpha_min
-            self.picard_density(self.density, alpha)
+                # Do line search?
+                if self.do_line_search:
+                    #self.plot_line_search()
+                #sys.exit()
+                    alpha = self.line_search(debug=False)
+                else:
+                    alpha = self.alpha_min
+            self.picard_density(self.densities, alpha)
 
         # Calculate deviation between new and old density profiles
-        self.error = np.linalg.norm(self.density - self.old_density, ord=self.norm)
+        self.error[:] = self.densities.diff_norms(
+            self.old_densities, ord=self.norm)[:]
         return have_failed
 
     def iteration_plot_profile(self):
         fig, ax = plt.subplots(1, 1)
         ax.set_xlabel("$z$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
-        d_plot, = ax.plot(self.r[self.domain_mask],
-                          self.density[self.domain_mask] / self.cDFT.bulk_density,
-                          lw=2, color="k")
-        d_plot_old, = ax.plot(self.r[self.domain_mask],
-                              self.old_density[self.domain_mask] / self.cDFT.bulk_density,
-                              lw=2, color="k", ls="--")
+        colors = ["k", "g", "b", "r"]
+        for i in range(self.densities.nc):
+            ax.plot(self.r[self.domain_mask],
+                    self.densities[i][self.domain_mask] /
+                    self.cDFT.bulk_densities[i],
+                    lw=2, color=colors[i], label=f"Comp. {i+1}")
+#        for i in range(self.densities.nc):
+#            ax.plot(self.r[self.domain_mask],
+#                    self.old_densities[i][self.domain_mask] /
+#                    self.cDFT.bulk_densities[i],
+#                    lw=2, color="g", label=f"Old. Comp. {i+1}")
+        leg = plt.legend(loc="best", numpoints=1)
+        leg.get_frame().set_linewidth(0.0)
         plt.show()
 
     def minimise(self, tolerance=1e-12,
@@ -218,7 +259,7 @@ class picard_geometry_solver():
 
         self.iteration = 0
         self.print_frequency = print_frequency
-        for iteration in range(maximum_iterations):
+        for _ in range(maximum_iterations):
             have_failed = self.single_iteration()
             if have_failed:
                 print("Solver got invalid number and failed")
@@ -240,18 +281,13 @@ class picard_geometry_solver():
         """
         Method to calculate the equilibrium density profile.
 
-        Args:
-            tolerance (float): Solver tolerance
-            maximum_iterations (int): Maximum number of iteration
-            print_frequency (int): HOw often should solver status be printed?
-            plot_profile (bool): Plot density profile while iterating?
         Returns:
-            None
+            bool: Did iteration fail?
         """
 
         have_failed = self.picard_update()
         self.iteration += 1
-        if self.error < self.tolerance:
+        if np.max(self.error) < self.tolerance:
             self.converged = True
         if self.iteration % self.print_frequency == 0:
             print(f"{self.iteration} complete. Deviation: {self.error}\n")
@@ -280,7 +316,6 @@ class picard_geometry_solver():
         anim = anim_solver(self, z_max=z_max)
         plt.show()
 
-
     def print_perform_minimization_message(self):
         """
 
@@ -292,7 +327,12 @@ class picard_geometry_solver():
         """
         Generate case name from specifications
         """
-        self.case_name = f'Planar_{self.cDFT.wall}_{"{:.3f}".format(self.cDFT.eta)}'
+        etas = ""
+        for i in range(self.cDFT.nc):
+            etas += "{:.3f}".format(self.cDFT.eta[i])
+            if i < self.cDFT.nc - 1:
+                etas += "_"
+        self.case_name = f'Planar_{self.cDFT.wall}_{etas}'
         self.case_name += '_' + self.cDFT.functional.short_name
 
     def save_equilibrium_density_profile(self):
@@ -303,14 +343,15 @@ class picard_geometry_solver():
             self.print_perform_minimization_message()
             return
 
+        nd_densities = self.densities.get_nd_copy()
         filename = self.case_name + '.dat'
         np.savetxt(filename,
                    np.c_[self.r[self.domain_mask],
-                         self.density[self.domain_mask],
-                         self.density[self.domain_mask] / self.cDFT.bulk_density],
+                         nd_densities[:, self.domain_mask],
+                         (nd_densities[:, self.domain_mask].T / self.cDFT.bulk_densities).T],
                    header="# r, rho, rho/rho_bulk")
 
-    def plot_equilibrium_density_profile(self, data_dict=None):
+    def plot_equilibrium_density_profiles(self, data_dict=None):
         """
         Plot equilibrium density profile
         Args:
@@ -323,9 +364,11 @@ class picard_geometry_solver():
         fig, ax = plt.subplots(1, 1)
         ax.set_xlabel("$z$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
-        ax.plot(self.r[self.domain_mask],
-                self.density[self.domain_mask] / self.cDFT.bulk_density,
-                lw=2, color="k", label="cDFT")
+        for i in range(self.densities.nc):
+            ax.plot(self.r[self.domain_mask],
+                    self.densities[i][self.domain_mask] /
+                    self.cDFT.bulk_densities[i],
+                    lw=2, color="k", label=f"cDFT comp. {i+1}")
         if data_dict is not None:
             plot_data_container(data_dict, ax)
             leg = plt.legend(loc="best", numpoints=1)
@@ -334,7 +377,6 @@ class picard_geometry_solver():
         filename = self.case_name + ".pdf"
         plt.savefig(filename)
         plt.show()
-
 
     # def test_differentials(self):
     #
@@ -376,25 +418,31 @@ class picard_geometry_solver():
         Print solver state and status
 
         Args:
-            None
+            alpha
+            update=True
         Returns:
             None
         """
         if update:
-            self.picard_density(self.temp_density, alpha, new_density=self.ls_density)
+            self.picard_density(self.temp_densities, alpha,
+                                new_densities=self.ls_densities)
         if self.line_search_eval == "ERROR":
             # Knepley et al. 2010. doi: 10.1063/1.3357981
             if update:
-                self.successive_substitution(self.temp_density)
-            err = np.linalg.norm(self.new_density[self.domain_mask]-self.temp_density[self.domain_mask], ord=2)**2
+                self.successive_substitution(self.temp_densities)
+            err = self.new_densities.diff_norm_scaled(other=self.temp_densities,
+                                                      scale=self.cDFT.bulk_densities,
+                                                      mask=self.domain_mask,
+                                                      ord=2)**2
         elif self.line_search_eval.strip("-_") in ["GP", "GRANDPOTENTIAL"]:
-            err = self.cDFT.grand_potential(self.temp_density, update_convolutions=update)[0]
+            err = self.cDFT.grand_potential(
+                self.temp_densities, update_convolutions=update)[0]
         else:
-            raise ValueError("get_line_search_error: Wrong type for function evaluation")
+            raise ValueError(
+                "get_line_search_error: Wrong type for function evaluation")
         return err
 
     def calc_alpha_max(self):
-
         """
         Calculate maximum alpha value such that n3 < 1.0
         See: Knepley et al. 2010. doi: 10.1063/1.3357981
@@ -402,10 +450,10 @@ class picard_geometry_solver():
         Returns:
             alpha_max (float): Maximum alpha value
         """
-        n3_inf_0 = np.linalg.norm(self.cDFT.weighted_densities.n3, ord=np.inf)
-        self.mod_density[:] = self.new_density[:]
-        self.cDFT.weights.convolution_n3(self.cDFT.weighted_densities, self.mod_density)
-        n3_inf_1 = np.linalg.norm(self.cDFT.weighted_densities.n3, ord=np.inf)
+        n3_inf_0 = np.linalg.norm(self.cDFT.weights_system.weighted_densities.n3, ord=np.inf)
+        self.mod_densities.assign_elements(self.new_densities)
+        self.cDFT.weights_system.convolution_n3(self.mod_densities)
+        n3_inf_1 = np.linalg.norm(self.cDFT.weights_system.weighted_densities.n3, ord=np.inf)
         alpha_max = min(0.9, (0.9 - n3_inf_0)/max(n3_inf_1 - n3_inf_0, 1e-6))
         #print("alpha_max", alpha_max, n3_inf_0,n3_inf_1)
         return alpha_max
@@ -419,8 +467,9 @@ class picard_geometry_solver():
         Returns:
             None
         """
-        self.ls_density[:] = self.new_density[:]
-        self.temp_density[:] = self.density[:]  # Set to avoid update in get_line_search_error
+        self.ls_densities.assign_elements(self.new_densities)
+        # Set to avoid update in get_line_search_error
+        self.temp_densities.assign_elements(self.densities)
         e0 = self.get_line_search_error(alpha=0.0, update=False)
         alpha_max = self.calc_alpha_max()
         alpha1 = 0.5*alpha_max
@@ -445,7 +494,7 @@ class picard_geometry_solver():
             else:
                 alpha = self.alpha_min
         # Reset new_density
-        self.new_density[:] = self.ls_density[:]
+        self.new_densities.assign_elements(self.ls_densities)
         return alpha
 
     def plot_line_search(self):
@@ -454,7 +503,7 @@ class picard_geometry_solver():
 
         """
         alpha_max = self.calc_alpha_max()
-        self.ls_density[:] = self.new_density[:]
+        self.ls_densities.assign_elements(self.new_densities)
         alphas = np.linspace(0.0, alpha_max, 3)
         objective = np.zeros_like(alphas)
         for i, alpha in enumerate(alphas):
@@ -468,13 +517,11 @@ class picard_geometry_solver():
         plt.plot(alphas, objective, color="b")
         plt.plot(alphas, qp.evaluate(alphas), label="Polynomial", color="g")
         print("extrema", qp.get_extrema())
-        #plt.show()
+        plt.show()
         # Reset density
-        self.new_density[:] = self.ls_density[:]
-
+        self.new_densities.assign_elements(self.ls_densities)
 
     def print_solver_status(self):
-
         """
         Print solver state and status
 
@@ -485,7 +532,6 @@ class picard_geometry_solver():
         """
 
     def print_solver_status(self):
-
         """
         Print solver state and status
 
@@ -595,12 +641,15 @@ class anim_solver():
     def animate(self, frame):
         have_failed = self.solver.single_iteration()
         if have_failed or self.solver.converged:
-            if have_failed: print(f"Simulation failed")
-            if self.solver.converged: print(f"Simulation converged after {solver.iteration} iterations")
+            if have_failed:
+                print(f"Simulation failed")
+            if self.solver.converged:
+                print(
+                    f"Simulation converged after {solver.iteration} iterations")
             self.ani.event_source.stop()
         self.line.set_data(self.solver.r[self.solver.domain_mask],
                            self.solver.density[self.solver.domain_mask] / self.solver.cDFT.bulk_density)
-        #self.line, = self.ax.plot(self.solver.r[self.solver.domain_mask],
+        # self.line, = self.ax.plot(self.solver.r[self.solver.domain_mask],
         #                          self.solver.density[self.solver.domain_mask] / self.solver.cDFT.bulk_density,
         #                          lw=2, color="k")
         self.ax.relim()
@@ -612,24 +661,46 @@ class anim_solver():
 
     def init_plot(self):
         self.line, = self.ax.plot(self.solver.r[self.solver.domain_mask],
-                                  self.solver.density[self.solver.domain_mask] / self.solver.cDFT.bulk_density,
+                                  self.solver.density[self.solver.domain_mask] /
+                                  self.solver.cDFT.bulk_density,
                                   lw=2, color="k")
         self.ax.set_xlabel("$z$")
         self.ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
         return self.line,
 
+
 if __name__ == "__main__":
-    bulk_density = density_from_packing_fraction(eta=0.2)
-    dft = cdft1D(bulk_density=bulk_density, functional="RF", domain_length=50.0, wall="HardWall", grid_dr=0.001)
+
+    d = np.array([1.0, 3.0/5.0])
+    bulk_densities = density_from_packing_fraction(
+        eta=np.array([0.3105, 0.0607]), d=d)
+    dft = cdft1D(bulk_densities=bulk_densities, particle_diameters=d, functional="RF",
+                 domain_length=50.0, wall="HardWall", grid_dr=0.001)
+    solver = picard_geometry_solver(
+        cDFT=dft, alpha_min=0.05, alpha_initial=0.001, n_alpha_initial=50,
+        ng_extrapolations=None, line_search="ERROR")
+    solver.minimise(print_frequency=50,
+                    plot_profile=True)
+    sys.exit()
+    bulk_densities = density_from_packing_fraction(eta=np.array([0.3105+0.0607]))
+    dft = cdft1D(bulk_densities=bulk_densities, functional="RF",
+                 domain_length=50.0, wall="HardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="HardWall", grid_dr=0.5)
-    solver = picard_geometry_solver(cDFT=dft, ng_extrapolations=10, line_search="ERROR")
-    #solver.minimise(print_frequency=20,
-    #                plot_profile=False)
-    solver.animate(z_max=4.0)
+    solver = picard_geometry_solver(
+        cDFT=dft, ng_extrapolations=None, line_search="ERROR")
+    solver.minimise(print_frequency=10,
+                    plot_profile=True)
+    # solver.animate(z_max=4.0)
 
-    data_dict = get_data_container("../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
-    solver.plot_equilibrium_density_profile(data_dict=data_dict)
+    data_dict = get_data_container(
+        "../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
+    solver.plot_equilibrium_density_profiles(data_dict=data_dict)
 
-    omega, omega_arr = solver.cDFT.grand_potential(solver.density, update_convolutions=True)
+    omega, omega_arr = solver.cDFT.grand_potential(
+        solver.densities, update_convolutions=True)
     print("omega", omega)
+
+    sys.exit()
+
+
