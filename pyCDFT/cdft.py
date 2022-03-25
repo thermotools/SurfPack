@@ -96,11 +96,11 @@ class cdft1D:
         self.domain_mask[self.NiWall:self.end] = True
 
         # Set up wall
-        self.NiWallArrayLeft = [self.NiWall] * self.nc
-        self.NiWallArrayRight = [self.NiWall] * self.nc
-        self.Vext = densities(self.nc, self.N) # Use structure of densities class
+        self.NiWall_array_left = [self.NiWall] * self.nc
+        self.NiWall_array_right = [self.NiWall] * self.nc
+        # Use structure of densities class
+        self.Vext = densities(self.nc, self.N)
         self.wall_setup(wall)
-
 
     def wall_setup(self, wall):
         """
@@ -120,15 +120,15 @@ class cdft1D:
             self.left_boundary = boundary_condition["WALL"]
             self.wall = "HW"
             for i in range(self.nc):
-                self.NiWallArrayLeft[i] += round(self.NinP[i]/2)
-                self.Vext[i][:self.NiWallArrayLeft[i]] = 500.0
+                self.NiWall_array_left[i] += round(self.NinP[i]/2)
+                self.Vext[i][:self.NiWall_array_left[i]] = 500.0
             if is_slit:
                 # Add right wall setup
                 self.right_boundary = boundary_condition["WALL"]
                 self.wall = "SHW"
                 for i in range(self.nc):
-                    self.NiWallArrayRight[i] += round(self.NinP[i] / 2)
-                    self.Vext[i][self.NiWallArrayRight[i]:] = 500.0
+                    self.NiWall_array_right[i] += round(self.NinP[i] / 2)
+                    self.Vext[i][self.NiWall_array_right[i]:] = 500.0
 
     def grand_potential(self, dens, update_convolutions=True):
         """
@@ -152,7 +152,8 @@ class cdft1D:
 
         # FMT hard-sphere part
         omega_a = self.T * \
-            self.functional.excess_free_energy(self.weights_system.weighted_densities)
+            self.functional.excess_free_energy(
+                self.weights_system.weighted_densities)
 
         # Add ideal part and extrinsic part
         for i in range(self.nc):
@@ -161,7 +162,7 @@ class cdft1D:
                 (np.log(dens[i][self.domain_mask]) - 1.0)
             # Extrinsic part
             omega_a[self.domain_mask] += dens[i][self.domain_mask] \
-                * (self.Vext[self.domain_mask] - mu[i])
+                * (self.Vext[i][self.domain_mask] - mu[i])
 
         omega_a[:] *= self.dr
 

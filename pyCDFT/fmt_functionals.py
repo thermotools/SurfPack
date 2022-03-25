@@ -54,6 +54,7 @@ class bulk_weighted_densities:
         print("n_2: ", self.n[2])
         print("n_3: ", self.n[3])
 
+
 class Rosenfeld:
     """
     Rosenfeld, Yaakov
