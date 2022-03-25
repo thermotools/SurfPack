@@ -58,9 +58,11 @@ class cdft1D:
             self.padding = 0
         # Get grid info
         self.N = round(domain_length / grid_dr) + 1
-        self.NinP = 2 * round(self.R / grid_dr)  # Number of grid points within particle
+        # Number of grid points within particle
+        self.NinP = 2 * round(self.R / grid_dr)
         self.padding *= self.NinP
-        self.N = self.N + 2 * self.NinP + 2 * self.padding  # Add boundary and padding to grid
+        self.N = self.N + 2 * self.NinP + 2 * \
+            self.padding  # Add boundary and padding to grid
         self.end = self.N - self.NinP - self.padding  # End of domain
 
         # Allocate weighted densities
@@ -71,9 +73,10 @@ class cdft1D:
         self.weights = planar_weights(self.dr, self.R, self.N)
 
         # Calculate reduced pressure and excess chemical potential
-        self.red_pressure = self.bulk_density * self.T * self.functional.compressibility(self.eta)
+        self.red_pressure = self.bulk_density * self.T * \
+            self.functional.compressibility(self.eta)
         self.excess_mu = self.functional.excess_chemical_potential(self.eta)
-
+        print(self.red_pressure, self.excess_mu)
         # Set up wall
         self.wall_setup(wall)
 
@@ -122,23 +125,31 @@ class cdft1D:
         mu = self.excess_mu + self.T * np.log(self.bulk_density)
 
         # FMT hard-sphere part
-        omega_a = self.T * self.functional.excess_free_energy(self.weighted_densities)
+        omega_a = self.T * \
+            self.functional.excess_free_energy(self.weighted_densities)
 
         # Ideal part
         omega_a[self.domain_mask] += self.T * density[self.domain_mask] * \
-                                   (np.log(density[self.domain_mask]) - 1.0)
+            (np.log(density[self.domain_mask]) - 1.0)
 
         # Extrinsic part
         omega_a[self.domain_mask] += density[self.domain_mask] \
-                                   * (self.Vext[self.domain_mask] - mu)
+            * (self.Vext[self.domain_mask] - mu)
 
         omega_a[:] *= self.dr
 
         # Integrate using trapezoidal method
-        omega = np.sum(omega_a[self.domain_mask]) - 0.5*omega_a[self.NiWall] - 0.5*omega_a[self.end]
+        omega = np.sum(omega_a[self.domain_mask]) - 0.5 * \
+            omega_a[self.NiWall] - 0.5*omega_a[self.end]
 
         return omega, omega_a[:]
 
 
 if __name__ == "__main__":
-    pass
+    from utility import density_from_packing_fraction
+    bulk_density = density_from_packing_fraction(eta=0.2)
+    cdft = cdft1D(bulk_density=bulk_density,
+                  domain_length=40.0,
+                  functional="WHITEBEARMARKII",
+                  grid_dr=0.001,
+                  temperature=1.0)

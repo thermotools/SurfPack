@@ -44,8 +44,13 @@ class picard_geometry_solver():
         self.left_boundary_mask[:self.NiWall] = True
         self.right_boundary_mask = np.full(self.cDFT.N, False, dtype=bool)
         self.right_boundary_mask[self.cDFT.N - self.NiWall:] = True
+        self.nmask = np.full(self.cDFT.N, False, dtype=bool)
+        self.nmask[self.NiWall-round(self.cDFT.R/self.cDFT.dr)+1:] = True
+        self.cDFT.weighted_densities.set_convolution_result_mask(
+            np.invert(self.nmask))
         # Set radius for plotting
-        self.r = np.linspace(-self.NiWall * self.cDFT.dr, (self.cDFT.end - 1) * self.cDFT.dr, self.cDFT.N)
+        self.r = np.linspace(-self.NiWall * self.cDFT.dr,
+                             (self.cDFT.end - 1) * self.cDFT.dr, self.cDFT.N)
 
         # Density profile
         self.density = np.zeros(self.cDFT.N)
@@ -84,7 +89,8 @@ class picard_geometry_solver():
         self.generate_case_name()
 
         # Extrapolations according to Ng 1974
-        self.ng = ng_extrapolation.ng_extrapolation(self.cDFT.N, ng_extrapolations, self.domain_mask)
+        self.ng = ng_extrapolation.ng_extrapolation(
+            self.cDFT.N, ng_extrapolations, self.domain_mask)
 
         # Line search
         self.do_line_search = not line_search.upper() == "NONE"
@@ -114,8 +120,7 @@ class picard_geometry_solver():
         mix_density[self.left_boundary_mask] = old_density[self.left_boundary_mask]
         mix_density[self.right_boundary_mask] = old_density[self.right_boundary_mask]
         mix_density[self.cDFT.domain_mask] = (1 - alpha) * old_density[self.cDFT.domain_mask] + \
-                                             alpha * new_density[self.cDFT.domain_mask]
-
+            alpha * new_density[self.cDFT.domain_mask]
 
     def successive_substitution(self, density):
         """
@@ -126,24 +131,31 @@ class picard_geometry_solver():
             have_failed (bool): Fail indicator
         """
 
-        if DEBUG: self.cDFT.weights.print()
+        if DEBUG:
+            self.cDFT.weights.print()
         # Calculate weighted densities
         self.mod_density[:] = density[:]
-        self.mod_density[self.wall_mask] *= 0.5  # todo find explanation for 0.5 trick
-        self.cDFT.weights.convolutions(self.cDFT.weighted_densities, self.mod_density)
-        if DEBUG: self.cDFT.weighted_densities.print()
+        # todo find explanation for 0.5 trick
+        self.mod_density[self.wall_mask] *= 0.5
+        self.cDFT.weights.convolutions(
+            self.cDFT.weighted_densities, self.mod_density)
+        if DEBUG:
+            self.cDFT.weighted_densities.print()
 
         # Calculate one-body direct correlation function
-        self.cDFT.functional.differentials(self.cDFT.weighted_densities, self.cDFT.differentials)
+        self.cDFT.functional.differentials(
+            self.cDFT.weighted_densities, self.cDFT.differentials)
         self.cDFT.weights.correlation_convolution(self.cDFT.differentials)
-        if DEBUG: self.cDFT.differentials.print()
+        if DEBUG:
+            self.cDFT.differentials.print()
 
         # Calculate new density profile using the variations of the functional
         self.new_density[self.domain_mask] = self.cDFT.bulk_density * \
-                                             np.exp(self.cDFT.differentials.corr[self.domain_mask]
-                                                    + self.cDFT.beta *
-                                                    (self.cDFT.excess_mu - self.cDFT.Vext[self.domain_mask]))
-        if DEBUG: print("new_density", self.new_density)
+            np.exp(self.cDFT.differentials.corr[self.domain_mask]
+                   + self.cDFT.beta *
+                   (self.cDFT.excess_mu - self.cDFT.Vext[self.domain_mask]))
+        if DEBUG:
+            print("new_density", self.new_density)
 
     def picard_update(self):
         """
@@ -174,14 +186,15 @@ class picard_geometry_solver():
             # Picard update
             # Do line search?
             if self.do_line_search:
-                #self.plot_line_search()
+                # self.plot_line_search()
                 alpha = self.line_search(debug=False)
             else:
                 alpha = self.alpha_min
             self.picard_density(self.density, alpha)
 
         # Calculate deviation between new and old density profiles
-        self.error = np.linalg.norm(self.density - self.old_density, ord=self.norm)
+        self.error = np.linalg.norm(
+            self.density - self.old_density, ord=self.norm)
         return have_failed
 
     def iteration_plot_profile(self):
@@ -189,10 +202,12 @@ class picard_geometry_solver():
         ax.set_xlabel("$z$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
         d_plot, = ax.plot(self.r[self.domain_mask],
-                          self.density[self.domain_mask] / self.cDFT.bulk_density,
+                          self.density[self.domain_mask] /
+                          self.cDFT.bulk_density,
                           lw=2, color="k")
         d_plot_old, = ax.plot(self.r[self.domain_mask],
-                              self.old_density[self.domain_mask] / self.cDFT.bulk_density,
+                              self.old_density[self.domain_mask] /
+                              self.cDFT.bulk_density,
                               lw=2, color="k", ls="--")
         plt.show()
 
@@ -280,7 +295,6 @@ class picard_geometry_solver():
         anim = anim_solver(self, z_max=z_max)
         plt.show()
 
-
     def print_perform_minimization_message(self):
         """
 
@@ -335,7 +349,6 @@ class picard_geometry_solver():
         plt.savefig(filename)
         plt.show()
 
-
     # def test_differentials(self):
     #
     #     """
@@ -381,16 +394,20 @@ class picard_geometry_solver():
             None
         """
         if update:
-            self.picard_density(self.temp_density, alpha, new_density=self.ls_density)
+            self.picard_density(self.temp_density, alpha,
+                                new_density=self.ls_density)
         if self.line_search_eval == "ERROR":
             # Knepley et al. 2010. doi: 10.1063/1.3357981
             if update:
                 self.successive_substitution(self.temp_density)
-            err = np.linalg.norm(self.new_density[self.domain_mask]-self.temp_density[self.domain_mask], ord=2)**2
+            err = np.linalg.norm(
+                self.new_density[self.domain_mask]-self.temp_density[self.domain_mask], ord=2)**2
         elif self.line_search_eval.strip("-_") in ["GP", "GRANDPOTENTIAL"]:
-            err = self.cDFT.grand_potential(self.temp_density, update_convolutions=update)[0]
+            err = self.cDFT.grand_potential(
+                self.temp_density, update_convolutions=update)[0]
         else:
-            raise ValueError("get_line_search_error: Wrong type for function evaluation")
+            raise ValueError(
+                "get_line_search_error: Wrong type for function evaluation")
         return err
 
     def calc_alpha_max(self):
@@ -620,7 +637,7 @@ class anim_solver():
 
 if __name__ == "__main__":
     bulk_density = density_from_packing_fraction(eta=0.2)
-    dft = cdft1D(bulk_density=bulk_density, functional="RF", domain_length=50.0, wall="HardWall", grid_dr=0.001)
+    dft = cdft1D(bulk_density=bulk_density, functional="WB", domain_length=50.0, wall="HardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="HardWall", grid_dr=0.5)
     solver = picard_geometry_solver(cDFT=dft, ng_extrapolations=10, line_search="ERROR")
@@ -628,8 +645,8 @@ if __name__ == "__main__":
                     plot_profile=False)
     #solver.animate(z_max=4.0)
 
-    data_dict = get_data_container("../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
-    solver.plot_equilibrium_density_profile(data_dict=data_dict)
+    # data_dict = get_data_container("../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
+    # solver.plot_equilibrium_density_profile(data_dict=data_dict)
 
     omega, omega_arr = solver.cDFT.grand_potential(solver.density, update_convolutions=True)
     print("omega", omega)
