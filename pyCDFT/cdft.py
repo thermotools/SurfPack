@@ -76,13 +76,6 @@ class cdft1D:
         self.N = self.N + 2 * self.Nbc + 2 * self.padding
         self.end = self.N - self.Nbc - self.padding  # End of domain
 
-        # Allocate weighted densities, differentials container and weights
-        self.weights_system = planar_weights_system_mc(functional=self.functional,
-                                                       dr=self.dr,
-                                                       R=self.R,
-                                                       N=self.N,
-                                                       quad=quadrature)
-
         # Calculate reduced pressure and excess chemical potential
         self.red_pressure = np.sum(self.bulk_densities) * self.T * \
             self.functional.bulk_compressibility(self.bulk_densities)
@@ -94,6 +87,7 @@ class cdft1D:
         self.NiWall = self.N - self.end
         self.domain_mask = np.full(self.N, False, dtype=bool)
         self.domain_mask[self.NiWall:self.end] = True
+        self.weight_mask = np.full(self.N, False, dtype=bool)
 
         # Set up wall
         self.NiWall_array_left = [self.NiWall] * self.nc
@@ -101,6 +95,14 @@ class cdft1D:
         # Use structure of densities class
         self.Vext = densities(self.nc, self.N)
         self.wall_setup(wall)
+
+        # Allocate weighted densities, differentials container and weights
+        self.weights_system = planar_weights_system_mc(functional=self.functional,
+                                                       dr=self.dr,
+                                                       R=self.R,
+                                                       N=self.N,
+                                                       quad=quadrature,
+                                                       mask_conv_results=self.weight_mask)
 
     def wall_setup(self, wall):
         """
@@ -119,6 +121,7 @@ class cdft1D:
         if is_hard_wall:
             self.left_boundary = boundary_condition["WALL"]
             self.wall = "HW"
+            self.weight_mask[:self.NiWall + 1] = True
             for i in range(self.nc):
                 self.NiWall_array_left[i] += round(self.NinP[i]/2)
                 self.Vext[i][:self.NiWall_array_left[i]] = 500.0
@@ -126,6 +129,7 @@ class cdft1D:
                 # Add right wall setup
                 self.right_boundary = boundary_condition["WALL"]
                 self.wall = "SHW"
+                self.weight_mask[self.end - 1:] = True
                 for i in range(self.nc):
                     self.NiWall_array_right[i] += round(self.NinP[i] / 2)
                     self.Vext[i][self.NiWall_array_right[i]:] = 500.0

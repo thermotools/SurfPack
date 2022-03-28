@@ -71,9 +71,6 @@ class picard_geometry_solver():
             self.densities.set_mask(self.right_boundary_mask)
         self.old_densities.assign_elements(self.densities)
 
-        # Set up FFT objects if required
-        # self.cDFT.weights.setup_fft(self.cDFT.weighted_densities,
-        #                            self.cDFT.differentials)
         # Configure PyFFTW to use multiple threads
         # fftw.config.NUM_THREADS = 2
 
@@ -689,22 +686,22 @@ class anim_solver():
 
 if __name__ == "__main__":
     # Binary hard-sphere case from: 10.1103/physreve.62.6926
-    # d = np.array([1.0, 3.0/5.0])
-    # bulk_densities = density_from_packing_fraction(
-    #     eta=np.array([0.3105, 0.0607]), d=d)
-    # dft = cdft1D(bulk_densities=bulk_densities, particle_diameters=d, functional="WB",
-    #              domain_length=50.0, wall="HardWall", grid_dr=0.001)
-    # solver = picard_geometry_solver(
-    #     cDFT=dft, alpha_min=0.01, alpha_max=0.1, alpha_initial=0.001, n_alpha_initial=1000,
-    #     ng_extrapolations=None, line_search="None")
-    # # solver.minimise(print_frequency=50,
-    # #                plot_profile=True)
-    # solver.animate(z_max=4.0)
-    # sys.exit()
+    d = np.array([1.0, 3.0/5.0])
+    bulk_densities = density_from_packing_fraction(
+        eta=np.array([0.3105, 0.0607]), d=d)
+    dft = cdft1D(bulk_densities=bulk_densities, particle_diameters=d, functional="WB",
+                 domain_length=50.0, wall="HardWall", grid_dr=0.001)
+    solver = picard_geometry_solver(
+        cDFT=dft, alpha_min=0.05, alpha_max=0.25, alpha_initial=0.001, n_alpha_initial=50,
+        ng_extrapolations=10, line_search="ERROR")
+    # solver.minimise(print_frequency=50,
+    #                plot_profile=True)
+    solver.animate(z_max=4.0)
+    sys.exit()
     # Pure hard-sphere case from. Packing fraction 0.2.
     bulk_densities = density_from_packing_fraction(
         eta=np.array([0.2]))
-    dft = cdft1D(bulk_densities=bulk_densities, functional="RF",
+    dft = cdft1D(bulk_densities=bulk_densities, functional="WB",
                  domain_length=50.0, wall="HardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
     # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="HardWall", grid_dr=0.5)

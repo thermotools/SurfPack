@@ -78,7 +78,12 @@ class planar_weights_system_mc():
     Multicomponent planar weigts
     """
 
-    def __init__(self, functional, dr: float, R: float, N: int, quad="Roth"):
+    def __init__(self, functional,
+                 dr: float,
+                 R: float,
+                 N: int,
+                 quad="Roth",
+                 mask_conv_results=None):
         """
 
         Args:
@@ -97,11 +102,12 @@ class planar_weights_system_mc():
             self.pl_weights.append(planar_weights(
                 dr=dr, R=R[i], N=N, quad=quad))
             self.comp_weighted_densities.append(
-                weighted_densities_1D(N=N, R=R[i]))
+                weighted_densities_1D(N=N, R=R[i],
+                                      mask_conv_results=mask_conv_results))
             self.differentials.append(differentials_1D(N=N, R=R[i]))
 
         # Overall weighted densities
-        self.weighted_densities = weighted_densities_1D(N=N, R=0.5)
+        self.weighted_densities = weighted_densities_1D(N=N, R=0.5)  # Dummy R
         self.setup_fft()
 
     def convolutions(self, rho):
@@ -133,7 +139,7 @@ class planar_weights_system_mc():
             self.pl_weights[i].convolution_n3(
                 self.comp_weighted_densities[i], rho[i])
             self.weighted_densities += self.comp_weighted_densities[i]
-        self.weighted_densities.update_after_convolution()
+        # self.weighted_densities.update_after_convolution()
 
     def setup_fft(self):
         """
