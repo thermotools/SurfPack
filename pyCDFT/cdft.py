@@ -81,7 +81,7 @@ class cdft1D:
             self.functional.bulk_compressibility(self.bulk_densities)
         self.excess_mu = self.functional.bulk_excess_chemical_potential(
             self.bulk_densities)
-        print(self.red_pressure, self.excess_mu)
+        #print(self.red_pressure, self.excess_mu)
 
         # Mask for inner domain
         self.NiWall = self.N - self.end
@@ -91,10 +91,27 @@ class cdft1D:
 
         # Set up wall
         self.NiWall_array_left = [self.NiWall] * self.nc
-        self.NiWall_array_right = [self.NiWall] * self.nc
+        self.NiWall_array_right = [self.N - self.NiWall] * self.nc
         # Use structure of densities class
         self.Vext = densities(self.nc, self.N)
         self.wall_setup(wall)
+
+        self.left_boundary_mask = []
+        self.right_boundary_mask = []
+        self.boundary_mask = []
+        for i in range(self.nc):
+            self.left_boundary_mask.append(
+                np.full(self.N, False, dtype=bool))
+            self.right_boundary_mask.append(
+                np.full(self.N, False, dtype=bool))
+            self.boundary_mask.append(
+                np.full(self.N, False, dtype=bool))
+            self.left_boundary_mask[i][:self.NiWall_array_left[i]] = True
+            self.right_boundary_mask[i][self.NiWall_array_right[i]:] = True
+            self.boundary_mask[i] = np.logical_or(
+                self.left_boundary_mask[i], self.right_boundary_mask[i])
+
+        # self.print_grid()
 
         # Allocate weighted densities, differentials container and weights
         self.weights_system = planar_weights_system_mc(functional=self.functional,
@@ -103,6 +120,25 @@ class cdft1D:
                                                        N=self.N,
                                                        quad=quadrature,
                                                        mask_conv_results=self.weight_mask)
+
+    def print_grid(self):
+        """
+        Debug function
+
+        """
+        print("N: ", self.N)
+        print("NiWall: ", self.NiWall)
+        print("NinP: ", self.NinP)
+        print("Nbc: ", self.Nbc)
+        print("end: ", self.end)
+        print("domain_mask: ", self.domain_mask)
+        print("weight_mask: ", self.weight_mask)
+        for i in range(self.nc):
+            print(f"NiWall_array_left {i}: ", self.NiWall_array_left[i])
+            print(f"NiWall_array_right {i}: ", self.NiWall_array_right[i])
+            print(f"left_boundary_mask {i}: ", self.left_boundary_mask[i])
+            print(f"right_boundary_mask {i}: ", self.right_boundary_mask[i])
+            print(f"boundary_mask {i}: ", self.boundary_mask[i])
 
     def wall_setup(self, wall):
         """
@@ -131,7 +167,7 @@ class cdft1D:
                 self.wall = "SHW"
                 self.weight_mask[self.end - 1:] = True
                 for i in range(self.nc):
-                    self.NiWall_array_right[i] += round(self.NinP[i] / 2)
+                    self.NiWall_array_right[i] -= round(self.NinP[i] / 2)
                     self.Vext[i][self.NiWall_array_right[i]:] = 500.0
 
     def grand_potential(self, dens, update_convolutions=True):
@@ -170,9 +206,11 @@ class cdft1D:
 
         omega_a[:] *= self.dr
 
-        # Integrate using trapezoidal method
-        omega = np.sum(omega_a[self.domain_mask]) - 0.5 * \
-            omega_a[self.NiWall] - 0.5*omega_a[self.end]
+        # Integrate
+        omega = 0.0
+        for i in range(self.nc):
+            omega_a[self.boundary_mask[i]] = 0.0  # Don't include wall
+            omega += np.sum(omega_a[:])
 
         return omega, omega_a[:]
 

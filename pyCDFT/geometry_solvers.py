@@ -42,16 +42,7 @@ class picard_geometry_solver():
         # Mask for updating density on inner domain
         self.NiWall = self.cDFT.NiWall
         self.domain_mask = self.cDFT.domain_mask
-        self.left_boundary_mask = []
-        self.right_boundary_mask = []
-        for i in range(self.cDFT.nc):
-            self.left_boundary_mask.append(
-                np.full(self.cDFT.N, False, dtype=bool))
-            self.right_boundary_mask.append(
-                np.full(self.cDFT.N, False, dtype=bool))
-            self.left_boundary_mask[i][:self.cDFT.NiWall_array_left[i]] = True
-            self.right_boundary_mask[i][self.cDFT.N -
-                                        self.cDFT.NiWall_array_right[i]:] = True
+
         # Set radius for plotting
         self.r = np.linspace(-self.NiWall * self.cDFT.dr,
                              (self.cDFT.end - 1) * self.cDFT.dr, self.cDFT.N)
@@ -66,9 +57,9 @@ class picard_geometry_solver():
 
         self.densities.assign_components(self.cDFT.bulk_densities)
         if self.cDFT.left_boundary == boundary_condition["WALL"]:
-            self.densities.set_mask(self.left_boundary_mask)
+            self.densities.set_mask(self.cDFT.left_boundary_mask)
         if self.cDFT.right_boundary == boundary_condition["WALL"]:
-            self.densities.set_mask(self.right_boundary_mask)
+            self.densities.set_mask(self.cDFT.right_boundary_mask)
         self.old_densities.assign_elements(self.densities)
 
         # Configure PyFFTW to use multiple threads
@@ -317,7 +308,7 @@ class picard_geometry_solver():
         """
 
         # todo find explanation for 0.5 trick
-        if self.cDFT.wall == "HW":
+        if self.cDFT.wall == "HW" or self.cDFT.wall == "SHW":
             for i in range(self.cDFT.nc):
                 if self.cDFT.left_boundary == boundary_condition["WALL"]:
                     self.mod_densities[i][self.cDFT.NiWall_array_left[i] + 1] *= 0.5
@@ -691,29 +682,33 @@ if __name__ == "__main__":
         eta=np.array([0.3105, 0.0607]), d=d)
     dft = cdft1D(bulk_densities=bulk_densities, particle_diameters=d, functional="WB",
                  domain_length=50.0, wall="HardWall", grid_dr=0.001)
+    # dft = cdft1D(bulk_densities=bulk_densities, particle_diameters=d, functional="WB",
+    #              domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
     solver = picard_geometry_solver(
         cDFT=dft, alpha_min=0.05, alpha_max=0.25, alpha_initial=0.001, n_alpha_initial=50,
         ng_extrapolations=10, line_search="ERROR")
-    # solver.minimise(print_frequency=50,
-    #                plot_profile=True)
-    solver.animate(z_max=4.0)
+    solver.minimise(print_frequency=50,
+                    plot_profile=True)
+    # solver.animate(z_max=4.0)
     sys.exit()
     # Pure hard-sphere case from. Packing fraction 0.2.
     bulk_densities = density_from_packing_fraction(
         eta=np.array([0.2]))
     dft = cdft1D(bulk_densities=bulk_densities, functional="WB",
                  domain_length=50.0, wall="HardWall", grid_dr=0.001)
-    # dft = cdft1D(bulk_density=bulk_density, domain_length=50.0, wall="SlitHardWall", grid_dr=0.001)
-    # dft = cdft1D(bulk_density=bulk_density, domain_length=1.0, wall="HardWall", grid_dr=0.5)
+    # dft = cdft1D(bulk_densities=bulk_densities, domain_length=50.0,
+    #              wall="SlitHardWall", grid_dr=0.001)
+    # dft = cdft1D(bulk_densities=bulk_densities,
+    #              domain_length=3.0, wall="HardWall", grid_dr=0.25, quadrature="NONE")
     solver = picard_geometry_solver(
         cDFT=dft, alpha_min=0.1, ng_extrapolations=10, line_search="ERROR")
     solver.minimise(print_frequency=10,
                     plot_profile=True)
     # solver.animate(z_max=4.0)
 
-    data_dict = get_data_container(
-        "../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
-    solver.plot_equilibrium_density_profiles(data_dict=data_dict)
+    # data_dict = get_data_container(
+    #     "../testRF.dat", labels=["RF"], x_index=0, y_indices=[2])
+    # solver.plot_equilibrium_density_profiles(data_dict=data_dict)
 
     omega, omega_arr = solver.cDFT.grand_potential(
         solver.densities, update_convolutions=True)

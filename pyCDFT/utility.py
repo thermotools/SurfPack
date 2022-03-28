@@ -186,7 +186,7 @@ class densities():
 
     def __init__(self, nc, N, is_conv_var=False):
         """
-        
+
         Args:
             nc (int): Number of components
             N (int): Number of grid points
@@ -310,6 +310,7 @@ class densities():
         for i in range(self.nc):
             nd_copy[i, :] = self.densities[i][:]
         return nd_copy
+
 
 class weighted_densities_1D():
     """
