@@ -713,5 +713,3 @@ if __name__ == "__main__":
     omega, omega_arr = solver.cDFT.grand_potential(
         solver.densities, update_convolutions=True)
     print("omega", omega)
-
-    sys.exit()
