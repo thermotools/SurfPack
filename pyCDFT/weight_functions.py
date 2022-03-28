@@ -176,6 +176,7 @@ class planar_weights():
         self.dr = dr
         self.R = R
         self.N = N
+        # todo Reduce NinP and make identical to Fourier transforms
         NinP = 2 * round(R / dr) + 1
         self.quad = quadrature(NinP)
         self.w3 = np.zeros(NinP)
@@ -183,7 +184,7 @@ class planar_weights():
         self.w2vec = np.zeros(NinP)
         self.x = np.linspace(-self.R, self.R, NinP)
         self.w3[:] = np.pi * (self.R ** 2 - self.x[:] ** 2)
-        self.w2[:] = np.pi * np.ones(NinP)[:]
+        self.w2[:] = np.pi * np.ones(NinP)[:] * (self.R / 0.5)
         self.w2vec[:] = 2 * np.pi * self.x[:]
         # Multiply with quadrature weights
         quad_w = self.quad.get_quadrature_weights(quad)
@@ -238,7 +239,7 @@ class planar_weights():
             self.fw3[:] = sfft.fft(w3_temp)
             self.fw2vec[:] = sfft.fft(w2vec_temp)
 
-            self.analytical_fourier_weigts()
+        self.analytical_fourier_weigts()
 
         # Fourier transformation objects. Allocated in separate method.
         self.fftw_rho = None
@@ -483,6 +484,23 @@ class planar_weights():
                 kz[self.N - k - 1] = -k - 1
             kz /= self.dr*self.N
             kz_abs = np.zeros(self.N)
+            kz_abs[:] = np.abs(kz[:])
+            kz_abs *= 2 * np.pi * self.R
+            self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * \
+                (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
+            self.fw3.imag = 0.0
+            self.fw2.real = 4 * np.pi * self.R**2 * spherical_jn(0, kz_abs)
+            self.fw2.imag = 0.0
+            self.fw2vec.real = 0.0
+            self.fw2vec.imag = -2 * np.pi * kz * self.fw3.real
+        if CONVOLUTIONS == CONV_FFTW:
+            n = int(self.N//2)+1
+            kz = np.zeros(n)
+            for k in range(int(self.N/2)):
+                kz[k] = k
+            kz[-1] = -self.N/2
+            kz /= self.dr*self.N
+            kz_abs = np.zeros(n)
             kz_abs[:] = np.abs(kz[:])
             kz_abs *= 2 * np.pi * self.R
             self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * \
