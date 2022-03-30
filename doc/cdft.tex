@@ -198,11 +198,12 @@
 \newcommand{\pvec}{\ensuremath{\mathbf{p}}\xspace}
 \newcommand{\attractive}{\ensuremath{\text{att}}\xspace}
 \newcommand{\kB}{\ensuremath{\text{k}_{\text{B}}}\xspace}
+\newcommand{\NA}{\ensuremath{N_{\text{A}}}\xspace}
 \newcommand{\external}{\ensuremath{\text{ext}}\xspace}
 \newcommand{\bulk}{\ensuremath{\text{b}}\xspace}
 \newcommand{\pure}{\ensuremath{\text{p}}\xspace}
 \newcommand{\NC}{\ensuremath{\text{NC}}\xspace}
-
+\newcommand{\disp}{\ensuremath{\text{disp}}\xspace}
 \graphicspath{{gfx/}}
 
 \title{Classical Density Functional Theory (cDFT) for Thermopack}
@@ -574,6 +575,7 @@ Dipole-dipole:\citet{gross2006}
 Dipole-Quadruplole: \citet{vrabec2008}
 
 
+
 \section{Analytial Fourier transforms of the weight functions}
 \citet[Appendix B]{knepley2010} derives the analytical Fourier
 transform for the weight functions.
@@ -721,6 +723,54 @@ For the pure fluid, using $\eta = n_{3,\bulk}$ and \eqref{eq:chem_pot} we get,
   =&\frac{14\eta - 13\eta^2 + 5\eta^3}{2\lb 1 - \eta \rb^3}-\ln \lb 1 - \eta \rb
 \end{align}
 
+\section{Thermopack properties}
+The cDFT code use reduced units, and the spatial dimension is reduced
+with respect to the hard-sphere diameter of the first component in the
+mixture. The gemoetry is therefore defined by the widt $L$ in reduced
+units, and the actual widht is therefore $L d_{11}$. The component densities are
+\begin{equation}
+  \rho_{i}^* = \frac{N_id_{11}^3}{V}.
+\end{equation}
+The temperature is also given from component 1 and
+\begin{equation}
+  T^* = \frac{\kB T}{\epsilon_{11}}.
+\end{equation}
+
+\subsection{Bulk fluid}
+The thermopack interface use functions of temperature, volume and mol
+numbers, ($T, V, \mathrm{n}$). When calculating thermopack properties,
+the densities must be converted to Thermopack units
+\begin{equation}
+  \mathrm{\rho}_n = \mathrm{\rho}^*\frac{1}{\NA d_{11}^3}.
+\end{equation}
+Thermopack can then be evaluated using $V=1.0$ and $\mathrm{\rho}$, or
+the densities cam be converted to mol numbers and specific volume.
+
+The \excess reduced chemical potential is given from thermopack as
+\begin{equation}
+  \beta \mu_{i}^\excess = \beta\pd{A^\excess}{N_i} =
+  \beta \pd{A^\excess \lb T, V, \mathrm{n} \rb}{n_i} \pd{n_i}{N_i} = \frac{1}{R T}\pd{A^\excess \lb T, V, \mathrm{n} \rb}{n_i}.
+\end{equation}
+
+The \excess compressibillity from thermopack is given as
+\begin{equation}
+  z^\excess = \frac{P^\excess}{\underset{i}{\sum} \rho_{n,i} R T}
+\end{equation}
+
+\subsection{Dispersion functional differentials}
+Thermopack implements the dispersion contribution as
+\begin{equation}
+  a_\disp\lb T, V, \mathrm{n} \rb = \frac{A_\disp\lb T, V, \mathrm{n} \rb}{n R T}.
+\end{equation}
+The \cdft code need differentials for the functional $\beta \rho^* a_\disp\lb \rho^* \rb$,
+\begin{align}
+  \pd{\lb \rho a_\disp\lb \rho^* \rb \rb}{\rho_i} & = a_\disp +  \rho^* \pd{a_\disp}{\rho_i^*} \nonumber \\
+                                                  & = a_\disp +  \rho^* \pd{a_\disp}{\rho_{n,i}} \pd{\rho_{n,i}}{\rho_i^*} \nonumber \\
+                                                  & = a_\disp +  \rho^* \pd{a_\disp}{\rho_{n,i}} \frac{1}{\NA d_{11}^3}\nonumber \\
+                                                  & = a_\disp +  \rho_n \pd{a_\disp}{\rho_{n,i}}.
+\end{align}
+Thermopack can then be evaluated setting $V=1.0$ and
+$\mathrm{n}=\mathrm{\rho}_n$.
 \clearpage
 \bibliographystyle{plainnat}
 \bibliography{./DFT.bib,./HardSphere.bib,./PC-SAFT.bib}

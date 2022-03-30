@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import numpy as np
 from utility import weighted_densities_1D, differentials_1D
+from pyctp import pcsaft
+from constants import NA
 
 
 def get_functional(functional="Rosenfeld", R=np.array([0.5])):
@@ -64,16 +66,27 @@ class Rosenfeld:
     doi:10.1103/PhysRevLett.63.980
     """
 
-    def __init__(self, R=np.array([0.5])):
+    def __init__(self, N, R=np.array([0.5])):
         """
 
         Args:
+            N (integer): Grid size
             R (ndarray): Particle radius for all components
         """
         self.name = "Rosenfeld"
         self.short_name = "RF"
         self.R = R
         self.nc = np.shape(R)[0]
+        self.N = N
+        # Allocate arrays for differentials
+        self.d0 = np.zeros(N)
+        self.d1 = np.zeros(N)
+        self.d2 = np.zeros(N)
+        self.d3 = np.zeros(N)
+        self.d1v = np.zeros(N)
+        self.d2v = np.zeros(N)
+        self.d2eff = np.zeros(N)
+        self.d2veff = np.zeros(N)
 
     def excess_free_energy(self, dens):
         """
@@ -152,7 +165,7 @@ class Rosenfeld:
             bd.n[2] ** 3 / (24 * np.pi * n3neg ** 2)
         return phi, dphidn
 
-    def differentials(self, dens, diff):
+    def differentials(self, dens):
         """
         Calculates the functional differentials wrpt. the weighted densities.
 
@@ -161,21 +174,27 @@ class Rosenfeld:
         diff (array_like): Functional differentials
 
         """
-        diff.d0[:] = -np.log(dens.n3neg[:])
-        diff.d1[:] = dens.n2[:] / dens.n3neg[:]
-        diff.d2[:] = dens.n1[:] / dens.n3neg[:] + \
+        self.d0[:] = -np.log(dens.n3neg[:])
+        self.d1[:] = dens.n2[:] / dens.n3neg[:]
+        self.d2[:] = dens.n1[:] / dens.n3neg[:] + \
             (dens.n2[:] ** 2 - dens.n2v2[:]) / (8 * np.pi * dens.n3neg2[:])
-        diff.d3[:] = dens.n0[:] / dens.n3neg[:] + (dens.n1[:] * dens.n2[:] - dens.n1v[:] * dens.n2v[:]) / \
+        self.d3[:] = dens.n0[:] / dens.n3neg[:] + (dens.n1[:] * dens.n2[:] - dens.n1v[:] * dens.n2v[:]) / \
             dens.n3neg2[:] + (dens.n2[:] ** 3 - 3 * dens.n2[:] * dens.n2v2[:]) / \
             (12 * np.pi * dens.n3neg[:] ** 3)
-        diff.d1v[:] = -dens.n2v[:] / dens.n3neg[:]
-        diff.d2v[:] = -(dens.n1v[:] / dens.n3neg[:] + dens.n2[:]
+        self.d1v[:] = -dens.n2v[:] / dens.n3neg[:]
+        self.d2v[:] = -(dens.n1v[:] / dens.n3neg[:] + dens.n2[:]
                         * dens.n2v[:] / (4 * np.pi * dens.n3neg2[:]))
 
         # Combining differentials
-        diff.combine_differentials()
+        self.combine_differentials()
 
-        return diff
+    def combine_differentials(self):
+        """
+        Combining differentials to reduce number of convolution integrals
+        """
+        self.d2eff[:] = self.d0[:] / (4 * np.pi * self.R ** 2) + \
+            self.d1[:] / (4 * np.pi * self.R) + self.d2[:]
+        self.d2veff[:] = self.d1v[:] / (4 * np.pi * self.R) + self.d2v[:]
 
     def test_differentials(self, dens0):
         print("Testing functional " + self.name)
@@ -244,13 +263,14 @@ class Whitebear(Rosenfeld):
 
     """
 
-    def __init__(self, R=np.array([0.5])):
+    def __init__(self, N, R=np.array([0.5])):
         """
 
         Args:
+            N (integer): Grid size
             R (ndarray): Particle radius for all components
         """
-        super(Whitebear, self).__init__(R)
+        super(Whitebear, self).__init__(N, R)
         self.name = "White Bear"
         self.short_name = "WB"
         self.numerator = None
@@ -305,13 +325,12 @@ class Whitebear(Rosenfeld):
             bd.n[2] ** 3 * numerator / denumerator
         return phi, dphidn
 
-    def differentials(self, dens, diff):
+    def differentials(self, dens):
         """
         Calculates the functional differentials wrpt. the weighted densities
 
         Args:
         dens (array_like): weighted densities
-        diff (array_like): Functional differentials
 
         """
         if self.numerator is None or np.shape(self.numerator) != np.shape(dens.n0):
@@ -325,29 +344,27 @@ class Whitebear(Rosenfeld):
         pn3m = dens.n3 > 0.0  # Positive value n3 mask
         non_pn3m = np.invert(pn3m)  # Mask for zero and negative value of n3
 
-        diff.d0[pn3m] = -dens.logn3neg[pn3m]
-        diff.d1[pn3m] = dens.n2[pn3m] / dens.n3neg[pn3m]
-        diff.d2[pn3m] = dens.n1[pn3m] / dens.n3neg[pn3m] + 3 * (dens.n2[pn3m] ** 2 - dens.n2v2[pn3m]) * \
+        self.d0[pn3m] = -dens.logn3neg[pn3m]
+        self.d1[pn3m] = dens.n2[pn3m] / dens.n3neg[pn3m]
+        self.d2[pn3m] = dens.n1[pn3m] / dens.n3neg[pn3m] + 3 * (dens.n2[pn3m] ** 2 - dens.n2v2[pn3m]) * \
             self.numerator[pn3m] / self.denumerator[pn3m]
-        diff.d3[pn3m] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
+        self.d3[pn3m] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
             (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) / dens.n3neg2[pn3m] + \
             (dens.n2[pn3m] ** 3 - 3 * dens.n2[pn3m] * dens.n2v2[pn3m]) * \
             ((dens.n3[pn3m] * (5 - dens.n3[pn3m]) - 2) /
              (self.denumerator[pn3m] * dens.n3neg[pn3m]) - dens.logn3neg[pn3m] / (
                 18 * np.pi * dens.n3[pn3m] ** 3))
-        diff.d1v[pn3m] = -dens.n2v[pn3m] / dens.n3neg[pn3m]
-        diff.d2v[pn3m] = -dens.n1v[pn3m] / dens.n3neg[pn3m] - 6 * dens.n2[pn3m] * dens.n2v[pn3m] * \
+        self.d1v[pn3m] = -dens.n2v[pn3m] / dens.n3neg[pn3m]
+        self.d2v[pn3m] = -dens.n1v[pn3m] / dens.n3neg[pn3m] - 6 * dens.n2[pn3m] * dens.n2v[pn3m] * \
             self.numerator[pn3m] / self.denumerator[pn3m]
 
         # Combining differentials
-        diff.combine_differentials()
+        self.combine_differentials()
 
         # Set non positive n3 grid points to zero
-        diff.d3[non_pn3m] = 0.0
-        diff.d2eff[non_pn3m] = 0.0
-        diff.d2veff[non_pn3m] = 0.0
-
-        return diff
+        self.d3[non_pn3m] = 0.0
+        self.d2eff[non_pn3m] = 0.0
+        self.d2veff[non_pn3m] = 0.0
 
 
 class WhitebearMarkII(Whitebear):
@@ -360,13 +377,13 @@ class WhitebearMarkII(Whitebear):
     doi: 10.1088/0953-8984/18/37/002
     """
 
-    def __init__(self, R=np.array([0.5])):
+    def __init__(self, N, R=np.array([0.5])):
         """
 
         Args:
             R (ndarray): Radius of particles
         """
-        super(WhitebearMarkII, self).__init__(R)
+        super(WhitebearMarkII, self).__init__(N, R)
         self.name = "White Bear Mark II"
         self.short_name = "WBII"
         self.phi2_div3 = None
@@ -483,13 +500,12 @@ class WhitebearMarkII(Whitebear):
             bd.n[2] ** 3 * numerator / denumerator
         return phi, dphidn
 
-    def differentials(self, dens, diff):
+    def differentials(self, dens):
         """
         Calculates the functional differentials wrpt. the weighted densities
 
         Args:
         dens (array_like): weighted densities
-        diff (array_like): Functional differentials
 
         """
         # Avoid dividing with zero value of n3 in boundary grid points
@@ -503,32 +519,156 @@ class WhitebearMarkII(Whitebear):
             self.denumerator = np.zeros_like(dens.n0)
         self.denumerator[:] = (24.0 * np.pi * dens.n3neg2[:])
 
-        diff.d0[pn3m] = -dens.logn3neg[pn3m]
-        diff.d1[pn3m] = dens.n2[pn3m] * \
+        self.d0[pn3m] = -dens.logn3neg[pn3m]
+        self.d1[pn3m] = dens.n2[pn3m] * \
             (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m]
-        diff.d2[pn3m] = dens.n1[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] + 3 * (
+        self.d2[pn3m] = dens.n1[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] + 3 * (
             dens.n2[pn3m] ** 2 - dens.n2v2[pn3m]) * self.numerator[pn3m] / self.denumerator[pn3m]
-        diff.d3[pn3m] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
+        self.d3[pn3m] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
             (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) * \
             ((1 + self.phi2_div3[pn3m]) / dens.n3neg2[pn3m] +
              self.dphi2dn3_div3[pn3m] / dens.n3neg[pn3m]) + \
             (dens.n2[pn3m] ** 3 - 3 * dens.n2[pn3m] * dens.n2v2[pn3m]) / self.denumerator[pn3m] * \
             (-self.dphi3dn3_div3[pn3m] + 2 *
              self.numerator[pn3m] / dens.n3neg[pn3m])
-        diff.d1v[pn3m] = -dens.n2v[pn3m] * \
+        self.d1v[pn3m] = -dens.n2v[pn3m] * \
             (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m]
-        diff.d2v[pn3m] = -dens.n1v[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] \
+        self.d2v[pn3m] = -dens.n1v[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] \
             - 6 * dens.n2[pn3m] * dens.n2v[pn3m] * \
             self.numerator[pn3m] / self.denumerator[pn3m]
 
         # Combining differentials
-        diff.combine_differentials()
+        self.combine_differentials()
 
         # Set non positive n3 grid points to zero
-        diff.d3[non_pn3m] = 0.0
-        diff.d2eff[non_pn3m] = 0.0
-        diff.d2veff[non_pn3m] = 0.0
-        return diff
+        self.d3[non_pn3m] = 0.0
+        self.d2eff[non_pn3m] = 0.0
+        self.d2veff[non_pn3m] = 0.0
+
+
+class pc_saft(Whitebear):
+    """
+
+    """
+
+    def __init__(self, N, pcs: pcsaft, T_red, R=np.array([0.5])):
+        """
+
+        Args:
+            pcs (pcsaft): Thermopack object
+            T_red (float): Reduced temperature
+            R (ndarray): Particle radius for all components
+        """
+        self.thermo = pcs
+        self.T_red = T_red
+        self.T = self.T_red * self.thermo.eps_div_kb[0]
+        Whitebear.__init__(self, N, R)
+        self.name = "PC-SAFT"
+        self.short_name = "PC"
+        self.mu_disp = np.zeros((N, pcs.nc))
+        self.d_hs = np.zeros(pcs.nc)
+        for i in range(self.nc):
+            self.d_hs[i] = pcs.hard_sphere_diameters(self.T)
+
+    def excess_free_energy(self, dens):
+        """
+        Calculates the excess HS Helmholtz free energy from the weighted densities
+
+        Args:
+        dens (array_like): Weighted densities
+
+        Returns:
+        array_like: Excess HS Helmholtz free energy ()
+
+        """
+        f = Whitebear.excess_free_energy(self, dens)
+
+        rho_thermo = np.array(self.nc)
+        V = 1.0
+        for i in range(len(f)):
+            rho_thermo[:] = dens.rho_disp_array[i, :]
+            rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+            a, = self.thermo.a_dispersion(self.T, V, rho_thermo)
+            f[i] += a
+
+        return f
+
+    def differentials(self, dens):
+        """
+        Calculates the functional differentials wrpt. the weighted densities
+
+        Args:
+        dens (array_like): weighted densities
+        diff (array_like): Functional differentials
+
+        """
+        Whitebear.differentials(self, dens)
+
+        # All densities must be positie
+        prdm = dens.rho_disp > 0.0  # Positive rho_disp value mask
+        for i in range(self.nc):
+            np.logical_and(prdm, dens.rho_disp_array[:, i] > 0.0, out=prdm)
+        # Mask for zero and negative value of rho_disp
+        non_prdm = np.invert(prdm)
+        rho_thermo = np.array(self.nc)
+        V = 1.0
+        for i in range(self.N):
+            if prdm[i]:
+                rho_thermo[:] = dens.rho_disp_array[i, :]
+                rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+                a, a_n, = self.thermo.a_dispersion(
+                    self.T, V, rho_thermo, a_n=True)
+                self.mu_disp[i, :] = a + np.sum(rho_thermo)*a_n[:]
+
+        self.mu_disp[non_prdm, :] = 0.0
+
+    def bulk_compressibility(self, rho_b):
+        """
+        Calculates the PC-SAFT compressibility.
+        Multiply by rho*kB*T to get pressure.
+
+        Args:
+            rho_b (ndarray): Bulk densities
+
+        Returns:
+            float: compressibility
+        """
+        z = Whitebear.bulk_compressibility(self, rho_b)
+
+        # PC-SAFT contributions
+        rho_thermo = np.array(rho_b)
+        rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+        rho_mix = np.sum(rho_thermo)
+        V = 1.0/rho_mix
+        n = rho_thermo/rho_mix
+        p_r = self.thermo.pressure_tv(self.T, V, n, property_flag="R")
+        z_r = p_r/(rho_mix * R * self.T)
+        z += z_r
+        return z
+
+    def bulk_excess_chemical_potential(self, rho_b):
+        """
+        Calculates the reduced HS excess chemical potential from the bulk
+        packing fraction.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess reduced HS chemical potential ()
+
+        """
+        mu_ex = Whitebear.bulk_excess_chemical_potential(self, rho_b)
+        # PC-SAFT contributions
+        rho_thermo = np.array(rho_b)
+        rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+        rho_mix = np.sum(rho_thermo)
+        V = 1.0/rho_mix
+        n = rho_thermo/rho_mix
+        mu_ex_pc,  = self.thermo.chemical_potential_tv(
+            self.T, V, n, property_flag="R")
+        mu_ex += mu_ex_pc / (R * self.T)
+        return mu_ex
 
 
 if __name__ == "__main__":

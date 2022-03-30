@@ -316,11 +316,12 @@ class weighted_densities_1D():
     """
     """
 
-    def __init__(self, N, R, mask_conv_results=None):
+    def __init__(self, N, R, ms=1.0, mask_conv_results=None):
         """
         """
         self.N = N
         self.R = R
+        self.ms = ms
         self.n0 = np.zeros(N)
         self.n1 = np.zeros(N)
         self.n2 = allocate_real_convolution_variable(N)
@@ -366,6 +367,11 @@ class weighted_densities_1D():
         self.n2[self.mask_conv_results] = 0.0
         self.n3[self.mask_conv_results] = 0.0
         self.n2v[self.mask_conv_results] = 0.0
+        # Account for segments
+        self.n2[:] *= self.ms
+        self.n3[:] *= self.ms
+        self.n2v[:] *= self.ms
+        # Get remaining densities from convoultion results
         self.n1v[:] = self.n2v[:] / (4 * np.pi * self.R)
         self.n0[:] = self.n2[:] / (4 * np.pi * self.R ** 2)
         self.n1[:] = self.n2[:] / (4 * np.pi * self.R)
@@ -482,6 +488,56 @@ class weighted_densities_1D():
                 print("n32: ", self.n32[index])
 
 
+class weighted_densities_pc_saft_1D(weighted_densities_1D):
+    """
+    """
+
+    def __init__(self, N, R, mask_conv_results=None):
+        """
+        """
+        weighted_densities_1D.__init__(self, N, R, mask_conv_results)
+        self.rho_disp = allocate_real_convolution_variable(N)
+        self.rho_disp_array = None
+
+    def set_zero(self):
+        """
+        Set weights to zero
+        """
+        weighted_densities_1D.set_zero(self)
+        self.rho_disp[:] = 0.0
+        if self.rho_disp_array is not None:
+            self.rho_disp_array[:] = 0.0
+
+    def __iadd__(self, other):
+        """
+        Add weights
+        """
+        weighted_densities_1D.__iadd__(self, other)
+        self.rho_disp[:] += other.rho_disp[:]
+        return self
+
+    def set_testing_values(self):
+        """
+        Set some dummy values for testing differentials
+        """
+        weighted_densities_1D.set_testing_values(self)
+        self.rho_disp[:] = 1.0
+
+    def print(self, print_utilities=False, index=None):
+        """
+
+        Args:
+            print_utilities (bool): Print also utility variables
+        """
+        weighted_densities_1D.print(self, print_utilities, index)
+
+        print("PC-SAFT:")
+        if index is None:
+            print("r_disp: ", self.rho_disp)
+        else:
+            print("r_disp: ", self.rho_disp[index])
+
+
 class differentials_1D():
     """
     """
@@ -534,13 +590,15 @@ class differentials_1D():
         self.corr[:] = -(self.d3_conv[:] +
                          self.d2eff_conv[:] + self.d2veff_conv[:])
 
-    def combine_differentials(self):
-        """
-        Combining differentials to reduce number of convolution integrals
-        """
-        self.d2eff[:] = self.d0[:] / (4 * np.pi * self.R ** 2) + \
-            self.d1[:] / (4 * np.pi * self.R) + self.d2[:]
-        self.d2veff[:] = self.d1v[:] / (4 * np.pi * self.R) + self.d2v[:]
+    def set_functional_differentials(self, functional, ic=0):
+        self.d0[:] = functional.d0[:]
+        self.d1[:] = functional.d1[:]
+        self.d2[:] = functional.d2[:]
+        self.d3[:] = functional.d3[:]
+        self.d1v[:] = functional.d1v[:]
+        self.d2v[:] = functional.d2v[:]
+        self.d2eff[:] = functional.d2eff[:]
+        self.d2veff[:] = functional.d2veff[:]
 
     def get_differential(self, i):
         """
@@ -619,6 +677,22 @@ class quadratic_polynomial():
         p_of_x = np.zeros_like(x)
         p_of_x[:] = self.c[0] + self.c[1] * x[:] + self.c[2] * x[:]**2
         return p_of_x
+
+
+class differentials_pc_saft_1D(differentials_1D):
+    """
+    """
+
+    def __init__(self, N, R, mask_conv_results=None):
+        """
+        """
+        differentials_1D.__init__(self, N, R, mask_conv_results)
+        self.mu_disp = allocate_real_convolution_variable(N)
+        self.mu_disp_conv = allocate_real_convolution_variable(N)
+
+    def set_functional_differentials(self, functional, ic):
+        differentials_1D.set_functional_differentials(self, functional, ic)
+        self.mu_disp[:] = functional.mu_disp[:, ic]
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@ import numpy as np
 from constants import CONVOLUTIONS, CONV_NO_FFT, CONV_FFTW, CONV_SCIPY_FFT
 from scipy.ndimage import convolve1d
 from utility import weighted_densities_1D, differentials_1D, \
-    allocate_fourier_convolution_variable, allocate_real_convolution_variable
+    allocate_fourier_convolution_variable, allocate_real_convolution_variable, \
+    weighted_densities_pc_saft_1D, differentials_pc_saft_1D
 import matplotlib.pyplot as plt
 import pyfftw as fftw
 import scipy.fft as sfft
@@ -80,10 +81,14 @@ class planar_weights_system_mc():
 
     def __init__(self, functional,
                  dr: float,
-                 R: float,
+                 R: ndarray,
                  N: int,
                  quad="Roth",
-                 mask_conv_results=None):
+                 mask_conv_results=None,
+                 ms=None,
+                 plw=planar_weights,
+                 wd=weighted_densities_1D,
+                 diff=differentials_1D):
         """
 
         Args:
@@ -92,22 +97,27 @@ class planar_weights_system_mc():
             R (ndarray): Particle radius
             N (int): Grid size
             quad (str): Quadrature for integral
+            mask_conv_results: Mask to avoid divide by zero
+            ms (np.ndarray): Mumber of monomers
+            plw: Class type,defaults to planar_weights
+            wd: Class type,defaults to weighted_densities_1D
+            diff: Class type,defaults to differentials_1D
         """
         self.functional = functional
         self.pl_weights = []
         self.comp_weighted_densities = []
         self.differentials = []
         self.nc = np.shape(R)[0]
+        if ms is None:
+            ms = np.ones(self.nc)
         for i in range(self.nc):
-            self.pl_weights.append(planar_weights(
-                dr=dr, R=R[i], N=N, quad=quad))
+            self.pl_weights.append(plw(dr=dr, R=R[i], N=N, quad=quad))
             self.comp_weighted_densities.append(
-                weighted_densities_1D(N=N, R=R[i],
-                                      mask_conv_results=mask_conv_results))
-            self.differentials.append(differentials_1D(N=N, R=R[i]))
+                wd(N=N, R=R[i], ms=ms[i], mask_conv_results=mask_conv_results))
+            self.comp_differentials.append(diff(N=N, R=R[i]))
 
         # Overall weighted densities
-        self.weighted_densities = weighted_densities_1D(N=N, R=0.5)  # Dummy R
+        self.weighted_densities = wd(N=N, R=0.5)  # Dummy R
         self.setup_fft()
 
     def convolutions(self, rho):
@@ -147,17 +157,65 @@ class planar_weights_system_mc():
         """
         for i in range(self.nc):
             self.pl_weights[i].setup_fft(self.comp_weighted_densities[i],
-                                         self.differentials[i])
+                                         self.comp_differentials[i])
 
     def correlation_convolution(self):
         """
         Calculate functional differentials and perform convolutions with the
         appropriate weight functions.
         """
+        self.functional.differentials(self.weighted_densities)
         for i in range(self.nc):
-            self.functional.differentials(
-                self.weighted_densities, self.differentials[i])
-            self.pl_weights[i].correlation_convolution(self.differentials[i])
+            self.comp_differentials[i].set_functional_differentials(
+                self.functional)
+            self.pl_weights[i].correlation_convolution(
+                self.comp_differentials[i])
+
+
+class planar_weights_system_mc_pc_saft():
+    """
+    Multicomponent planar weigts including PC-SAFT dispersion
+    """
+
+    def __init__(self, functional,
+                 dr: float,
+                 R: np.ndarray,
+                 N: int,
+                 pcsaft: object,
+                 mask_conv_results=None,
+                 plw=planar_pc_saft_weights,
+                 wd=weighted_densities_pc_saft_1D,
+                 diff=differentials_pc_saft_1D):
+        """
+
+        Args:
+            functional: Functional
+            dr (float): Grid spacing
+            R (np.ndarray): Particle radius
+            N (int): Grid size
+            pcsaft: Thermopack object
+            mask_conv_results: Mask to avoid divide by zero
+            plw: Class type,defaults to planar_weights
+            wd: Class type,defaults to weighted_densities_1D
+            diff: Class type,defaults to differentials_1D
+        """
+
+        self.thermo = pcsaft
+        planar_weights_system_mc.__init__(self, functional, dr, R, N,
+                                          mask_conv_results, pcsaft.ms,
+                                          plw, wd, diff)
+
+    def convolutions(self, rho):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        planar_weights_system_mc.convolutions(self, rho)
+        for i in range(self.nc):
+            self.weighted_densities.rho_disp_array[i, :] = \
+                self.comp_weighted_densities[i].rho_disp[:]
 
 
 class planar_weights():
@@ -469,11 +527,6 @@ class planar_weights():
     def analytical_fourier_weigts(self):
         """
 
-        Args:
-            densities:
-            rho (np.ndarray): Density profile
-
-        Returns:
 
         """
         # Fourier space variables
@@ -482,34 +535,157 @@ class planar_weights():
             for k in range(int(self.N/2)):
                 kz[k] = k
                 kz[self.N - k - 1] = -k - 1
-            kz /= self.dr*self.N
-            kz_abs = np.zeros(self.N)
-            kz_abs[:] = np.abs(kz[:])
-            kz_abs *= 2 * np.pi * self.R
-            self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * \
-                (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
-            self.fw3.imag = 0.0
-            self.fw2.real = 4 * np.pi * self.R**2 * spherical_jn(0, kz_abs)
-            self.fw2.imag = 0.0
-            self.fw2vec.real = 0.0
-            self.fw2vec.imag = -2 * np.pi * kz * self.fw3.real
-        if CONVOLUTIONS == CONV_FFTW:
+        elif CONVOLUTIONS == CONV_FFTW:
             n = int(self.N//2)+1
             kz = np.zeros(n)
             for k in range(int(self.N/2)):
                 kz[k] = k
             kz[-1] = -self.N/2
-            kz /= self.dr*self.N
-            kz_abs = np.zeros(n)
-            kz_abs[:] = np.abs(kz[:])
-            kz_abs *= 2 * np.pi * self.R
-            self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * \
-                (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
-            self.fw3.imag = 0.0
-            self.fw2.real = 4 * np.pi * self.R**2 * spherical_jn(0, kz_abs)
-            self.fw2.imag = 0.0
-            self.fw2vec.real = 0.0
-            self.fw2vec.imag = -2 * np.pi * kz * self.fw3.real
+
+        kz /= self.dr*self.N
+        kz_abs = np.zeros_like(kz)
+        kz_abs[:] = np.abs(kz[:])
+        kz_abs *= 2 * np.pi * self.R
+        self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * \
+            (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
+        self.fw3.imag = 0.0
+        self.fw2.real = 4 * np.pi * self.R**2 * spherical_jn(0, kz_abs)
+        self.fw2.imag = 0.0
+        self.fw2vec.real = 0.0
+        self.fw2vec.imag = -2 * np.pi * kz * self.fw3.real
+
+
+class planar_pc_saft_weights(planar_weights):
+    """
+    """
+
+    def __init__(self, dr: float, R: float, N: int, quad="Roth"):
+        """
+
+        Args:
+            dr (float): Grid spacing
+            R (float): Particle radius
+            N (int): Grid size
+            quad (str): Quadrature for integral
+        """
+        assert(CONVOLUTIONS != CONV_NO_FFT)
+        # Fourier space variables
+        self.fw_disp = allocate_fourier_convolution_variable(N)
+        self.frho_disp = allocate_fourier_convolution_variable(N)
+        self.fw_rho_disp = allocate_fourier_convolution_variable(N)
+        self.fmu_disp = allocate_fourier_convolution_variable(N)
+        self.fw_mu_disp = allocate_fourier_convolution_variable(N)
+
+        planar_weights.__init__(self, dr, R, N, quad)
+
+        # Fourier transformation objects. Allocated in separate method.
+        self.fftw_rho_disp = None
+        self.ifftw_rho_disp = None
+        self.fftw_mu_disp = None
+        self.ifftw_mu_disp = None
+
+    def analytical_fourier_weigts(self):
+        """
+
+        """
+        planar_weights.analytical_fourier_weigts(self)
+        phi = 1.3862
+        # Fourier space variables
+        if CONVOLUTIONS == CONV_SCIPY_FFT:
+            kz = np.zeros(self.N)
+            for k in range(int(self.N/2)):
+                kz[k] = k
+                kz[self.N - k - 1] = -k - 1
+        elif CONVOLUTIONS == CONV_FFTW:
+            kz = np.zeros(int(self.N//2)+1)
+            for k in range(int(self.N/2)):
+                kz[k] = k
+            kz[-1] = -self.N/2
+
+        kz /= self.dr*self.N
+        kz_abs = np.zeros_like(kz)
+        kz_abs[:] = np.abs(kz[:])
+        kz_abs *= 4 * np.pi * self.R * phi
+        self.fw_disp.real = (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
+        self.fw_disp.imag = 0.0
+
+    def setup_fft(self, densities: weighted_densities_pc_saft_1D, diff: differentials_pc_saft_1D):
+        """
+        Args:
+            densities: Weighted densities
+            diff: Functional differentials'
+
+        """
+        planar_weights.setup_fft(self, densities, diff)
+        if CONVOLUTIONS == CONV_FFTW:
+            # FFTW objects to perform the fourier transforms
+            self.fftw_rho_disp = fftw.FFTW(self.rho, self.frho_disp,
+                                           direction='FFTW_FORWARD',
+                                           flags=('FFTW_ESTIMATE',))
+
+            self.ifftw_rho_disp = fftw.FFTW(self.fw_rho_disp, densities.rho_disp,
+                                            direction='FFTW_BACKWARD',
+                                            flags=('FFTW_ESTIMATE',))
+
+            self.fftw_mu_disp = fftw.FFTW(diff.mu_disp, self.fmu_disp,
+                                          direction='FFTW_FORWARD',
+                                          flags=('FFTW_ESTIMATE',))
+
+            self.ifftw_mu_disp = fftw.FFTW(self.fw_mu_disp, diff.mu_disp_conv,
+                                           direction='FFTW_BACKWARD',
+                                           flags=('FFTW_ESTIMATE',))
+
+    def convolutions(self, densities: weighted_densities_pc_saft_1D, rho: np.ndarray):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+        planar_weights.convolutions(self, densities, rho)
+        if CONVOLUTIONS == CONV_FFTW:
+            #self.rho[:] = rho[:]
+            self.fftw_rho_disp()
+            # Dispersion density
+            self.fw_rho_disp[:] = self.frho_disp[:] * self.fw_disp[:]
+            self.ifftw_rho_disp()
+
+        elif CONVOLUTIONS == CONV_SCIPY_FFT:
+            self.frho_disp[:] = sfft.fft(rho)
+            # Dispersion density
+            self.fw_rho_disp[:] = self.frho_disp[:] * self.fw_disp[:]
+            self.rho_disp[:] = sfft.ifft(self.fw_rho_disp).real
+
+    def correlation_convolution(self, diff: differentials_pc_saft_1D):
+        """
+
+        Args:
+            diff: Functional differentials
+
+        Returns:
+
+        """
+        planar_weights.correlation_convolution(self, diff)
+        if CONVOLUTIONS == CONV_FFTW:
+            # Fourier transform derivatives
+            self.fftw_mu_disp()
+
+            # Fourier space multiplications
+            self.fw_mu_disp[:] = self.fmu_disp[:] * self.fw_disp[:]
+
+            # Transform from Fourier space to real space
+            self.ifftw_mu_disp()
+
+        elif CONVOLUTIONS == CONV_SCIPY_FFT:
+            # Fourier transform derivatives
+            self.fmu_disp[:] = sfft.fft(diff.mu_disp)
+
+            # Fourier space multiplications
+            self.fw_mu_disp[:] = self.fmu_disp[:] * self.fw_disp[:]
+
+            # Transform from Fourier space to real space
+            diff.mu_disp_conv[:] = sfft.ifft(self.fw_mu_disp).real
 
 
 if __name__ == "__main__":
