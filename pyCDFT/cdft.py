@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import numpy as np
 import fmt_functionals
-from utility import weighted_densities_1D, differentials_1D, \
-    packing_fraction_from_density, boundary_condition, densities
+from utility import packing_fraction_from_density, \
+    boundary_condition, densities, get_thermopack_model
 from weight_functions import planar_weights_system_mc
-from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS
+from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS, NA
 import sys
 
 
@@ -21,7 +21,8 @@ class cdft1D:
                  functional="Rosenfeld",
                  grid_dr=0.001,
                  temperature=1.0,
-                 quadrature="None"):
+                 quadrature="None",
+                 thermopack=None):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
@@ -38,6 +39,8 @@ class cdft1D:
         Returns:
             None
         """
+        # Thermopack
+        self.thermo = thermopack
         # Number of components
         self.nc = len(particle_diameters)
         # Particle radius
@@ -56,9 +59,6 @@ class cdft1D:
         # Grid spacing
         self.dr = grid_dr
 
-        # Get functional
-        self.functional = fmt_functionals.get_functional(functional, self.R)
-
         # FFT padding of grid
         if CONVOLUTIONS in (CONV_FFTW, CONV_SCIPY_FFT):
             self.padding = 1
@@ -75,6 +75,13 @@ class cdft1D:
         # Add boundary and padding to grid
         self.N = self.N + 2 * self.Nbc + 2 * self.padding
         self.end = self.N - self.Nbc - self.padding  # End of domain
+
+        # Get functional
+        self.functional = fmt_functionals.get_functional(self.N,
+                                                         self.T,
+                                                         functional,
+                                                         self.R,
+                                                         self.thermo)
 
         # Calculate reduced pressure and excess chemical potential
         self.red_pressure = np.sum(self.bulk_densities) * self.T * \
@@ -94,6 +101,9 @@ class cdft1D:
         self.NiWall_array_right = [self.N - self.NiWall] * self.nc
         # Use structure of densities class
         self.Vext = densities(self.nc, self.N)
+        self.left_boundary = None  # Handled in setup_wall
+        self.right_boundary = None  # Handled in setup_wall
+        self.wall = None  # Handled in setup_wall
         self.wall_setup(wall)
 
         self.left_boundary_mask = []
@@ -215,25 +225,119 @@ class cdft1D:
         return omega, omega_a[:]
 
 
+class cdft_thermopack(cdft1D):
+    """
+    Base classical DFT class for 1D problems
+    """
+
+    def __init__(self,
+                 model,
+                 comp_names,
+                 comp,
+                 temperature,
+                 pressure,
+                 bubble_point_pressure=False,
+                 wall="HW",
+                 domain_length=40.0,
+                 grid_dr=0.001):
+        """
+        Object holding specifications for classical DFT problem.
+        Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
+
+        Args:
+            model (str): Themopack model "PC-SAFT", "SAFT-VR Mie"
+            comp_names (str): Component names
+            comp (array like): Composition
+            temperature (float): Temperature (K)
+            pressure (float): Pressure (MPa)
+            bubble_point_pressure (bool): Calculate bubble point pressure
+            wall (str): Wall type (HardWall, SlitHardWall)
+            domain_length (float): Length of domain
+            grid_dr (float) : Grid spacing
+        Returns:
+            None
+        """
+        self.thermo = get_thermopack_model(model)
+        self.thermo.init(comp_names)
+        self.comp = comp
+        if bubble_point_pressure:
+            print(temperature, comp)
+            self.eos_pressure, self.eos_gas_comp = self.thermo.bubble_pressure(temperature, comp)
+            self.eos_liq_comp = self.comp
+            self.eos_phase = self.thermo.TWOPH
+        else:
+            flash = self.thermo.two_phase_tpflash(temperature, pressure, comp)
+            self.eos_pressure = pressure
+            self.eos_liq_comp = flash[0]
+            self.eos_gas_comp = flash[1]
+            self.eos_beta_gas = flash[2]
+            self.eos_phase = flash[4]
+
+        if self.eos_phase == self.thermo.TWOPH:
+            self.eos_vl = self.thermo.specific_volume(temperature,
+                                                      self.eos_pressure,
+                                                      self.eos_liq_comp,
+                                                      self.thermo.LIQPH)
+            self.eos_vg = self.thermo.specific_volume(temperature,
+                                                      self.eos_pressure,
+                                                      self.eos_gas_comp,
+                                                      self.thermo.VAPPH)
+        else:
+            self.eos_vl = self.thermo.specific_volume(temperature,
+                                                      self.eos_pressure,
+                                                      comp,
+                                                      self.eos_phase)
+
+        particle_diameters = np.zeros(self.thermo.nc)
+        particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
+        bulk_densities = np.zeros(self.thermo.nc)
+        bulk_densities[:] = self.eos_liq_comp[:]/self.eos_vl
+        bulk_densities[:] *= NA*particle_diameters[0]**3
+        particle_diameters[:] /= particle_diameters[0]
+        temp_red = temperature / self.thermo.eps_div_kb[0]
+        print(bulk_densities)
+        cdft1D.__init__(self,
+                        bulk_densities=bulk_densities,
+                        particle_diameters=particle_diameters,
+                        wall=wall,
+                        domain_length=domain_length,
+                        functional="PC-SAFT",
+                        grid_dr=grid_dr,
+                        temperature=temp_red,
+                        thermopack=self.thermo)
+
+
+
 if __name__ == "__main__":
+    cdft_tp = cdft_thermopack(model="PC-SAFT",
+                              comp_names="C1",
+                              comp=np.array([1.0]),
+                              temperature=130.0,
+                              pressure=0.0,
+                              bubble_point_pressure=True,
+                              domain_length=40.0,
+                              grid_dr=0.001)
+    cdft_tp.functional.test_bulk_differentials(cdft_tp.bulk_densities)
+    #cdft_tp.functional.test_differentials()
+    sys.exit()
     from utility import density_from_packing_fraction
     d = np.array([1.0, 3.0/5.0])
     bulk_density = density_from_packing_fraction(
         eta=np.array([0.3105, 0.0607]), d=d)
-    cdft = cdft1D(bulk_densities=bulk_density,
-                  particle_diameters=d,
-                  domain_length=40.0,
-                  functional="Rosenfeld",
-                  grid_dr=0.001,
-                  temperature=1.0,
-                  quadrature="None")
+    cdft1 = cdft1D(bulk_densities=bulk_density,
+                   particle_diameters=d,
+                   domain_length=40.0,
+                   functional="Rosenfeld",
+                   grid_dr=0.001,
+                   temperature=1.0,
+                   quadrature="None")
 
     d = np.array([1.0])
     bulk_density = density_from_packing_fraction(eta=np.array([0.2]), d=d)
-    cdft = cdft1D(bulk_densities=bulk_density,
-                  particle_diameters=d,
-                  domain_length=40.0,
-                  functional="WHITEBEARMARKII",
-                  grid_dr=0.001,
-                  temperature=1.0,
-                  quadrature="None")
+    cdft2 = cdft1D(bulk_densities=bulk_density,
+                   particle_diameters=d,
+                   domain_length=40.0,
+                   functional="WHITEBEARMARKII",
+                   grid_dr=0.001,
+                   temperature=1.0,
+                   quadrature="None")

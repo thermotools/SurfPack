@@ -74,150 +74,6 @@ class quadrature():
         self.weights[-1] = 1.0 / 2.0
 
 
-class planar_weights_system_mc():
-    """
-    Multicomponent planar weigts
-    """
-
-    def __init__(self, functional,
-                 dr: float,
-                 R: ndarray,
-                 N: int,
-                 quad="Roth",
-                 mask_conv_results=None,
-                 ms=None,
-                 plw=planar_weights,
-                 wd=weighted_densities_1D,
-                 diff=differentials_1D):
-        """
-
-        Args:
-            functional: Functional
-            dr (float): Grid spacing
-            R (ndarray): Particle radius
-            N (int): Grid size
-            quad (str): Quadrature for integral
-            mask_conv_results: Mask to avoid divide by zero
-            ms (np.ndarray): Mumber of monomers
-            plw: Class type,defaults to planar_weights
-            wd: Class type,defaults to weighted_densities_1D
-            diff: Class type,defaults to differentials_1D
-        """
-        self.functional = functional
-        self.pl_weights = []
-        self.comp_weighted_densities = []
-        self.differentials = []
-        self.nc = np.shape(R)[0]
-        if ms is None:
-            ms = np.ones(self.nc)
-        for i in range(self.nc):
-            self.pl_weights.append(plw(dr=dr, R=R[i], N=N, quad=quad))
-            self.comp_weighted_densities.append(
-                wd(N=N, R=R[i], ms=ms[i], mask_conv_results=mask_conv_results))
-            self.comp_differentials.append(diff(N=N, R=R[i]))
-
-        # Overall weighted densities
-        self.weighted_densities = wd(N=N, R=0.5)  # Dummy R
-        self.setup_fft()
-
-    def convolutions(self, rho):
-        """
-        Perform convolutions for weighted densities
-
-        Args:
-            rho (array_like): Density profile
-        """
-        self.weighted_densities.set_zero()
-        for i in range(self.nc):
-            self.pl_weights[i].convolutions(
-                self.comp_weighted_densities[i], rho[i])
-            self.weighted_densities += self.comp_weighted_densities[i]
-        self.weighted_densities.update_utility_variables()
-
-    def convolution_n3(self, rho):
-        """
-
-            Args:
-                densities:
-                rho (array_like): Density profile
-
-            Returns:
-
-            """
-        self.weighted_densities.set_zero()
-        for i in range(self.nc):
-            self.pl_weights[i].convolution_n3(
-                self.comp_weighted_densities[i], rho[i])
-            self.weighted_densities += self.comp_weighted_densities[i]
-        # self.weighted_densities.update_after_convolution()
-
-    def setup_fft(self):
-        """
-        Allocate memory and setup object for FFT
-        """
-        for i in range(self.nc):
-            self.pl_weights[i].setup_fft(self.comp_weighted_densities[i],
-                                         self.comp_differentials[i])
-
-    def correlation_convolution(self):
-        """
-        Calculate functional differentials and perform convolutions with the
-        appropriate weight functions.
-        """
-        self.functional.differentials(self.weighted_densities)
-        for i in range(self.nc):
-            self.comp_differentials[i].set_functional_differentials(
-                self.functional)
-            self.pl_weights[i].correlation_convolution(
-                self.comp_differentials[i])
-
-
-class planar_weights_system_mc_pc_saft():
-    """
-    Multicomponent planar weigts including PC-SAFT dispersion
-    """
-
-    def __init__(self, functional,
-                 dr: float,
-                 R: np.ndarray,
-                 N: int,
-                 pcsaft: object,
-                 mask_conv_results=None,
-                 plw=planar_pc_saft_weights,
-                 wd=weighted_densities_pc_saft_1D,
-                 diff=differentials_pc_saft_1D):
-        """
-
-        Args:
-            functional: Functional
-            dr (float): Grid spacing
-            R (np.ndarray): Particle radius
-            N (int): Grid size
-            pcsaft: Thermopack object
-            mask_conv_results: Mask to avoid divide by zero
-            plw: Class type,defaults to planar_weights
-            wd: Class type,defaults to weighted_densities_1D
-            diff: Class type,defaults to differentials_1D
-        """
-
-        self.thermo = pcsaft
-        planar_weights_system_mc.__init__(self, functional, dr, R, N,
-                                          mask_conv_results, pcsaft.ms,
-                                          plw, wd, diff)
-
-    def convolutions(self, rho):
-        """
-        Perform convolutions for weighted densities
-
-        Args:
-            rho (array_like): Density profile
-        """
-        planar_weights_system_mc.convolutions(self, rho)
-        for i in range(self.nc):
-            self.weighted_densities.rho_disp_array[i, :] = \
-                self.comp_weighted_densities[i].rho_disp[:]
-
-
 class planar_weights():
     """
     """
@@ -541,6 +397,8 @@ class planar_weights():
             for k in range(int(self.N/2)):
                 kz[k] = k
             kz[-1] = -self.N/2
+        else:
+            return
 
         kz /= self.dr*self.N
         kz_abs = np.zeros_like(kz)
@@ -601,6 +459,8 @@ class planar_pc_saft_weights(planar_weights):
             for k in range(int(self.N/2)):
                 kz[k] = k
             kz[-1] = -self.N/2
+        else:
+            return
 
         kz /= self.dr*self.N
         kz_abs = np.zeros_like(kz)
@@ -655,7 +515,7 @@ class planar_pc_saft_weights(planar_weights):
             self.frho_disp[:] = sfft.fft(rho)
             # Dispersion density
             self.fw_rho_disp[:] = self.frho_disp[:] * self.fw_disp[:]
-            self.rho_disp[:] = sfft.ifft(self.fw_rho_disp).real
+            densities.rho_disp[:] = sfft.ifft(self.fw_rho_disp).real
 
     def correlation_convolution(self, diff: differentials_pc_saft_1D):
         """
@@ -686,6 +546,149 @@ class planar_pc_saft_weights(planar_weights):
 
             # Transform from Fourier space to real space
             diff.mu_disp_conv[:] = sfft.ifft(self.fw_mu_disp).real
+
+
+class planar_weights_system_mc():
+    """
+    Multicomponent planar weigts
+    """
+
+    def __init__(self, functional,
+                 dr: float,
+                 R: np.ndarray,
+                 N: int,
+                 quad="Roth",
+                 mask_conv_results=None,
+                 ms=None,
+                 plweights=planar_weights,
+                 wd=weighted_densities_1D,
+                 diff=differentials_1D):
+        """
+
+        Args:
+            functional: Functional
+            dr (float): Grid spacing
+            R (ndarray): Particle radius
+            N (int): Grid size
+            quad (str): Quadrature for integral
+            mask_conv_results: Mask to avoid divide by zero
+            ms (np.ndarray): Mumber of monomers
+            plweights: Class type,defaults to planar_weights
+            wd: Class type,defaults to weighted_densities_1D
+            diff: Class type,defaults to differentials_1D
+        """
+        self.functional = functional
+        self.pl_weights = []
+        self.comp_weighted_densities = []
+        self.comp_differentials = []
+        self.nc = np.shape(R)[0]
+        if ms is None:
+            ms = np.ones(self.nc)
+        for i in range(self.nc):
+            self.pl_weights.append(plweights(dr=dr, R=R[i], N=N, quad=quad))
+            self.comp_weighted_densities.append(
+                wd(N=N, R=R[i], ms=ms[i], mask_conv_results=mask_conv_results))
+            self.comp_differentials.append(diff(N=N, R=R[i]))
+
+        # Overall weighted densities
+        self.weighted_densities = wd(N=N, R=0.5)  # Dummy R
+        self.setup_fft()
+
+    def convolutions(self, rho):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        self.weighted_densities.set_zero()
+        for i in range(self.nc):
+            self.pl_weights[i].convolutions(
+                self.comp_weighted_densities[i], rho[i])
+            self.weighted_densities += self.comp_weighted_densities[i]
+        self.weighted_densities.update_utility_variables()
+
+    def convolution_n3(self, rho):
+        """
+
+            Args:
+                rho (array_like): Density profile
+
+            Returns:
+
+            """
+        self.weighted_densities.set_zero()
+        for i in range(self.nc):
+            self.pl_weights[i].convolution_n3(
+                self.comp_weighted_densities[i], rho[i])
+            self.weighted_densities += self.comp_weighted_densities[i]
+        # self.weighted_densities.update_after_convolution()
+
+    def setup_fft(self):
+        """
+        Allocate memory and setup object for FFT
+        """
+        for i in range(self.nc):
+            self.pl_weights[i].setup_fft(self.comp_weighted_densities[i],
+                                         self.comp_differentials[i])
+
+    def correlation_convolution(self):
+        """
+        Calculate functional differentials and perform convolutions with the
+        appropriate weight functions.
+        """
+        self.functional.differentials(self.weighted_densities)
+        for i in range(self.nc):
+            self.comp_differentials[i].set_functional_differentials(
+                self.functional)
+            self.pl_weights[i].correlation_convolution(
+                self.comp_differentials[i])
+
+
+class planar_weights_system_mc_pc_saft(planar_weights_system_mc):
+    """
+    Multicomponent planar weigts including PC-SAFT dispersion
+    """
+
+    def __init__(self, functional,
+                 dr: float,
+                 R: np.ndarray,
+                 N: int,
+                 pcsaft: object,
+                 mask_conv_results=None,
+                 plweights=planar_pc_saft_weights,
+                 wd=weighted_densities_pc_saft_1D,
+                 diff=differentials_pc_saft_1D):
+        """
+
+        Args:
+            functional: Functional
+            dr (float): Grid spacing
+            R (np.ndarray): Particle radius
+            N (int): Grid size
+            pcsaft (pyctp.pcsaft): Thermopack object
+            mask_conv_results: Mask to avoid divide by zero
+            plweights: Class type,defaults to planar_weights
+            wd: Class type,defaults to weighted_densities_1D
+            diff: Class type,defaults to differentials_1D
+        """
+
+        self.thermo = pcsaft
+        planar_weights_system_mc.__init__(self, functional, dr, R, N,
+                                          mask_conv_results, ms=pcsaft.m,
+                                          plweights=plweights, wd=wd, diff=diff)
+
+    def convolutions(self, rho):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        planar_weights_system_mc.convolutions(self, rho)
+        for i in range(self.nc):
+            self.weighted_densities.rho_disp_array[i, :] = \
+                self.comp_weighted_densities[i].rho_disp[:]
 
 
 if __name__ == "__main__":

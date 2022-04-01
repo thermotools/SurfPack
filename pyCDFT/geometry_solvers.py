@@ -200,7 +200,7 @@ class picard_geometry_solver():
 
         # Calculate deviation between new and old density profiles
         self.error[:] = self.densities.diff_norms(
-            self.old_densities, ord=self.norm)[:]
+            self.old_densities, order=self.norm)[:]
         return have_failed
 
     def iteration_plot_profile(self, plot_old_profile=False):

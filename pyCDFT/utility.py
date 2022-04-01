@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS
 import pyfftw as fftw
+from pyctp import pcsaft, saftvrmie
 
 boundary_condition = {"OPEN": 0,
                       "WALL": 1}
@@ -61,25 +62,25 @@ def density_from_packing_fraction(eta, d=np.array([1.0])):
         density(ndarray): reduced density
     """
 
-    densities = np.zeros_like(eta)
-    densities[:] = 6 * eta[:] / (np.pi * d[:] ** 3)
+    dens = np.zeros_like(eta)
+    dens[:] = 6 * eta[:] / (np.pi * d[:] ** 3)
 
-    return densities
+    return dens
 
 
-def packing_fraction_from_density(densities, d=np.array([1.0])):
+def packing_fraction_from_density(dens, d=np.array([1.0])):
     """
     Calculates the hard-sphere fluid packing fraction from reduced density.
 
     Args:
-        densities(ndarray): reduced density
+        dens(ndarray): reduced density
         d (ndarray): Reduced hard-sphere diameter
     Returns:
         eta (ndarray): Hard-sphere packing fraction
     """
 
-    eta = np.zeros_like(densities)
-    eta[:] = densities[:] * (np.pi * d[:] ** 3) / 6
+    eta = np.zeros_like(dens)
+    eta[:] = dens[:] * (np.pi * d[:] ** 3) / 6
 
     return eta
 
@@ -266,12 +267,12 @@ class densities():
                 break
         return is_valid
 
-    def diff_norms(self, other, ord=np.inf):
+    def diff_norms(self, other, order=np.inf):
         """
 
         Args:
             other (densities): Other densities
-            ord: Order of norm
+            order: Order of norm
 
         Returns:
 
@@ -279,7 +280,7 @@ class densities():
         nms = np.zeros(self.nc)
         for i in range(self.nc):
             nms[i] = np.linalg.norm(
-                self.densities[i] - other.densities[i], ord=ord)
+                self.densities[i] - other.densities[i], ord=order)
         return nms
 
     def diff_norm_scaled(self, other, scale, mask, ord=np.inf):
@@ -318,6 +319,12 @@ class weighted_densities_1D():
 
     def __init__(self, N, R, ms=1.0, mask_conv_results=None):
         """
+
+        Args:
+            N:
+            R:
+            ms:
+            mask_conv_results:
         """
         self.N = N
         self.R = R
@@ -544,6 +551,11 @@ class differentials_1D():
 
     def __init__(self, N, R, mask_conv_results=None):
         """
+
+        Args:
+            N:
+            R:
+            mask_conv_results:
         """
         self.N = N
         self.R = R
@@ -584,13 +596,27 @@ class differentials_1D():
         self.mask_conv_results[:] = mask_conv_results[:]
 
     def update_after_convolution(self):
+        """
+
+        Returns:
+
+        """
         self.d3_conv[self.mask_conv_results] = 0.0
         self.d2eff_conv[self.mask_conv_results] = 0.0
         self.d2veff_conv[self.mask_conv_results] = 0.0
         self.corr[:] = -(self.d3_conv[:] +
                          self.d2eff_conv[:] + self.d2veff_conv[:])
 
-    def set_functional_differentials(self, functional, ic=0):
+    def set_functional_differentials(self, functional, ic=None):
+        """
+
+        Args:
+            functional:
+            ic:
+
+        Returns:
+
+        """
         self.d0[:] = functional.d0[:]
         self.d1[:] = functional.d1[:]
         self.d2[:] = functional.d2[:]
@@ -685,14 +711,46 @@ class differentials_pc_saft_1D(differentials_1D):
 
     def __init__(self, N, R, mask_conv_results=None):
         """
+
+        Args:
+            N:
+            R:
+            mask_conv_results:
         """
         differentials_1D.__init__(self, N, R, mask_conv_results)
         self.mu_disp = allocate_real_convolution_variable(N)
         self.mu_disp_conv = allocate_real_convolution_variable(N)
 
-    def set_functional_differentials(self, functional, ic):
+    def set_functional_differentials(self, functional, ic=None):
+        """
+
+        Args:
+            functional:
+            ic:
+
+        Returns:
+
+        """
         differentials_1D.set_functional_differentials(self, functional, ic)
         self.mu_disp[:] = functional.mu_disp[:, ic]
+
+
+def get_thermopack_model(model):
+    """
+        Return thermopack object
+    Args:
+        model (str): Model name "PC-SAFT", "SAFT-VR Mie", ...
+
+    Returns:
+
+    """
+    if model.upper() in ("PC-SAFT", "PCSAFT"):
+        thermo = pcsaft.pcsaft()
+    elif model.upper() in ("SAFTVRMIE", "SAFT-VR MIE", "SAFT-VR-MIE"):
+        thermo = saftvrmie.saftvrmie()
+    else:
+        raise ValueError("Unknown thermopack model: " + model)
+    return thermo
 
 
 if __name__ == "__main__":

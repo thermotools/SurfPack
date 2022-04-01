@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
 import numpy as np
-from utility import weighted_densities_1D, differentials_1D
+from utility import weighted_densities_1D
 from pyctp import pcsaft
-from constants import NA
+from constants import NA, RGAS
 
 
-def get_functional(functional="Rosenfeld", R=np.array([0.5])):
+def get_functional(N, T, functional="Rosenfeld", R=np.array([0.5]), thermopack=None):
     """
     Return functional class based on functional name.
 
     Args:
+        N (int): Grid size
+        T (float): Reduced temperature
         functional (str): Name of functional
         R (ndarray): Particle radius for all components
+        thermopack (thermo): Thermopack object
     """
     functional_name = functional.upper().strip(" -")
     if functional_name in ("ROSENFELD", "RF"):
-        func = Rosenfeld(R=R)
+        func = Rosenfeld(N=N, R=R)
     elif functional_name in ("WHITEBEAR", "WB"):
-        func = Whitebear(R=R)
+        func = Whitebear(N=N, R=R)
     elif functional_name in ("WHITEBEARMARKII", "WHITEBEARII", "WBII"):
-        func = WhitebearMarkII(R=R)
+        func = WhitebearMarkII(N=N, R=R)
+    elif functional_name in ("PC-SAFT", "PCSAFT"):
+        func = pc_saft(N=N, pcs=thermopack, T_red=T, R=R)
     else:
         raise ValueError("Unknown functional: " + functional)
 
@@ -196,10 +201,30 @@ class Rosenfeld:
             self.d1[:] / (4 * np.pi * self.R) + self.d2[:]
         self.d2veff[:] = self.d1v[:] / (4 * np.pi * self.R) + self.d2v[:]
 
+    def get_differential(self, i):
+        """
+        Get differential number i
+        """
+        if i == 0:
+            d = self.d0
+        elif i == 1:
+            d = self.d1
+        elif i == 2:
+            d = self.d2
+        elif i == 3:
+            d = self.d3
+        elif i == 4:
+            d = self.d1v
+        elif i == 5:
+            d = self.d2v
+        else:
+            raise ValueError("get_differential: Index out of bounds")
+        return d
+
+
     def test_differentials(self, dens0):
         print("Testing functional " + self.name)
-        dFdn = differentials_1D(1, 1.0)
-        dFdn = self.differentials(dens, dFdn)
+        self.differentials(dens)
         eps = 1.0e-5
         for i in range(6):
             ni0 = dens0.get_density(i)
@@ -213,13 +238,14 @@ class Rosenfeld:
             dens0.set_density(i, ni0)
             dens0.update_utility_variables()
             dFdn_num = (F2 - F1) / (2 * dni)
-            print("Differential: ", i, dFdn_num, dFdn.get_differential(i))
+            print("Differential: ", i, dFdn_num, self.get_differential(i))
 
     def test_bulk_differentials(self, rho_b):
         print("Testing functional " + self.name)
         bd0 = bulk_weighted_densities(rho_b, self.R)
         phi, dphidn = self.bulk_functional_with_differentials(bd0)
 
+        print("Functional differentials:")
         for i in range(4):
             bd = bulk_weighted_densities(rho_b, self.R)
             eps = 1.0e-5 * bd.n[i]
@@ -234,6 +260,7 @@ class Rosenfeld:
 
         mu_ex = self.bulk_excess_chemical_potential(rho_b)
         rho_b_local = np.zeros_like(rho_b)
+        print("Functional differentials:")
         for i in range(self.nc):
             eps = 1.0e-5 * rho_b[i]
             rho_b_local[:] = rho_b[:]
@@ -587,9 +614,10 @@ class pc_saft(Whitebear):
         V = 1.0
         for i in range(len(f)):
             rho_thermo[:] = dens.rho_disp_array[i, :]
+            rho_mix = np.sum(rho_thermo)
             rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
             a, = self.thermo.a_dispersion(self.T, V, rho_thermo)
-            f[i] += a
+            f[i] += rho_mix*a
 
         return f
 
@@ -642,7 +670,7 @@ class pc_saft(Whitebear):
         V = 1.0/rho_mix
         n = rho_thermo/rho_mix
         p_r = self.thermo.pressure_tv(self.T, V, n, property_flag="R")
-        z_r = p_r/(rho_mix * R * self.T)
+        z_r = p_r/(rho_mix * RGAS * self.T)
         z += z_r
         return z
 
@@ -667,27 +695,48 @@ class pc_saft(Whitebear):
         n = rho_thermo/rho_mix
         mu_ex_pc,  = self.thermo.chemical_potential_tv(
             self.T, V, n, property_flag="R")
-        mu_ex += mu_ex_pc / (R * self.T)
+        mu_ex += mu_ex_pc / (RGAS * self.T)
         return mu_ex
 
+    def bulk_functional_with_differentials(self, bd):
+        """
+        Calculates the functional differentials wrpt. the weighted densities
+        in the bulk phase.
+
+        Args:
+        bd (bulk_weighted_densities): bulk_weighted_densities
+
+        """
+        phi, dphidn = Whitebear.bulk_functional_with_differentials(self, bd)
+        rho = np.array([bd.n[0]])
+        rho_mix = np.sum(rho)
+        V = 1.0
+        rho_thermo = rho/(NA*self.d_hs[0]**3)
+        print(type(rho_thermo))
+        a, a_n, = self.thermo.a_dispersion(
+            self.T, V, rho_thermo, a_n=True)
+        phi += rho_mix*a
+        dphidn[0] += a + np.sum(rho_thermo)*a_n[0]
+
+        return phi, dphidn
 
 if __name__ == "__main__":
     # Model testing
     dens = weighted_densities_1D(1, 0.5)
     dens.set_testing_values()
     dens.print(print_utilities=True)
-    RF_functional = Rosenfeld()
+    RF_functional = Rosenfeld(N=1)
     RF_functional.test_differentials(dens)
-    WB_functional = Whitebear()
+    WB_functional = Whitebear(N=1)
     WB_functional.test_differentials(dens)
-    WBII_functional = WhitebearMarkII()
+    WBII_functional = WhitebearMarkII(N=1)
     WBII_functional.test_differentials(dens)
 
     rho = np.array([0.5, 0.1])
     R = np.array([0.5, 0.3])
-    RF_functional = Rosenfeld(R=R)
+    RF_functional = Rosenfeld(N=1, R=R)
     RF_functional.test_bulk_differentials(rho)
-    WB_functional = Whitebear(R=R)
+    WB_functional = Whitebear(N=1, R=R)
     WB_functional.test_bulk_differentials(rho)
-    WBII_functional = WhitebearMarkII(R=R)
+    WBII_functional = WhitebearMarkII(N=1, R=R)
     WBII_functional.test_bulk_differentials(rho)
