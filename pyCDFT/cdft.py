@@ -2,7 +2,8 @@
 import numpy as np
 import fmt_functionals
 from utility import packing_fraction_from_density, \
-    boundary_condition, densities, get_thermopack_model
+    boundary_condition, densities, get_thermopack_model, \
+    weighted_densities_pc_saft_1D
 from weight_functions import planar_weights_system_mc
 from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS, NA
 import sys
@@ -262,7 +263,8 @@ class cdft_thermopack(cdft1D):
         self.comp = comp
         if bubble_point_pressure:
             print(temperature, comp)
-            self.eos_pressure, self.eos_gas_comp = self.thermo.bubble_pressure(temperature, comp)
+            self.eos_pressure, self.eos_gas_comp = self.thermo.bubble_pressure(
+                temperature, comp)
             self.eos_liq_comp = self.comp
             self.eos_phase = self.thermo.TWOPH
         else:
@@ -287,17 +289,22 @@ class cdft_thermopack(cdft1D):
                                                       self.eos_pressure,
                                                       comp,
                                                       self.eos_phase)
-
+            self.eos_vg = np.ones_like(self.eos_vl)
+            self.eos_gas_comp = np.zeros_like(self.eos_vl)
+        print(self.eos_vg, self.eos_gas_comp)
         particle_diameters = np.zeros(self.thermo.nc)
         particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
-        bulk_densities = np.zeros(self.thermo.nc)
-        bulk_densities[:] = self.eos_liq_comp[:]/self.eos_vl
-        bulk_densities[:] *= NA*particle_diameters[0]**3
+        self.bulk_densities_l = np.zeros(self.thermo.nc)
+        self.bulk_densities_l[:] = self.eos_liq_comp[:]/self.eos_vl
+        self.bulk_densities_l[:] *= NA*particle_diameters[0]**3
+        self.bulk_densities_g = np.zeros(self.thermo.nc)
+        self.bulk_densities_g[:] = self.eos_gas_comp[:]/self.eos_vg
+        self.bulk_densities_g[:] *= NA*particle_diameters[0]**3
         particle_diameters[:] /= particle_diameters[0]
         temp_red = temperature / self.thermo.eps_div_kb[0]
-        print(bulk_densities)
+        print(self.bulk_densities_g)
         cdft1D.__init__(self,
-                        bulk_densities=bulk_densities,
+                        bulk_densities=self.bulk_densities_l,
                         particle_diameters=particle_diameters,
                         wall=wall,
                         domain_length=domain_length,
@@ -306,6 +313,23 @@ class cdft_thermopack(cdft1D):
                         temperature=temp_red,
                         thermopack=self.thermo)
 
+    def test_initial_vle_state(self):
+        """
+        """
+        # Test bulk differentials
+        self.functional.test_bulk_differentials(self.bulk_densities)
+        z_l = self.functional.bulk_compressibility(self.bulk_densities_l)
+        print("z_l", z_l)
+        z_g = self.functional.bulk_compressibility(self.bulk_densities_g)
+        print("z_g", z_g)
+        mu_l = self.functional.bulk_excess_chemical_potential(
+            self.bulk_densities_l) + np.log(self.bulk_densities_l)
+        mu_g = self.functional.bulk_excess_chemical_potential(
+            self.bulk_densities_g) + np.log(self.bulk_densities_g)
+        print("mu_l, mu_g, mu_l-mu_g", mu_l, mu_g, mu_l-mu_g)
+        P_g = z_g*np.sum(self.bulk_densities_g) * self.T
+        P_l = z_l*np.sum(self.bulk_densities_l) * self.T
+        print("P_l, P_g", P_l, P_g, P_l-P_g)
 
 
 if __name__ == "__main__":
@@ -317,8 +341,7 @@ if __name__ == "__main__":
                               bubble_point_pressure=True,
                               domain_length=40.0,
                               grid_dr=0.001)
-    cdft_tp.functional.test_bulk_differentials(cdft_tp.bulk_densities)
-    #cdft_tp.functional.test_differentials()
+    cdft_tp.test_initial_vle_state()
     sys.exit()
     from utility import density_from_packing_fraction
     d = np.array([1.0, 3.0/5.0])

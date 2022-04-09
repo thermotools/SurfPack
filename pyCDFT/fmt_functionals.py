@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
-from utility import weighted_densities_1D
+from utility import weighted_densities_1D, get_thermopack_model, \
+    weighted_densities_pc_saft_1D
 from pyctp import pcsaft
 from constants import NA, RGAS
 
@@ -24,7 +25,7 @@ def get_functional(N, T, functional="Rosenfeld", R=np.array([0.5]), thermopack=N
     elif functional_name in ("WHITEBEARMARKII", "WHITEBEARII", "WBII"):
         func = WhitebearMarkII(N=N, R=R)
     elif functional_name in ("PC-SAFT", "PCSAFT"):
-        func = pc_saft(N=N, pcs=thermopack, T_red=T, R=R)
+        func = pc_saft(N=N, pcs=thermopack, T_red=T)
     else:
         raise ValueError("Unknown functional: " + functional)
 
@@ -43,6 +44,8 @@ class bulk_weighted_densities:
             rho_b (ndarray): Bulk densities
             R (ndarray): Particle radius for all components
         """
+        self.rho_i = np.array(rho_b)
+        self.rho_i[:] = rho_b[:]
         self.n = np.zeros(4)
         self.n[0] = np.sum(rho_b)
         self.n[1] = np.sum(R * rho_b)
@@ -124,8 +127,9 @@ class Rosenfeld:
             float: compressibility
         """
         bd = bulk_weighted_densities(rho_b, self.R)
-        phi, dphidn = self.bulk_functional_with_differentials(bd)
-        beta_p_ex = - phi + np.sum(dphidn * bd.n)
+        phi, dphidn = self.bulk_functional_with_differentials(
+            bd, only_hs_system=True)
+        beta_p_ex = - phi + np.sum(dphidn[:4] * bd.n)
         beta_p_id = bd.n[0]
         z = (beta_p_id + beta_p_ex)/bd.n[0]
         return z
@@ -143,20 +147,22 @@ class Rosenfeld:
 
         """
         bd = bulk_weighted_densities(rho_b, self.R)
-        phi, dphidn = self.bulk_functional_with_differentials(bd)
+        phi, dphidn = self.bulk_functional_with_differentials(
+            bd, only_hs_system=True)
         mu_ex = np.zeros(self.nc)
         for i in range(self.nc):
-            mu_ex[i] = np.sum(dphidn * bd.dndrho[:, i])
+            mu_ex[i] = np.sum(dphidn[:4] * bd.dndrho[:, i])
 
         return mu_ex
 
-    def bulk_functional_with_differentials(self, bd):
+    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
         """
         Calculates the functional differentials wrpt. the weighted densities
         in the bulk phase.
 
         Args:
         bd (bulk_weighted_densities): bulk_weighted_densities
+        only_hs_system (bool): Only calculate for hs-system
 
         """
         n3neg = 1.0-bd.n[3]
@@ -221,14 +227,22 @@ class Rosenfeld:
             raise ValueError("get_differential: Index out of bounds")
         return d
 
-
     def test_differentials(self, dens0):
+        """
+
+        Args:
+            dens0 (weighted_densities_1D): Weighted densities
+
+        """
         print("Testing functional " + self.name)
-        self.differentials(dens)
+        self.differentials(dens0)
+        #F0 = self.excess_free_energy(dens0)
         eps = 1.0e-5
-        for i in range(6):
-            ni0 = dens0.get_density(i)
-            dni = eps * ni0
+        ni0 = np.zeros_like(dens0.n0)
+        dni = np.zeros_like(dens0.n0)
+        for i in range(dens0.n_max_test):
+            ni0[:] = dens0.get_density(i)
+            dni[:] = eps * ni0[:]
             dens0.set_density(i, ni0 - dni)
             dens0.update_utility_variables()
             F1 = self.excess_free_energy(dens0)
@@ -241,11 +255,17 @@ class Rosenfeld:
             print("Differential: ", i, dFdn_num, self.get_differential(i))
 
     def test_bulk_differentials(self, rho_b):
+        """
+
+        Args:
+            rho_b (np.ndarray): Bulk densities
+
+        """
         print("Testing functional " + self.name)
         bd0 = bulk_weighted_densities(rho_b, self.R)
         phi, dphidn = self.bulk_functional_with_differentials(bd0)
 
-        print("Functional differentials:")
+        print("HS functional differentials:")
         for i in range(4):
             bd = bulk_weighted_densities(rho_b, self.R)
             eps = 1.0e-5 * bd.n[i]
@@ -267,12 +287,19 @@ class Rosenfeld:
             rho_b_local[i] += eps
             bd = bulk_weighted_densities(rho_b_local, self.R)
             phi2, dphidn = self.bulk_functional_with_differentials(bd)
+            phi2_hs, _ = self.bulk_functional_with_differentials(
+                bd, only_hs_system=True)
             rho_b_local[:] = rho_b[:]
             rho_b_local[i] -= eps
             bd = bulk_weighted_densities(rho_b_local, self.R)
             phi1, dphidn = self.bulk_functional_with_differentials(bd)
+            phi1_hs, _ = self.bulk_functional_with_differentials(
+                bd, only_hs_system=True)
+            dphidrho_num_no_hs = (phi2 - phi2_hs - phi1 + phi1_hs) / (2 * eps)
             dphidrho_num = (phi2 - phi1) / (2 * eps)
-            print("Differential: ", i, dphidrho_num, mu_ex[i])
+            if np.shape(dphidn)[0] > 4:
+                print("Differential: ", 4+i, dphidrho_num_no_hs, dphidn[4+i])
+            print("Chemical potential comp.: ", i, dphidrho_num, mu_ex[i])
 
 
 class Whitebear(Rosenfeld):
@@ -325,13 +352,14 @@ class Whitebear(Rosenfeld):
 
         return f
 
-    def bulk_functional_with_differentials(self, bd):
+    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
         """
         Calculates the functional differentials wrpt. the weighted densities
         in the bulk phase.
 
         Args:
         bd (bulk_weighted_densities): bulk_weighted_densities
+        only_hs_system (bool): Only calculate for hs-system
 
         """
         n3neg = 1.0-bd.n[3]
@@ -496,13 +524,14 @@ class WhitebearMarkII(Whitebear):
              (bd.n[3] ** 2 * bd.n[3]) - 4 / bd.n[3] ** 2 + 2 / bd.n[3] + 2)
         return phi2_div3, dphi2dn3_div3, phi3_div3, dphi3dn3_div3
 
-    def bulk_functional_with_differentials(self, bd):
+    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
         """
         Calculates the functional differentials wrpt. the weighted densities
         in the bulk phase.
 
         Args:
         bd (bulk_weighted_densities): bulk_weighted_densities
+        only_hs_system (bool): Only calculate for hs-system
 
         """
         phi2_div3, dphi2dn3_div3, phi3_div3, dphi3dn3_div3 = \
@@ -578,7 +607,7 @@ class pc_saft(Whitebear):
 
     """
 
-    def __init__(self, N, pcs: pcsaft, T_red, R=np.array([0.5])):
+    def __init__(self, N, pcs: pcsaft, T_red):
         """
 
         Args:
@@ -589,13 +618,15 @@ class pc_saft(Whitebear):
         self.thermo = pcs
         self.T_red = T_red
         self.T = self.T_red * self.thermo.eps_div_kb[0]
+        self.d_hs = np.zeros(pcs.nc)
+        for i in range(pcs.nc):
+            self.d_hs[i] = pcs.hard_sphere_diameters(self.T)
+        R = np.zeros(pcs.nc)
+        R[:] = 0.5*self.d_hs[:]/self.d_hs[0]
         Whitebear.__init__(self, N, R)
         self.name = "PC-SAFT"
         self.short_name = "PC"
         self.mu_disp = np.zeros((N, pcs.nc))
-        self.d_hs = np.zeros(pcs.nc)
-        for i in range(self.nc):
-            self.d_hs[i] = pcs.hard_sphere_diameters(self.T)
 
     def excess_free_energy(self, dens):
         """
@@ -609,8 +640,7 @@ class pc_saft(Whitebear):
 
         """
         f = Whitebear.excess_free_energy(self, dens)
-
-        rho_thermo = np.array(self.nc)
+        rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(len(f)):
             rho_thermo[:] = dens.rho_disp_array[i, :]
@@ -632,13 +662,13 @@ class pc_saft(Whitebear):
         """
         Whitebear.differentials(self, dens)
 
-        # All densities must be positie
+        # All densities must be positive
         prdm = dens.rho_disp > 0.0  # Positive rho_disp value mask
         for i in range(self.nc):
             np.logical_and(prdm, dens.rho_disp_array[:, i] > 0.0, out=prdm)
         # Mask for zero and negative value of rho_disp
         non_prdm = np.invert(prdm)
-        rho_thermo = np.array(self.nc)
+        rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(self.N):
             if prdm[i]:
@@ -662,15 +692,15 @@ class pc_saft(Whitebear):
             float: compressibility
         """
         z = Whitebear.bulk_compressibility(self, rho_b)
-
         # PC-SAFT contributions
         rho_thermo = np.array(rho_b)
         rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
         rho_mix = np.sum(rho_thermo)
         V = 1.0/rho_mix
         n = rho_thermo/rho_mix
-        p_r = self.thermo.pressure_tv(self.T, V, n, property_flag="R")
-        z_r = p_r/(rho_mix * RGAS * self.T)
+        a, a_V, = self.thermo.a_dispersion(
+            self.T, V, n, a_v=True)
+        z_r = -a_V*V
         z += z_r
         return z
 
@@ -693,50 +723,86 @@ class pc_saft(Whitebear):
         rho_mix = np.sum(rho_thermo)
         V = 1.0/rho_mix
         n = rho_thermo/rho_mix
-        mu_ex_pc,  = self.thermo.chemical_potential_tv(
-            self.T, V, n, property_flag="R")
-        mu_ex += mu_ex_pc / (RGAS * self.T)
+        a, a_n, = self.thermo.a_dispersion(
+            self.T, V, n, a_n=True)
+        a_n += a
+        mu_ex += a_n
         return mu_ex
 
-    def bulk_functional_with_differentials(self, bd):
+    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
         """
         Calculates the functional differentials wrpt. the weighted densities
         in the bulk phase.
 
         Args:
         bd (bulk_weighted_densities): bulk_weighted_densities
-
+        only_hs_system (bool): Only calculate for hs-system
         """
         phi, dphidn = Whitebear.bulk_functional_with_differentials(self, bd)
-        rho = np.array([bd.n[0]])
-        rho_mix = np.sum(rho)
-        V = 1.0
-        rho_thermo = rho/(NA*self.d_hs[0]**3)
-        print(type(rho_thermo))
-        a, a_n, = self.thermo.a_dispersion(
-            self.T, V, rho_thermo, a_n=True)
-        phi += rho_mix*a
-        dphidn[0] += a + np.sum(rho_thermo)*a_n[0]
+        if not only_hs_system:
+            rho_vec = bd.rho_i
+            rho_mix = np.sum(rho_vec)
+            V = 1.0
+            rho_thermo = rho_vec/(NA*self.d_hs[0]**3)
+            a, a_n, = self.thermo.a_dispersion(
+                self.T, V, rho_thermo, a_n=True)
+            phi += rho_mix*a
+            dphidn_comb = np.zeros(4 + self.nc)
+            dphidn_comb[:4] = dphidn
+            dphidn_comb[4:] = a + np.sum(rho_thermo)*a_n[:]
+        else:
+            dphidn_comb = dphidn
+        return phi, dphidn_comb
 
-        return phi, dphidn
+    def get_differential(self, i):
+        """
+        Get differential number i
+        """
+        if i <= 5:
+            d = Whitebear.get_differential(self, i)
+        else:
+            d = self.mu_disp[i-6, :]
+        return d
+
 
 if __name__ == "__main__":
     # Model testing
-    dens = weighted_densities_1D(1, 0.5)
-    dens.set_testing_values()
-    dens.print(print_utilities=True)
-    RF_functional = Rosenfeld(N=1)
-    RF_functional.test_differentials(dens)
-    WB_functional = Whitebear(N=1)
-    WB_functional.test_differentials(dens)
-    WBII_functional = WhitebearMarkII(N=1)
-    WBII_functional.test_differentials(dens)
 
-    rho = np.array([0.5, 0.1])
-    R = np.array([0.5, 0.3])
-    RF_functional = Rosenfeld(N=1, R=R)
-    RF_functional.test_bulk_differentials(rho)
-    WB_functional = Whitebear(N=1, R=R)
-    WB_functional.test_bulk_differentials(rho)
-    WBII_functional = WhitebearMarkII(N=1, R=R)
-    WBII_functional.test_bulk_differentials(rho)
+    pcs = get_thermopack_model("PC-SAFT")
+    pcs.init("C1")
+    PCS_functional = pc_saft(1, pcs, T_red=1.1)
+    dens_pcs = weighted_densities_pc_saft_1D(1, PCS_functional.R)
+
+    v = pcs.specific_volume(PCS_functional.T,
+                            1.0e6,
+                            np.array([1.0]),
+                            pcs.LIQPH)
+    rho = (NA * PCS_functional.d_hs[0] ** 3)/v
+    PCS_functional.test_bulk_differentials(rho)
+
+    dens = weighted_densities_pc_saft_1D(1, PCS_functional.R)
+    dens.set_testing_values(rho)
+    #dens.print(print_utilities=True)
+    print("\n")
+    PCS_functional.test_differentials(dens)
+
+    # Hard sphere functionals
+    # dens = weighted_densities_1D(1, 0.5)
+    # dens.set_testing_values()
+    # dens.print(print_utilities=True)
+    #
+    # RF_functional = Rosenfeld(N=1)
+    # RF_functional.test_differentials(dens)
+    # WB_functional = Whitebear(N=1)
+    # WB_functional.test_differentials(dens)
+    # WBII_functional = WhitebearMarkII(N=1)
+    # WBII_functional.test_differentials(dens)
+
+    # rho = np.array([0.5, 0.1])
+    # R = np.array([0.5, 0.3])
+    # RF_functional = Rosenfeld(N=1, R=R)
+    # RF_functional.test_bulk_differentials(rho)
+    # WB_functional = Whitebear(N=1, R=R)
+    # WB_functional.test_bulk_differentials(rho)
+    # WBII_functional = WhitebearMarkII(N=1, R=R)
+    # WBII_functional.test_bulk_differentials(rho)

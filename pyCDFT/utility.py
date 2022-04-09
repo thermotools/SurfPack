@@ -351,6 +351,9 @@ class weighted_densities_1D():
         else:
             self.mask_conv_results = mask_conv_results
 
+        # Utility for testing
+        self.n_max_test = 6
+
     def set_convolution_result_mask(self, mask_conv_results):
         """
 
@@ -407,16 +410,25 @@ class weighted_densities_1D():
         self.n1v[:] += other.n1v[:]
         return self
 
-    def set_testing_values(self):
+    def set_testing_values(self, rho=None):
         """
         Set some dummy values for testing differentials
         """
-        self.n2[:] = 3.0
-        self.n3[:] = 0.5
-        self.n2v[:] = 6.0
-        self.n0[:] = 1.0
-        self.n1[:] = 2.0
-        self.n1v[:] = 5.0
+        if rho is not None:
+            self.n0[:] = 0.5*rho/self.R
+            self.n1[:] = 0.5*rho
+            self.n2[:] = 2*np.pi*rho*self.R
+            self.n3[:] = 4*np.pi*self.R**3*rho/3
+            self.n1v[:] = - 1.0e-3*rho
+            self.n2v[:] = 4*np.pi*self.R*self.n1v[:]
+        else:
+            self.n2[:] = 3.0
+            self.n3[:] = 0.5
+            self.n2v[:] = 6.0
+            self.n0[:] = 1.0
+            self.n1[:] = 2.0
+            self.n1v[:] = 5.0
+
         self.N = 1
         self.R = 0.5
         self.update_utility_variables()
@@ -446,17 +458,17 @@ class weighted_densities_1D():
         Set weighted density number i
         """
         if i == 0:
-            self.n0 = n
+            self.n0[:] = n[:]
         elif i == 1:
-            self.n1 = n
+            self.n1[:] = n[:]
         elif i == 2:
-            self.n2 = n
+            self.n2[:] = n[:]
         elif i == 3:
-            self.n3 = n
+            self.n3[:] = n[:]
         elif i == 4:
-            self.n1v = n
+            self.n1v[:] = n[:]
         elif i == 5:
-            self.n2v = n
+            self.n2v[:] = n[:]
 
     def print(self, print_utilities=False, index=None):
         """
@@ -505,6 +517,7 @@ class weighted_densities_pc_saft_1D(weighted_densities_1D):
         weighted_densities_1D.__init__(self, N, R, mask_conv_results)
         self.rho_disp = allocate_real_convolution_variable(N)
         self.rho_disp_array = None
+        self.n_max_test = 7
 
     def set_zero(self):
         """
@@ -523,12 +536,38 @@ class weighted_densities_pc_saft_1D(weighted_densities_1D):
         self.rho_disp[:] += other.rho_disp[:]
         return self
 
-    def set_testing_values(self):
+    def set_testing_values(self, rho=None):
         """
         Set some dummy values for testing differentials
         """
-        weighted_densities_1D.set_testing_values(self)
-        self.rho_disp[:] = 1.0
+        weighted_densities_1D.set_testing_values(self, rho)
+        if self.rho_disp_array is None:
+            self.rho_disp_array = np.ones((1, 1))
+        if rho is not None:
+            self.rho_disp[:] = rho
+            self.rho_disp_array[:] = rho
+        else:
+            self.rho_disp[:] = 1.0
+
+    def get_density(self, i):
+        """
+        Get weighted density number i
+        """
+        if i <= 5:
+            n = weighted_densities_1D.get_density(self, i)
+        else:
+            n = self.rho_disp
+        return n
+
+    def set_density(self, i, n):
+        """
+        Set weighted density number i
+        """
+        if i <= 5:
+            weighted_densities_1D.set_density(self, i, n)
+        else:
+            self.rho_disp[:] = n
+            self.rho_disp_array[:] = n
 
     def print(self, print_utilities=False, index=None):
         """
@@ -751,6 +790,28 @@ def get_thermopack_model(model):
     else:
         raise ValueError("Unknown thermopack model: " + model)
     return thermo
+
+
+def get_initial_densities_vle(z, rho_g, rho_l, d_hs):
+    """
+    Calculate initial densities for gas-liquid interface calculatsion
+    Args:
+        z (np.ndarray): Grid positions (Symmetric around z=0)
+        d_hs (np.ndarray): Hard sphere diamaters in reduced units
+        rho_g (list of float): Gas density
+        rho_l (list of float): Liquid density
+
+    Returns:
+       rho0 (list of np.ndarray): Initial density with liquid deinsity to the right
+
+    """
+    rho0 = []
+    for i in range(len(d_hs)):
+        rho0i = np.zeros_like(z)
+        rho0i[:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
+            (rho_l[i] - rho_g[i])*np.tanh(0.6*z[:]/d_hs[i])
+        rho0.append(rho0i)
+    return rho0
 
 
 if __name__ == "__main__":

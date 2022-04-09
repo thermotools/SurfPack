@@ -677,6 +677,8 @@ class planar_weights_system_mc_pc_saft(planar_weights_system_mc):
         planar_weights_system_mc.__init__(self, functional, dr, R, N,
                                           mask_conv_results, ms=pcsaft.m,
                                           plweights=plweights, wd=wd, diff=diff)
+        # Make sure rho_disp_array is allocated for mother density class
+        self.weighted_densities.rho_disp_array = np.zeors((self.nc, N))
 
     def convolutions(self, rho):
         """
