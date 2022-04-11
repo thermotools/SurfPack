@@ -5,7 +5,7 @@ from collections import OrderedDict
 CONV_FFTW = 1
 CONV_SCIPY_FFT = 2
 CONV_NO_FFT = 3
-CONVOLUTIONS = CONV_SCIPY_FFT
+CONVOLUTIONS = CONV_FFTW  # CONV_SCIPY_FFT
 
 # Debug flag
 DEBUG = False

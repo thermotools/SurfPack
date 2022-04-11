@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
-from cdft import cdft1D
+from cdft import cdft1D, cdft_thermopack
 import matplotlib.pyplot as plt
 from utility import boundary_condition, density_from_packing_fraction, \
     get_data_container, plot_data_container, \
@@ -140,21 +140,31 @@ class picard_geometry_solver():
         # Calculate one-body direct correlation function
         self.cDFT.weights_system.correlation_convolution()
 
-        # index = 30000
-        # print(self.mod_densities[0][index], self.mod_densities[1][index])
+        # print(self.cDFT.N, self.cDFT.Nbc)
+        # index = 970
+        # print(self.mod_densities[0][index])
+        # #print(self.mod_densities[0][index], self.mod_densities[1][index])
         # self.cDFT.weights_system.comp_weighted_densities[0].print(index=index)
-        # self.cDFT.weights_system.comp_weighted_densities[1].print(index=index)
+        # # self.cDFT.weights_system.comp_weighted_densities[1].print(index=index)
         # self.cDFT.weights_system.weighted_densities.print(index=index)
         # bd = bulk_weighted_densities(self.cDFT.bulk_densities, self.cDFT.R)
         # bd.print()
+
+        # print(
+        #     "corr", self.cDFT.weights_system.comp_differentials[0].corr[index])
+        # print(
+        #     "mu", self.cDFT.excess_mu)
+        # print("corr_b", self.cDFT.functional.get_bulk_correlation(
+        #     self.cDFT.bulk_densities, only_hs_system=True))
+        # print("mu_disp",
+        #       self.cDFT.weights_system.comp_differentials[0].mu_disp_conv[index])
         # sys.exit()
 
         # Calculate new density profile using the variations of the functional
         for i in range(self.cDFT.nc):
             self.new_densities[i][self.domain_mask] = self.cDFT.bulk_densities[i] * \
-                np.exp(self.cDFT.weights_system.differentials[i].corr[self.domain_mask]
-                       + self.cDFT.beta *
-                       (self.cDFT.excess_mu[i] - self.cDFT.Vext[i][self.domain_mask]))
+                np.exp(self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask]
+                       + self.cDFT.excess_mu[i] - self.cDFT.beta * self.cDFT.Vext[i][self.domain_mask])
         if DEBUG:
             print("new_density", self.new_densities)
 
@@ -206,22 +216,35 @@ class picard_geometry_solver():
             self.old_densities, order=self.norm)[:]
         return have_failed
 
+    # def iteration_plot_profile(self, plot_old_profile=False):
+    #     fig, ax = plt.subplots(1, 1)
+    #     ax.set_xlabel("$z/\sigma_1$")
+    #     ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+    #     for i in range(self.densities.nc):
+    #         ax.plot(self.r[self.domain_mask],
+    #                 self.densities[i][self.domain_mask] /
+    #                 self.cDFT.bulk_densities[i],
+    #                 lw=2, color=LCOLORS[i], label=f"Comp. {i+1}")
+    #     if plot_old_profile:
+    #         for i in range(self.densities.nc):
+    #             ax.plot(self.r[self.domain_mask],
+    #                     self.old_densities[i][self.domain_mask] /
+    #                     self.cDFT.bulk_densities[i],
+    #                     lw=2, color=LCOLORS[i], ls="--",
+    #                     label=f"Old. Comp. {i+1}")
+    #     leg = plt.legend(loc="best", numpoints=1)
+    #     leg.get_frame().set_linewidth(0.0)
+    #     plt.show()
+
     def iteration_plot_profile(self, plot_old_profile=False):
         fig, ax = plt.subplots(1, 1)
         ax.set_xlabel("$z/\sigma_1$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
         for i in range(self.densities.nc):
-            ax.plot(self.r[self.domain_mask],
-                    self.densities[i][self.domain_mask] /
+            ax.plot(self.r[:],
+                    self.densities[i][:] /
                     self.cDFT.bulk_densities[i],
                     lw=2, color=LCOLORS[i], label=f"Comp. {i+1}")
-        if plot_old_profile:
-            for i in range(self.densities.nc):
-                ax.plot(self.r[self.domain_mask],
-                        self.old_densities[i][self.domain_mask] /
-                        self.cDFT.bulk_densities[i],
-                        lw=2, color=LCOLORS[i], ls="--",
-                        label=f"Old. Comp. {i+1}")
         leg = plt.legend(loc="best", numpoints=1)
         leg.get_frame().set_linewidth(0.0)
         plt.show()
@@ -679,6 +702,41 @@ class anim_solver():
 
 
 if __name__ == "__main__":
+
+    # d = np.array([1.0])
+    # bulk_density = np.array([0.74590459])
+    # cdft = cdft1D(bulk_densities=bulk_density,
+    #               particle_diameters=d,
+    #               domain_length=40.0,
+    #               functional="WHITEBEAR",
+    #               grid_dr=0.05,
+    #               temperature=0.8664933679930681,
+    #               quadrature="None")
+
+    # solver = picard_geometry_solver(
+    #     cDFT=cdft, alpha_min=0.1, alpha_max=0.25, alpha_initial=0.001, n_alpha_initial=50,
+    #     ng_extrapolations=None, line_search="None", density_init="Constant")
+    # solver.minimise(print_frequency=50,
+    #                 plot_profile=True)
+
+    # sys.exit()
+
+    # PC-SAFT
+    cdft_tp = cdft_thermopack(model="PC-SAFT",
+                              comp_names="C1",
+                              comp=np.array([1.0]),
+                              temperature=130.0,
+                              pressure=0.0,
+                              bubble_point_pressure=True,
+                              domain_length=40.0,
+                              grid_dr=0.05)
+    solver = picard_geometry_solver(
+        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, alpha_initial=0.1, n_alpha_initial=10,
+        ng_extrapolations=10, line_search="ERROR", density_init="VLE")
+    solver.minimise(print_frequency=25,
+                    plot_profile=True)
+
+    sys.exit()
     # Binary hard-sphere case from: 10.1103/physreve.62.6926
     d = np.array([1.0, 3.0/5.0])
     bulk_densities = density_from_packing_fraction(

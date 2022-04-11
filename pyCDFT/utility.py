@@ -638,8 +638,8 @@ class differentials_1D():
         """
 
         Returns:
-
         """
+
         self.d3_conv[self.mask_conv_results] = 0.0
         self.d2eff_conv[self.mask_conv_results] = 0.0
         self.d2veff_conv[self.mask_conv_results] = 0.0
@@ -773,6 +773,14 @@ class differentials_pc_saft_1D(differentials_1D):
         differentials_1D.set_functional_differentials(self, functional, ic)
         self.mu_disp[:] = functional.mu_disp[:, ic]
 
+    def update_after_convolution(self):
+        """
+        Add PC-SAFT contribution to one particle correlation function
+        """
+        differentials_1D.update_after_convolution(self)
+        self.mu_disp_conv[self.mask_conv_results] = 0.0
+        self.corr[:] -= self.mu_disp_conv
+
 
 def get_thermopack_model(model):
     """
@@ -792,12 +800,12 @@ def get_thermopack_model(model):
     return thermo
 
 
-def get_initial_densities_vle(z, rho_g, rho_l, d_hs):
+def get_initial_densities_vle(z, rho_g, rho_l, R):
     """
     Calculate initial densities for gas-liquid interface calculatsion
     Args:
         z (np.ndarray): Grid positions (Symmetric around z=0)
-        d_hs (np.ndarray): Hard sphere diamaters in reduced units
+        R (np.ndarray): Hard sphere radius in reduced units
         rho_g (list of float): Gas density
         rho_l (list of float): Liquid density
 
@@ -805,10 +813,10 @@ def get_initial_densities_vle(z, rho_g, rho_l, d_hs):
        rho0 (densities): Initial density with liquid deinsity to the right
 
     """
-    rho0 = densities(len(d_hs), np.shape(z)[0])
-    for i in range(len(d_hs)):
-        rho0.densities[:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
-            (rho_l[i] - rho_g[i])*np.tanh(0.6*z[:]/d_hs[i])
+    rho0 = densities(np.shape(R)[0], np.shape(z)[0])
+    for i in range(np.shape(R)[0]):
+        rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
+            (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
     return rho0
 
 

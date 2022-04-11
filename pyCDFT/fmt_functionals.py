@@ -227,6 +227,31 @@ class Rosenfeld:
             raise ValueError("get_differential: Index out of bounds")
         return d
 
+    def get_bulk_correlation(self, rho_b, only_hs_system=False):
+        """
+        Intended only for debugging
+        Args:
+            rho_b (np.ndarray): Bulk densities
+            only_hs_system (bool): Only calculate for hs-system
+
+        Return:
+            corr (np.ndarray): One particle correlation function
+        """
+        bd = bulk_weighted_densities(rho_b, self.R)
+        _, dphidn = self.bulk_functional_with_differentials(
+            bd, only_hs_system=only_hs_system)
+        corr = np.zeros(self.nc)
+        for i in range(self.nc):
+            corr[i] = dphidn[0] + \
+                self.R[i] * dphidn[1] + \
+                (4 * np.pi * self.R[i] ** 2) * dphidn[2] + \
+                4 * np.pi * self.R[i] ** 3 * dphidn[3] / 3
+            if np.shape(dphidn)[0] > 4:
+                corr[i] += dphidn[4+i]
+
+        corr = -corr
+        return corr
+
     def test_differentials(self, dens0):
         """
 
@@ -643,7 +668,7 @@ class pc_saft(Whitebear):
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(len(f)):
-            rho_thermo[:] = dens.rho_disp_array[i, :]
+            rho_thermo[:] = dens.rho_disp_array[:, i]
             rho_mix = np.sum(rho_thermo)
             rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
             a, = self.thermo.a_dispersion(self.T, V, rho_thermo)
@@ -672,7 +697,7 @@ class pc_saft(Whitebear):
         V = 1.0
         for i in range(self.N):
             if prdm[i]:
-                rho_thermo[:] = dens.rho_disp_array[i, :]
+                rho_thermo[:] = dens.rho_disp_array[:, i]
                 rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
                 a, a_n, = self.thermo.a_dispersion(
                     self.T, V, rho_thermo, a_n=True)
@@ -771,7 +796,7 @@ if __name__ == "__main__":
     pcs = get_thermopack_model("PC-SAFT")
     pcs.init("C1")
     PCS_functional = pc_saft(1, pcs, T_red=1.1)
-    dens_pcs = weighted_densities_pc_saft_1D(1, PCS_functional.R)
+    dens_pcs = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
 
     v = pcs.specific_volume(PCS_functional.T,
                             1.0e6,
@@ -780,11 +805,15 @@ if __name__ == "__main__":
     rho = (NA * PCS_functional.d_hs[0] ** 3)/v
     PCS_functional.test_bulk_differentials(rho)
 
-    dens = weighted_densities_pc_saft_1D(1, PCS_functional.R)
+    dens = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
     dens.set_testing_values(rho)
     # dens.print(print_utilities=True)
     print("\n")
     PCS_functional.test_differentials(dens)
+
+    corr = PCS_functional.get_bulk_correlation(np.array([rho]))
+    mu = PCS_functional.bulk_excess_chemical_potential(np.array([rho]))
+    print("corr, mu", corr, mu)
 
     # Hard sphere functionals
     # dens = weighted_densities_1D(1, 0.5)
@@ -792,6 +821,10 @@ if __name__ == "__main__":
     # dens.print(print_utilities=True)
     #
     # RF_functional = Rosenfeld(N=1)
+    # corr = RF_functional.get_bulk_correlation(np.array([rho]))
+    # mu = RF_functional.bulk_excess_chemical_potential(np.array([rho]))
+    # print("corr, mu", corr, mu)
+
     # RF_functional.test_differentials(dens)
     # WB_functional = Whitebear(N=1)
     # WB_functional.test_differentials(dens)

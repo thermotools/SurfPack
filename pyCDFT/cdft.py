@@ -224,7 +224,7 @@ class cdft1D:
             rho0 = get_initial_densities_vle(z_centered,
                                              self.bulk_densities_g,
                                              self.bulk_densities,
-                                             self.particle_diameters)
+                                             self.R)
         else:
             rho0 = densities(self.nc, self.N)
             rho0.assign_components(self.bulk_densities)

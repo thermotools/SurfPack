@@ -549,6 +549,8 @@ class planar_pc_saft_weights(planar_weights):
             # Transform from Fourier space to real space
             diff.mu_disp_conv[:] = sfft.ifft(self.fw_mu_disp).real
 
+        diff.update_after_convolution()
+
 
 class planar_weights_system_mc():
     """
@@ -642,7 +644,7 @@ class planar_weights_system_mc():
         self.functional.differentials(self.weighted_densities)
         for i in range(self.nc):
             self.comp_differentials[i].set_functional_differentials(
-                self.functional)
+                self.functional, i)
             self.pl_weights[i].correlation_convolution(
                 self.comp_differentials[i])
 
