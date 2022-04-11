@@ -24,7 +24,8 @@ class picard_geometry_solver():
                  alpha_initial=0.1,
                  n_alpha_initial=1,
                  ng_extrapolations=None,
-                 line_search="None"):
+                 line_search="None",
+                 density_init="Constant"):
         """
         Initialises arrays and fourier objects required for minimisation procedure.
 
@@ -34,6 +35,7 @@ class picard_geometry_solver():
             alpha_max (float): Maximum value for Picard parameter
             ng_extrapolations (int): Extrapolation with method of Ng? Value set update frequency.
             line_search (str): Perform line search ("None", "GP", "Error")
+            density_init (str): How to initialize density profiles? ("Constant", "VLE")
         Returns:
             None
         """
@@ -55,7 +57,8 @@ class picard_geometry_solver():
             self.cDFT.nc, self.cDFT.N, is_conv_var=True)
         self.temp_densities = densities(self.cDFT.nc, self.cDFT.N)
 
-        self.densities.assign_components(self.cDFT.bulk_densities)
+        rho0 = self.cDFT.get_density_profile(density_init, self.r)
+        self.densities.assign_elements(rho0)
         if self.cDFT.left_boundary == boundary_condition["WALL"]:
             self.densities.set_mask(self.cDFT.left_boundary_mask)
         if self.cDFT.right_boundary == boundary_condition["WALL"]:

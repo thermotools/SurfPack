@@ -415,12 +415,12 @@ class weighted_densities_1D():
         Set some dummy values for testing differentials
         """
         if rho is not None:
-            self.n0[:] = 0.5*rho/self.R
-            self.n1[:] = 0.5*rho
-            self.n2[:] = 2*np.pi*rho*self.R
-            self.n3[:] = 4*np.pi*self.R**3*rho/3
-            self.n1v[:] = - 1.0e-3*rho
-            self.n2v[:] = 4*np.pi*self.R*self.n1v[:]
+            self.n0[:] = np.sum(rho)
+            self.n1[:] = np.sum(self.R * rho)
+            self.n2[:] = 4 * np.pi * np.sum(self.R ** 2 * rho)
+            self.n3[:] = 4 * np.pi * np.sum(self.R ** 3 * rho) / 3
+            self.n1v[:] = - 1.0e-3*self.n0[:]
+            self.n2v[:] = 4*np.pi*np.average(self.R)*self.n1v[:]
         else:
             self.n2[:] = 3.0
             self.n3[:] = 0.5
@@ -511,10 +511,10 @@ class weighted_densities_pc_saft_1D(weighted_densities_1D):
     """
     """
 
-    def __init__(self, N, R, mask_conv_results=None):
+    def __init__(self, N, R, ms, mask_conv_results=None):
         """
         """
-        weighted_densities_1D.__init__(self, N, R, mask_conv_results)
+        weighted_densities_1D.__init__(self, N, R, ms, mask_conv_results)
         self.rho_disp = allocate_real_convolution_variable(N)
         self.rho_disp_array = None
         self.n_max_test = 7
@@ -802,15 +802,13 @@ def get_initial_densities_vle(z, rho_g, rho_l, d_hs):
         rho_l (list of float): Liquid density
 
     Returns:
-       rho0 (list of np.ndarray): Initial density with liquid deinsity to the right
+       rho0 (densities): Initial density with liquid deinsity to the right
 
     """
-    rho0 = []
+    rho0 = densities(len(d_hs), np.shape(z)[0])
     for i in range(len(d_hs)):
-        rho0i = np.zeros_like(z)
-        rho0i[:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
+        rho0.densities[:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
             (rho_l[i] - rho_g[i])*np.tanh(0.6*z[:]/d_hs[i])
-        rho0.append(rho0i)
     return rho0
 
 

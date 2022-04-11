@@ -417,7 +417,7 @@ class planar_pc_saft_weights(planar_weights):
     """
     """
 
-    def __init__(self, dr: float, R: float, N: int, quad="Roth"):
+    def __init__(self, dr: float, R: float, N: int, quad="Roth", phi_disp=1.3862):
         """
 
         Args:
@@ -425,6 +425,7 @@ class planar_pc_saft_weights(planar_weights):
             R (float): Particle radius
             N (int): Grid size
             quad (str): Quadrature for integral
+            phi_disp (float): Weigthing distance for disperesion term
         """
         assert(CONVOLUTIONS != CONV_NO_FFT)
         # Fourier space variables
@@ -433,6 +434,8 @@ class planar_pc_saft_weights(planar_weights):
         self.fw_rho_disp = allocate_fourier_convolution_variable(N)
         self.fmu_disp = allocate_fourier_convolution_variable(N)
         self.fw_mu_disp = allocate_fourier_convolution_variable(N)
+        # Weigthing distance for disperesion term
+        self.phi_disp = phi_disp
 
         planar_weights.__init__(self, dr, R, N, quad)
 
@@ -447,7 +450,6 @@ class planar_pc_saft_weights(planar_weights):
 
         """
         planar_weights.analytical_fourier_weigts(self)
-        phi = 1.3862
         # Fourier space variables
         if CONVOLUTIONS == CONV_SCIPY_FFT:
             kz = np.zeros(self.N)
@@ -465,7 +467,7 @@ class planar_pc_saft_weights(planar_weights):
         kz /= self.dr*self.N
         kz_abs = np.zeros_like(kz)
         kz_abs[:] = np.abs(kz[:])
-        kz_abs *= 4 * np.pi * self.R * phi
+        kz_abs *= 4 * np.pi * self.R * self.phi_disp
         self.fw_disp.real = (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
         self.fw_disp.imag = 0.0
 
@@ -591,7 +593,7 @@ class planar_weights_system_mc():
             self.comp_differentials.append(diff(N=N, R=R[i]))
 
         # Overall weighted densities
-        self.weighted_densities = wd(N=N, R=0.5)  # Dummy R
+        self.weighted_densities = wd(N=N, R=0.5, ms=ms[0])  # Dummy R
         self.setup_fft()
 
     def convolutions(self, rho):
@@ -668,17 +670,25 @@ class planar_weights_system_mc_pc_saft(planar_weights_system_mc):
             N (int): Grid size
             pcsaft (pyctp.pcsaft): Thermopack object
             mask_conv_results: Mask to avoid divide by zero
-            plweights: Class type,defaults to planar_weights
-            wd: Class type,defaults to weighted_densities_1D
-            diff: Class type,defaults to differentials_1D
+            plweights: Class type,defaults to planar_pc_saft_weights
+            wd: Class type,defaults to weighted_densities_pc_saft_1D
+            diff: Class type,defaults to differentials_pc_saft_1D
         """
 
         self.thermo = pcsaft
-        planar_weights_system_mc.__init__(self, functional, dr, R, N,
-                                          mask_conv_results, ms=pcsaft.m,
-                                          plweights=plweights, wd=wd, diff=diff)
+        planar_weights_system_mc.__init__(self,
+                                          functional,
+                                          dr,
+                                          R,
+                                          N,
+                                          quad="None",
+                                          mask_conv_results=mask_conv_results,
+                                          ms=pcsaft.m,
+                                          plweights=plweights,
+                                          wd=wd,
+                                          diff=diff)
         # Make sure rho_disp_array is allocated for mother density class
-        self.weighted_densities.rho_disp_array = np.zeors((self.nc, N))
+        self.weighted_densities.rho_disp_array = np.zeros((self.nc, N))
 
     def convolutions(self, rho):
         """
