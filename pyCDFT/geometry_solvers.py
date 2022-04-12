@@ -482,7 +482,7 @@ class picard_geometry_solver():
         n3_inf_1 = np.linalg.norm(
             self.cDFT.weights_system.weighted_densities.n3, ord=np.inf)
         alpha_max = min(0.9, (0.9 - n3_inf_0)/max(n3_inf_1 - n3_inf_0, 1e-6))
-        #print("alpha_max", alpha_max, n3_inf_0,n3_inf_1)
+        # print("alpha_max", alpha_max, n3_inf_0,n3_inf_1)
         return alpha_max
 
     def line_search(self, debug=False):
@@ -685,7 +685,7 @@ class anim_solver():
         self.ax.autoscale_view()
         if self.z_max is not None:
             self.ax.set_xlim(0, self.z_max)
-        #self.ax.set_ylim(-1, 1)
+        # self.ax.set_ylim(-1, 1)
         return self.line,
 
     def init_plot(self):
@@ -721,20 +721,25 @@ if __name__ == "__main__":
 
     # sys.exit()
 
-    # PC-SAFT
-    cdft_tp = cdft_thermopack(model="PC-SAFT",
-                              comp_names="C1",
+    # Thermopack
+    cdft_tp = cdft_thermopack(model="SAFT-VRQ Mie",
+                              comp_names="H2",
                               comp=np.array([1.0]),
-                              temperature=130.0,
+                              temperature=30.0,
                               pressure=0.0,
                               bubble_point_pressure=True,
-                              domain_length=40.0,
-                              grid_dr=0.05)
+                              domain_length=50.0,
+                              grid_dr=0.005,
+                              kwthermoargs={"feynman_hibbs_order": 0,
+                                            "parameter_reference": "AASEN2019-FH0"})
     solver = picard_geometry_solver(
-        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, alpha_initial=0.1, n_alpha_initial=10,
+        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, alpha_initial=0.02, n_alpha_initial=50,
         ng_extrapolations=10, line_search="ERROR", density_init="VLE")
-    solver.minimise(print_frequency=25,
-                    plot_profile=True)
+    solver.minimise(print_frequency=50,
+                    plot_profile=True,
+                    tolerance=2.0e-12)
+
+    print("gamma", cdft_tp.surface_tension_real_units(solver.densities))
 
     sys.exit()
     # Binary hard-sphere case from: 10.1103/physreve.62.6926

@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS
 import pyfftw as fftw
-from pyctp import pcsaft, saftvrmie
+from pyctp import pcsaft, saftvrmie, saftvrqmie
 
 boundary_condition = {"OPEN": 0,
                       "WALL": 1}
@@ -795,6 +795,8 @@ def get_thermopack_model(model):
         thermo = pcsaft.pcsaft()
     elif model.upper() in ("SAFTVRMIE", "SAFT-VR MIE", "SAFT-VR-MIE"):
         thermo = saftvrmie.saftvrmie()
+    elif model.upper() in ("SAFTVRQMIE", "SAFT-VRQ MIE", "SAFT-VRQ-MIE"):
+        thermo = saftvrqmie.saftvrqmie()
     else:
         raise ValueError("Unknown thermopack model: " + model)
     return thermo

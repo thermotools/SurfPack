@@ -372,7 +372,8 @@ class cdft_thermopack(cdft1D):
                  wall="None",
                  domain_length=40.0,
                  grid_dr=0.001,
-                 phi_disp=1.3862):
+                 phi_disp=1.3862,
+                 kwthermoargs={}):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
@@ -392,7 +393,8 @@ class cdft_thermopack(cdft1D):
             None
         """
         self.thermo = get_thermopack_model(model)
-        self.thermo.init(comp_names)
+        self.thermo.init(comp_names, **kwthermoargs)
+        self.thermo.set_tmin(0.75 * temperature)
         self.comp = comp
         if bubble_point_pressure:
             #print(temperature, comp)
@@ -447,7 +449,7 @@ class cdft_thermopack(cdft1D):
                         particle_diameters=particle_diameters,
                         wall=wall,
                         domain_length=domain_length,
-                        functional=model,
+                        functional="PC-SAFT",
                         grid_dr=grid_dr,
                         temperature=temp_red,
                         thermopack=self.thermo)
@@ -489,18 +491,33 @@ class cdft_thermopack(cdft1D):
 
 
 if __name__ == "__main__":
-    cdft_tp = cdft_thermopack(model="PC-SAFT",
-                              comp_names="C1",
+    # cdft_tp = cdft_thermopack(model="PC-SAFT",
+    #                           comp_names="C1",
+    #                           comp=np.array([1.0]),
+    #                           temperature=130.0,
+    #                           pressure=0.0,
+    #                           bubble_point_pressure=True,
+    #                           domain_length=40.0,
+    #                           grid_dr=0.001)
+    # cdft_tp.test_initial_vle_state()
+    # cdft_tp.test_grand_potential_bulk()
+
+    cdft_tp = cdft_thermopack(model="SAFT-VRQ MIE",
+                              comp_names="H2",
                               comp=np.array([1.0]),
-                              temperature=130.0,
+                              temperature=25.0,
                               pressure=0.0,
                               bubble_point_pressure=True,
                               domain_length=40.0,
-                              grid_dr=0.001)
+                              grid_dr=0.001,
+                              kwthermoargs={"feynman_hibbs_order": 1,
+                                            "parameter_reference": "AASEN2019-FH1"})
     cdft_tp.test_initial_vle_state()
     cdft_tp.test_grand_potential_bulk()
 
-    # sys.exit()
+    cdft_tp.thermo.print_saft_parameters(1)
+
+    sys.exit()
     from utility import density_from_packing_fraction
     d = np.array([1.0, 3.0/5.0])
     bulk_density = density_from_packing_fraction(
