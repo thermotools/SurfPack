@@ -376,7 +376,7 @@ class picard_geometry_solver():
                          (nd_densities[:, self.domain_mask].T / self.cDFT.bulk_densities).T],
                    header="# r, rho, rho/rho_bulk")
 
-    def plot_equilibrium_density_profiles(self, data_dict=None):
+    def plot_equilibrium_density_profiles(self, data_dict=None, xlim=None, ylim=None):
         """
         Plot equilibrium density profile
         Args:
@@ -396,8 +396,14 @@ class picard_geometry_solver():
                     lw=2, color="k", label=f"cDFT comp. {i+1}")
         if data_dict is not None:
             plot_data_container(data_dict, ax)
-            leg = plt.legend(loc="best", numpoints=1)
-            leg.get_frame().set_linewidth(0.0)
+
+        if xlim is not None:
+            plt.xlim(xlim)
+        if ylim is not None:
+            plt.ylim(ylim)
+
+        leg = plt.legend(loc="best", numpoints=1)
+        leg.get_frame().set_linewidth(0.0)
 
         filename = self.case_name + ".pdf"
         plt.savefig(filename)
@@ -721,6 +727,27 @@ if __name__ == "__main__":
 
     # sys.exit()
 
+    # Thermopack
+    cdft_tp = cdft_thermopack(model="PC-SAFT",
+                              comp_names="C1",
+                              comp=np.array([1.0]),
+                              temperature=100.0,
+                              pressure=0.0,
+                              bubble_point_pressure=True,
+                              domain_length=50.0,
+                              grid_dr=0.005)
+    solver = picard_geometry_solver(
+        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, alpha_initial=0.02, n_alpha_initial=2000,
+        ng_extrapolations=10, line_search="ERROR", density_init="VLE")
+    solver.minimise(print_frequency=250,
+                    plot_profile=True,
+                    tolerance=2.0e-12)
+
+    solver.plot_equilibrium_density_profiles(
+        xlim=[25.75, 35.0], ylim=[0.97, 1.005])
+    print("gamma", cdft_tp.surface_tension_real_units(solver.densities))
+
+    sys.exit()
     # Thermopack
     cdft_tp = cdft_thermopack(model="SAFT-VRQ Mie",
                               comp_names="H2",

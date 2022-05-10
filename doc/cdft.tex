@@ -746,6 +746,12 @@ the densities must be converted to Thermopack units
 Thermopack can then be evaluated using $V=1.0$ and $\mathrm{\rho}$, or
 the densities cam be converted to mol numbers and specific volume.
 
+\begin{align}
+  \beta A \lb T, V, \mathrm{n} \rb &= \frac{1}{V}\beta A \lb T, 1, \mathrm{\rho} \rb \\
+  \frac{1}{V}\beta A \lb T, 1, \mathrm{\rho} \rb\frac{1}{\sum \rho_i} &= \beta A \lb T, 1, \mathrm{\rho} \rb\frac{1}{\sum n_i}\nonumber \\
+  &= a \lb T, \mathrm{\rho} \rb
+\end{align}
+
 The \excess reduced chemical potential is given from thermopack as
 \begin{equation}
   \beta \mu_{i}^\excess = \beta\pd{A^\excess}{N_i} =
