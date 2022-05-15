@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
-from utility import densities
+from pyCDFT.utility import densities
 
 
 class ng_nc_wrapper():

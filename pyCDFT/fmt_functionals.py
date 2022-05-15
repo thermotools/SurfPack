@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import numpy as np
-from utility import weighted_densities_1D, get_thermopack_model, \
+from pyCDFT.utility import weighted_densities_1D, get_thermopack_model, \
     weighted_densities_pc_saft_1D
 from pyctp import pcsaft
-from constants import NA, RGAS
+from pyCDFT.constants import NA, RGAS
 
 
 def get_functional(N, T, functional="Rosenfeld", R=np.array([0.5]), thermopack=None):

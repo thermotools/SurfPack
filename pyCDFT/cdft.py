@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 import numpy as np
-import fmt_functionals
-from utility import packing_fraction_from_density, \
+import pyCDFT.fmt_functionals as fmt_functionals
+from pyCDFT.utility import packing_fraction_from_density, \
     boundary_condition, densities, get_thermopack_model, \
     weighted_densities_pc_saft_1D, get_initial_densities_vle, \
     weighted_densities_1D
-from weight_functions import planar_weights_system_mc, \
+from pyCDFT.weight_functions import planar_weights_system_mc, \
     planar_weights_system_mc_pc_saft
-from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS, NA, KB
+from pyCDFT.constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS, NA, KB
 import sys
 
 
@@ -75,6 +75,7 @@ class cdft1D:
             self.padding = 1
         else:
             self.padding = 0
+            
         # Get grid info
         self.N = round(domain_length / grid_dr)  # Should be even
         self.NinP = []
@@ -426,7 +427,7 @@ class cdft_thermopack(cdft1D):
                                                       self.eos_phase)
             self.eos_vg = np.ones_like(self.eos_vl)
             self.eos_gas_comp = np.zeros_like(self.eos_vl)
-        #print(self.eos_vg, self.eos_gas_comp)
+
         particle_diameters = np.zeros(self.thermo.nc)
         particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
         d_hs_reducing = particle_diameters[0]
@@ -438,8 +439,7 @@ class cdft_thermopack(cdft1D):
         self.bulk_densities_g[:] *= NA*particle_diameters[0]**3
         particle_diameters[:] /= particle_diameters[0]
         temp_red = temperature / self.thermo.eps_div_kb[0]
-        # print(self.bulk_densities_g)
-
+        
         self.phi_disp = phi_disp
         self.Nbc = 2 * round(self.phi_disp *
                              np.max(particle_diameters) / grid_dr)
@@ -454,9 +454,14 @@ class cdft_thermopack(cdft1D):
                         temperature=temp_red,
                         thermopack=self.thermo)
 
-        # Reduced unit
+        # Reduced units
         self.eps = self.thermo.eps_div_kb[0] * KB
         self.sigma = d_hs_reducing
+
+        # Extract normalized chemical potential (multiplied by beta) (mu/kbT)
+        self.mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(self.bulk_densities)
+        self.mu_ig_scaled_beta = np.log(self.bulk_densities)
+        self.mu_scaled_beta = self.mu_ig_scaled_beta+self.mu_res_scaled_beta
 
     def test_initial_vle_state(self):
         """

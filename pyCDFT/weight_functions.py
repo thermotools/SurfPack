@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import numpy as np
-from constants import CONVOLUTIONS, CONV_NO_FFT, CONV_FFTW, CONV_SCIPY_FFT
+from pyCDFT.constants import CONVOLUTIONS, CONV_NO_FFT, CONV_FFTW, \
+    CONV_SCIPY_FFT
 from scipy.ndimage import convolve1d
-from utility import weighted_densities_1D, differentials_1D, \
+from pyCDFT.utility import weighted_densities_1D, differentials_1D, \
     allocate_fourier_convolution_variable, allocate_real_convolution_variable, \
     weighted_densities_pc_saft_1D, differentials_pc_saft_1D
 import matplotlib.pyplot as plt
