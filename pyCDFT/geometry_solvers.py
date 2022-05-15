@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 import numpy as np
-from cdft import cdft1D, cdft_thermopack
+from pyCDFT.cdft import cdft1D, cdft_thermopack
 import matplotlib.pyplot as plt
-from utility import boundary_condition, density_from_packing_fraction, \
+from pyCDFT.utility import boundary_condition, density_from_packing_fraction, \
     get_data_container, plot_data_container, \
     quadratic_polynomial, densities
-from constants import DEBUG, LCOLORS
-import ng_extrapolation
+from pyCDFT.constants import DEBUG, LCOLORS
+import pyCDFT.ng_extrapolation as ng_extrapolation
 from matplotlib.animation import FuncAnimation
-from fmt_functionals import bulk_weighted_densities
+from pyCDFT.fmt_functionals import bulk_weighted_densities
 import sys
 
 
@@ -56,6 +56,9 @@ class picard_geometry_solver():
         self.mod_densities = densities(
             self.cDFT.nc, self.cDFT.N, is_conv_var=True)
         self.temp_densities = densities(self.cDFT.nc, self.cDFT.N)
+
+        # Functional derivatives
+        self.functional_derivative_value = densities(self.cDFT.nc, self.cDFT.N)
 
         rho0 = self.cDFT.get_density_profile(density_init, self.r)
         self.densities.assign_elements(rho0)
@@ -123,6 +126,28 @@ class picard_geometry_solver():
                 old_densities[i][self.cDFT.domain_mask] + \
                 alpha * new_densities[i][self.cDFT.domain_mask]
 
+    def functional_derivative(self):
+        """
+        Calculate the functional derivative based on the old density profile
+
+        """
+        # Calculate weighted densities
+        self.mod_densities.assign_elements(self.densities)
+
+        # Convolution integrals for densities
+        self.cDFT.weights_system.convolutions(self.mod_densities)
+
+        # Calculate one-body direct correlation function
+        self.cDFT.weights_system.correlation_convolution()
+
+
+        for i in range(self.cDFT.nc):
+            self.functional_derivative_value[i][self.domain_mask] = \
+                np.log(self.densities[i][self.domain_mask])/self.cDFT.beta + \
+                -1.0*self.cDFT.mu_scaled_beta[i]/self.cDFT.beta + \
+                -1.0* self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask]/self.cDFT.beta + \
+                self.cDFT.Vext[i][self.domain_mask]
+           
     def successive_substitution(self, dens):
         """
         Perform one successive substitution iteration on the equation system.
@@ -214,6 +239,24 @@ class picard_geometry_solver():
         # Calculate deviation between new and old density profiles
         self.error[:] = self.densities.diff_norms(
             self.old_densities, order=self.norm)[:]
+
+        # Calculate a new error based on the functional derivative
+        error2_vec=np.zeros(self.cDFT.nc)
+        self.functional_derivative()
+        # Here perhaps we could have the maximum norm of functinal derivative?
+        for i in range(self.cDFT.nc):
+            error2_vec[i]=np.trapz(np.abs(self.functional_derivative_value[i]),\
+                                   self.r[:])
+
+        # Compute an alternative error norm
+        if self.iteration<1.0:  # Have a comparable error at first iteration (rho vs functional derivative)
+            self.error2_scale=np.max(error2_vec)/self.error[:]
+
+        # Compute the second error based on functional derivatives
+        self.error2=np.max(error2_vec)/self.error2_scale
+        
+        #print('Iteration',self.iteration, 'Rho-based norm', self.error[:], 'Fun-deriv based norm', self.error2)
+        
         return have_failed
 
     # def iteration_plot_profile(self, plot_old_profile=False):
@@ -240,10 +283,11 @@ class picard_geometry_solver():
         fig, ax = plt.subplots(1, 1)
         ax.set_xlabel("$z/\sigma_1$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+        self.functional_derivative()
         for i in range(self.densities.nc):
             ax.plot(self.r[:],
-                    self.densities[i][:] /
-                    self.cDFT.bulk_densities[i],
+                    #self.densities[i],
+                    self.functional_derivative_value[i],
                     lw=2, color=LCOLORS[i], label=f"Comp. {i+1}")
         leg = plt.legend(loc="best", numpoints=1)
         leg.get_frame().set_linewidth(0.0)
