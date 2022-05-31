@@ -20,18 +20,18 @@ cdft_tp = cdft_thermopack(model="PC-SAFT",
                           temperature=100.0,
                           pressure=0.0,
                           bubble_point_pressure=True,
-                          domain_length=200,
-                          grid_dr=0.1)
+                          domain_length=50,
+                          grid_dr=0.05)
 
 # Initialize the solver
 solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, \
-                                alpha_initial=0.02, n_alpha_initial=2000,\
+                                alpha_initial=0.025, n_alpha_initial=250,\
                                 ng_extrapolations=10, line_search="ERROR",\
                                 density_init="VLE")
 
 # Make the calculations
 solver.minimise(print_frequency=250,
-                    plot_profile=True,
+                    plot="ERROR",
                     tolerance=1.0e-10)
 
 # Plot the profiles

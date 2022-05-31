@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
-from pyCDFT.utility import densities
+import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from utility import densities
 
 
 class ng_nc_wrapper():

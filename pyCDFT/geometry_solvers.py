@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 import numpy as np
-from pyCDFT.cdft import cdft1D, cdft_thermopack
+import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from cdft import cdft1D, cdft_thermopack
 import matplotlib.pyplot as plt
-from pyCDFT.utility import boundary_condition, density_from_packing_fraction, \
+from utility import boundary_condition, density_from_packing_fraction, \
     get_data_container, plot_data_container, \
     quadratic_polynomial, densities
-from pyCDFT.constants import DEBUG, LCOLORS
-import pyCDFT.ng_extrapolation as ng_extrapolation
+from constants import DEBUG, LCOLORS
+import ng_extrapolation
 from matplotlib.animation import FuncAnimation
-from pyCDFT.fmt_functionals import bulk_weighted_densities
+from fmt_functionals import bulk_weighted_densities
 import sys
 
 
@@ -143,11 +144,11 @@ class picard_geometry_solver():
 
         for i in range(self.cDFT.nc):
             self.functional_derivative_value[i][self.domain_mask] = \
-                np.log(self.densities[i][self.domain_mask])/self.cDFT.beta + \
-                -1.0*self.cDFT.mu_scaled_beta[i]/self.cDFT.beta + \
-                -1.0* self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask]/self.cDFT.beta + \
-                self.cDFT.Vext[i][self.domain_mask]
-           
+                np.log(self.densities[i][self.domain_mask]) + \
+                -self.cDFT.mu_scaled_beta[i] \
+                -self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask] + \
+                self.cDFT.beta * self.cDFT.Vext[i][self.domain_mask]
+
     def successive_substitution(self, dens):
         """
         Perform one successive substitution iteration on the equation system.
@@ -188,8 +189,8 @@ class picard_geometry_solver():
         # Calculate new density profile using the variations of the functional
         for i in range(self.cDFT.nc):
             self.new_densities[i][self.domain_mask] = self.cDFT.bulk_densities[i] * \
-                np.exp(self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask]
-                       + self.cDFT.excess_mu[i] - self.cDFT.beta * self.cDFT.Vext[i][self.domain_mask])
+                np.exp(self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask] \
+                       + self.cDFT.mu_res_scaled_beta[i] - self.cDFT.beta * self.cDFT.Vext[i][self.domain_mask])
         if DEBUG:
             print("new_density", self.new_densities)
 
@@ -254,9 +255,9 @@ class picard_geometry_solver():
 
         # Compute the second error based on functional derivatives
         self.error2=np.max(error2_vec)/self.error2_scale
-        
+
         #print('Iteration',self.iteration, 'Rho-based norm', self.error[:], 'Fun-deriv based norm', self.error2)
-        
+
         return have_failed
 
     # def iteration_plot_profile(self, plot_old_profile=False):
@@ -279,15 +280,19 @@ class picard_geometry_solver():
     #     leg.get_frame().set_linewidth(0.0)
     #     plt.show()
 
-    def iteration_plot_profile(self, plot_old_profile=False):
+    def iteration_plot_profile(self, plot="DENS", plot_old_profile=False):
         fig, ax = plt.subplots(1, 1)
-        ax.set_xlabel("$z/\sigma_1$")
-        ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
-        self.functional_derivative()
+        ax.set_xlabel("$z/d_{11}$")
+        if plot.upper() == "ERROR":
+            ax.set_ylabel(r"F")
+            self.functional_derivative()
+            plot_var = self.functional_derivative_value
+        else:
+            ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+            plot_var = self.densities
         for i in range(self.densities.nc):
             ax.plot(self.r[:],
-                    #self.densities[i],
-                    self.functional_derivative_value[i],
+                    plot_var[i],
                     lw=2, color=LCOLORS[i], label=f"Comp. {i+1}")
         leg = plt.legend(loc="best", numpoints=1)
         leg.get_frame().set_linewidth(0.0)
@@ -296,7 +301,7 @@ class picard_geometry_solver():
     def minimise(self, tolerance=1e-12,
                  maximum_iterations=10000000,
                  print_frequency=1000,
-                 plot_profile=False):
+                 plot=None):
         """
         Method to calculate the equilibrium density profile.
 
@@ -304,14 +309,14 @@ class picard_geometry_solver():
             tolerance (float): Solver tolerance
             maximum_iterations (int): Maximum number of iteration
             print_frequency (int): HOw often should solver status be printed?
-            plot_profile (bool): Plot density profile while iterating?
+            plot (str): Plot density profile ("DENS") or error ("ERROR") while iterating?
         Returns:
             None
         """
         self.maximum_iterations = maximum_iterations
         self.tolerance = tolerance
-        if plot_profile:
-            self.iteration_plot_profile()
+        if plot is not None:
+            self.iteration_plot_profile(plot)
 
         self.iteration = 0
         self.print_frequency = print_frequency
@@ -323,12 +328,12 @@ class picard_geometry_solver():
             if self.converged:
                 break
             if self.iteration % print_frequency == 0:
-                if plot_profile:
-                    self.iteration_plot_profile()
+                if plot is not None:
+                    self.iteration_plot_profile(plot)
 
         if self.converged:
-            if plot_profile:
-                self.iteration_plot_profile()
+            if plot is not None:
+                self.iteration_plot_profile(plot)
             print(f"Solver converged after {self.iteration} iterations\n")
         else:
             print(f"Solver did not converge. Deviation at exit {self.error}\n")
@@ -769,45 +774,45 @@ if __name__ == "__main__":
     # solver.minimise(print_frequency=50,
     #                 plot_profile=True)
 
-    # sys.exit()
+    #sys.exit()
 
     # Thermopack
-    cdft_tp = cdft_thermopack(model="PC-SAFT",
-                              comp_names="C1",
-                              comp=np.array([1.0]),
-                              temperature=100.0,
-                              pressure=0.0,
-                              bubble_point_pressure=True,
-                              domain_length=50.0,
-                              grid_dr=0.005)
-    solver = picard_geometry_solver(
-        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, alpha_initial=0.02, n_alpha_initial=2000,
-        ng_extrapolations=10, line_search="ERROR", density_init="VLE")
-    solver.minimise(print_frequency=250,
-                    plot_profile=True,
-                    tolerance=2.0e-12)
+    # cdft_tp = cdft_thermopack(model="PC-SAFT",
+    #                           comp_names="C1",
+    #                           comp=np.array([1.0]),
+    #                           temperature=110.0,
+    #                           pressure=0.0,
+    #                           bubble_point_pressure=True,
+    #                           domain_length=50.0,
+    #                           grid_dr=0.05)
+    # solver = picard_geometry_solver(
+    #     cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, alpha_initial=0.05, n_alpha_initial=50,
+    #     ng_extrapolations=10, line_search="ERROR", density_init="VLE")
+    # solver.minimise(print_frequency=25,
+    #                 plot="ERROR",
+    #                 tolerance=2.0e-12)
 
-    solver.plot_equilibrium_density_profiles(
-        xlim=[25.75, 35.0], ylim=[0.97, 1.005])
-    print("gamma", cdft_tp.surface_tension_real_units(solver.densities))
+    # solver.plot_equilibrium_density_profiles(
+    #     xlim=[25.75, 35.0], ylim=[0.97, 1.005])
+    # print("gamma", cdft_tp.surface_tension_real_units(solver.densities))
 
-    sys.exit()
+    # sys.exit()
     # Thermopack
     cdft_tp = cdft_thermopack(model="SAFT-VRQ Mie",
                               comp_names="H2",
                               comp=np.array([1.0]),
-                              temperature=30.0,
+                              temperature=20.0,
                               pressure=0.0,
                               bubble_point_pressure=True,
                               domain_length=50.0,
-                              grid_dr=0.005,
+                              grid_dr=0.05,
                               kwthermoargs={"feynman_hibbs_order": 0,
                                             "parameter_reference": "AASEN2019-FH0"})
     solver = picard_geometry_solver(
-        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, alpha_initial=0.02, n_alpha_initial=50,
+        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.9, alpha_initial=0.1, n_alpha_initial=3,
         ng_extrapolations=10, line_search="ERROR", density_init="VLE")
-    solver.minimise(print_frequency=50,
-                    plot_profile=True,
+    solver.minimise(print_frequency=100,
+                    plot="DENS",
                     tolerance=2.0e-12)
 
     print("gamma", cdft_tp.surface_tension_real_units(solver.densities))

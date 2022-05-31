@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import numpy as np
-import pyCDFT.fmt_functionals as fmt_functionals
-from pyCDFT.utility import packing_fraction_from_density, \
+import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+import fmt_functionals
+from utility import packing_fraction_from_density, \
     boundary_condition, densities, get_thermopack_model, \
     weighted_densities_pc_saft_1D, get_initial_densities_vle, \
     weighted_densities_1D
-from pyCDFT.weight_functions import planar_weights_system_mc, \
+from weight_functions import planar_weights_system_mc, \
     planar_weights_system_mc_pc_saft
-from pyCDFT.constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS, NA, KB
+from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS, NA, KB
 import sys
 
 
@@ -75,7 +76,7 @@ class cdft1D:
             self.padding = 1
         else:
             self.padding = 0
-            
+
         # Get grid info
         self.N = round(domain_length / grid_dr)  # Should be even
         self.NinP = []
@@ -104,10 +105,13 @@ class cdft1D:
         # Calculate reduced pressure and excess chemical potential
         self.red_pressure = np.sum(self.bulk_densities) * self.T * \
             self.functional.bulk_compressibility(self.bulk_densities)
-        self.excess_mu = self.functional.bulk_excess_chemical_potential(
+        # Extract normalized chemical potential (multiplied by beta) (mu/kbT)
+        self.mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(
             self.bulk_densities)
-        #print(self.red_pressure, self.excess_mu)
+        self.mu_ig_scaled_beta = np.log(self.bulk_densities)
+        self.mu_scaled_beta = self.mu_ig_scaled_beta + self.mu_res_scaled_beta
 
+        #print(self.red_pressure, self.excess_mu)
         # Mask for inner domain
         self.NiWall = self.N - self.end
         self.domain_mask = np.full(self.N, False, dtype=bool)
@@ -250,7 +254,7 @@ class cdft1D:
             self.weights_system.convolutions(dens)
 
         # Calculate chemical potential (excess + ideal)
-        mu = self.T * (self.excess_mu + np.log(self.bulk_densities))
+        mu = self.T * (self.mu_res_scaled_beta + np.log(self.bulk_densities))
 
         # FMT hard-sphere part
         omega_a = self.T * \
@@ -289,7 +293,7 @@ class cdft1D:
         """
 
         # Calculate chemical potential (excess + ideal)
-        mu = self.T * (self.excess_mu + np.log(self.bulk_densities))
+        mu = self.T * (self.mu_res_scaled_beta + np.log(self.bulk_densities))
 
         # FMT hard-sphere part
         omega_a = self.T * \
@@ -439,7 +443,7 @@ class cdft_thermopack(cdft1D):
         self.bulk_densities_g[:] *= NA*particle_diameters[0]**3
         particle_diameters[:] /= particle_diameters[0]
         temp_red = temperature / self.thermo.eps_div_kb[0]
-        
+
         self.phi_disp = phi_disp
         self.Nbc = 2 * round(self.phi_disp *
                              np.max(particle_diameters) / grid_dr)
@@ -457,11 +461,6 @@ class cdft_thermopack(cdft1D):
         # Reduced units
         self.eps = self.thermo.eps_div_kb[0] * KB
         self.sigma = d_hs_reducing
-
-        # Extract normalized chemical potential (multiplied by beta) (mu/kbT)
-        self.mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(self.bulk_densities)
-        self.mu_ig_scaled_beta = np.log(self.bulk_densities)
-        self.mu_scaled_beta = self.mu_ig_scaled_beta+self.mu_res_scaled_beta
 
     def test_initial_vle_state(self):
         """
@@ -499,14 +498,16 @@ if __name__ == "__main__":
     # cdft_tp = cdft_thermopack(model="PC-SAFT",
     #                           comp_names="C1",
     #                           comp=np.array([1.0]),
-    #                           temperature=130.0,
+    #                           temperature=100.0,
     #                           pressure=0.0,
     #                           bubble_point_pressure=True,
     #                           domain_length=40.0,
     #                           grid_dr=0.001)
+
     # cdft_tp.test_initial_vle_state()
     # cdft_tp.test_grand_potential_bulk()
 
+    # sys.exit()
     cdft_tp = cdft_thermopack(model="SAFT-VRQ MIE",
                               comp_names="H2",
                               comp=np.array([1.0]),
@@ -517,6 +518,7 @@ if __name__ == "__main__":
                               grid_dr=0.001,
                               kwthermoargs={"feynman_hibbs_order": 1,
                                             "parameter_reference": "AASEN2019-FH1"})
+
     cdft_tp.test_initial_vle_state()
     cdft_tp.test_grand_potential_bulk()
 

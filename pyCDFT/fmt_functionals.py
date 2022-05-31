@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import numpy as np
-from pyCDFT.utility import weighted_densities_1D, get_thermopack_model, \
+import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from utility import weighted_densities_1D, get_thermopack_model, \
     weighted_densities_pc_saft_1D
 from pyctp import pcsaft
-from pyCDFT.constants import NA, RGAS
+from constants import NA, RGAS
 
 
 def get_functional(N, T, functional="Rosenfeld", R=np.array([0.5]), thermopack=None):
@@ -44,7 +45,7 @@ class bulk_weighted_densities:
             rho_b (ndarray): Bulk densities
             R (ndarray): Particle radius for all components
         """
-        self.rho_i = np.array(rho_b)
+        self.rho_i = np.zeros_like(rho_b)
         self.rho_i[:] = rho_b[:]
         self.n = np.zeros(4)
         self.n[0] = np.sum(rho_b)
@@ -277,7 +278,7 @@ class Rosenfeld:
             dens0.set_density(i, ni0)
             dens0.update_utility_variables()
             dFdn_num = (F2 - F1) / (2 * dni)
-            print("Differential: ", i, dFdn_num, self.get_differential(i))
+            print("Differential: ", i, dFdn_num, self.get_differential(i), (dFdn_num -self.get_differential(i))/self.get_differential(i))
 
     def test_bulk_differentials(self, rho_b):
         """
@@ -311,19 +312,19 @@ class Rosenfeld:
             rho_b_local[:] = rho_b[:]
             rho_b_local[i] += eps
             bd = bulk_weighted_densities(rho_b_local, self.R)
-            phi2, dphidn = self.bulk_functional_with_differentials(bd)
+            phi2, dphidn1 = self.bulk_functional_with_differentials(bd)
             phi2_hs, _ = self.bulk_functional_with_differentials(
                 bd, only_hs_system=True)
             rho_b_local[:] = rho_b[:]
             rho_b_local[i] -= eps
             bd = bulk_weighted_densities(rho_b_local, self.R)
-            phi1, dphidn = self.bulk_functional_with_differentials(bd)
+            phi1, dphidn1 = self.bulk_functional_with_differentials(bd)
             phi1_hs, _ = self.bulk_functional_with_differentials(
                 bd, only_hs_system=True)
             dphidrho_num_no_hs = (phi2 - phi2_hs - phi1 + phi1_hs) / (2 * eps)
             dphidrho_num = (phi2 - phi1) / (2 * eps)
             if np.shape(dphidn)[0] > 4:
-                print("Differential: ", 4+i, dphidrho_num_no_hs, dphidn[4+i])
+                print("Differential: ", 4+i, dphidrho_num_no_hs, dphidn[4+i], (dphidrho_num_no_hs - dphidn[4+i])/dphidn[4+i])
             print("Chemical potential comp.: ", i, dphidrho_num, mu_ex[i])
 
 
@@ -701,8 +702,7 @@ class pc_saft(Whitebear):
                 rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
                 a, a_n, = self.thermo.a_dispersion(
                     self.T, V, rho_thermo, a_n=True)
-                self.mu_disp[i, :] = a + np.sum(rho_thermo)*a_n[:]
-
+                self.mu_disp[i, :] = (a + rho_thermo[:]*a_n[:])
         self.mu_disp[non_prdm, :] = 0.0
 
     def bulk_compressibility(self, rho_b):
@@ -718,7 +718,8 @@ class pc_saft(Whitebear):
         """
         z = Whitebear.bulk_compressibility(self, rho_b)
         # PC-SAFT contributions
-        rho_thermo = np.array(rho_b)
+        rho_thermo = np.zeros_like(rho_b)
+        rho_thermo[:] = rho_b[:]
         rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
         rho_mix = np.sum(rho_thermo)
         V = 1.0/rho_mix
@@ -743,13 +744,15 @@ class pc_saft(Whitebear):
         """
         mu_ex = Whitebear.bulk_excess_chemical_potential(self, rho_b)
         # PC-SAFT contributions
-        rho_thermo = np.array(rho_b)
+        rho_thermo = np.zeros_like(rho_b)
+        rho_thermo[:] = rho_b[:]
         rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
         rho_mix = np.sum(rho_thermo)
-        V = 1.0/rho_mix
-        n = rho_thermo/rho_mix
+        V = 1.0
+        n = rho_thermo
         a, a_n, = self.thermo.a_dispersion(
             self.T, V, n, a_n=True)
+        a_n *= n
         a_n += a
         mu_ex += a_n
         return mu_ex
@@ -768,13 +771,14 @@ class pc_saft(Whitebear):
             rho_vec = bd.rho_i
             rho_mix = np.sum(rho_vec)
             V = 1.0
-            rho_thermo = rho_vec/(NA*self.d_hs[0]**3)
+            rho_thermo = np.zeros_like(rho_vec)
+            rho_thermo[:] = rho_vec[:]/(NA*self.d_hs[0]**3)
             a, a_n, = self.thermo.a_dispersion(
                 self.T, V, rho_thermo, a_n=True)
             phi += rho_mix*a
             dphidn_comb = np.zeros(4 + self.nc)
             dphidn_comb[:4] = dphidn
-            dphidn_comb[4:] = a + np.sum(rho_thermo)*a_n[:]
+            dphidn_comb[4:] = a + rho_thermo[:]*a_n[:]
         else:
             dphidn_comb = dphidn
         return phi, dphidn_comb
@@ -795,7 +799,8 @@ if __name__ == "__main__":
 
     pcs = get_thermopack_model("PC-SAFT")
     pcs.init("C1")
-    PCS_functional = pc_saft(1, pcs, T_red=1.1)
+    PCS_functional = pc_saft(1, pcs, T_red=110.0/165.0)
+    print(PCS_functional.d_hs[0], PCS_functional.T)
     dens_pcs = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
 
     v = pcs.specific_volume(PCS_functional.T,
@@ -804,15 +809,12 @@ if __name__ == "__main__":
                             pcs.LIQPH)
     rho = (NA * PCS_functional.d_hs[0] ** 3)/v
     PCS_functional.test_bulk_differentials(rho)
-
     dens = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
     dens.set_testing_values(rho)
     # dens.print(print_utilities=True)
-    print("\n")
     PCS_functional.test_differentials(dens)
-
-    corr = PCS_functional.get_bulk_correlation(np.array([rho]))
-    mu = PCS_functional.bulk_excess_chemical_potential(np.array([rho]))
+    corr = PCS_functional.get_bulk_correlation(rho)
+    mu = PCS_functional.bulk_excess_chemical_potential(rho)
     print("corr, mu", corr, mu)
 
     # Hard sphere functionals
