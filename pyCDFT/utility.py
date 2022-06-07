@@ -507,6 +507,35 @@ class weighted_densities_1D():
                 print("logn3neg: ", self.logn3neg[index])
                 print("n32: ", self.n32[index])
 
+    def plot(self, r, show=True, mask=None):
+        """
+
+        Args:
+            r (np.ndarray): Spatial resolution
+            show (bool): Execute plt.show ?
+            mask (ndarray of bool): What to plot?
+        """
+        if mask is None:
+            mask = np.full(len(r), True, dtype=bool)
+        fig, ax1 = plt.subplots()
+        ax1.plot(r[mask], self.n0[mask], label="n0", color="r")
+        ax1.plot(r[mask], self.n1[mask], label="n1", color="g")
+        ax1.plot(r[mask], self.n2[mask], label="n2", color="b")
+        ax1.plot(r[mask], self.n3[mask], label="n3", color="orange")
+        ax2 = ax1.twinx()
+        ax2.plot(r[mask], self.n2v[mask], label="n2v", color="grey")
+        ax2.plot(r[mask], self.n1v[mask], label="n1v", color="cyan")
+        ax1.set_xlabel("$r$")
+        ax1.set_ylabel("$n$")
+        ax2.set_ylabel("$n_v$")
+        if show:
+            leg = ax1.legend(loc="best", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            leg = ax2.legend(loc="best", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            plt.show()
+        return ax1, ax2
+
 
 class weighted_densities_pc_saft_1D(weighted_densities_1D):
     """
@@ -585,6 +614,27 @@ class weighted_densities_pc_saft_1D(weighted_densities_1D):
             print("r_disp: ", self.rho_disp[index])
 
 
+    def plot(self, r, show=True, mask=None):
+        """
+
+        Args:
+            r (np.ndarray): Spatial resolution
+            show (bool): Execute plt.show ?
+            mask (ndarray of bool): What to plot?
+        """
+        if mask is None:
+            mask = np.full(len(r), True, dtype=bool)
+        ax1, ax2 = weighted_densities_1D.plot(self, r, show=False, mask=mask)
+        ax1.plot(r[mask], self.rho_disp[mask], label="rho_disp", color="k")
+        if show:
+            leg = ax1.legend(loc="center left", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            leg = ax2.legend(loc="center right", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            plt.show()
+        return ax1, ax2
+
+
 class differentials_1D():
     """
     """
@@ -645,7 +695,9 @@ class differentials_1D():
         self.d2eff_conv[self.mask_conv_results] = 0.0
         self.d2veff_conv[self.mask_conv_results] = 0.0
         self.corr[:] = -(self.d3_conv[:] +
-                         self.d2eff_conv[:] + self.d2veff_conv[:])
+                           self.d2eff_conv[:] + self.d2veff_conv[:])
+        # self.corr[:] = -(self.d3_conv[:] +
+        #                  self.d2eff_conv[:])
 
     def set_functional_differentials(self, functional, ic=None):
         """
@@ -703,6 +755,36 @@ class differentials_1D():
         print("d3_conv: ", self.d3_conv)
         print("d2veff_conv: ", self.d2veff_conv)
         print("corr: ", self.corr)
+
+    def plot(self, r, show=True, mask=None):
+        """
+
+        Args:
+            r (np.ndarray): Spatial resolution
+            show (bool): Execute plt.show ?
+            mask (ndarray of bool): What to plot?
+        """
+        if mask is None:
+            mask = np.full(len(r), True, dtype=bool)
+        fig, ax1 = plt.subplots()
+        ax1.plot(r[mask], self.d2eff_conv[mask], label="d2_sum", color="r")
+        ax1.plot(r[mask], self.d3_conv[mask], label="d3", color="g")
+        #ax1.plot(r[mask], self.n2[mask], label="n2", color="b")
+        #ax1.plot(r[mask], self.n3[mask], label="n3", color="orange")
+        ax2 = ax1.twinx()
+        ax2.plot(r[mask], self.d2veff_conv[mask], label="d2v_sum", color="orange")
+        #ax2.plot(r[mask], self.n1v[mask], label="n1v", color="cyan")
+        ax1.set_xlabel("$r$")
+        ax1.set_ylabel("$d$")
+        ax2.set_ylabel("$d_v$")
+        if show:
+            ax1.plot(r[mask], self.corr[mask], label="corr", color="b")
+            leg = ax1.legend(loc="best", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            leg = ax2.legend(loc="best", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            plt.show()
+        return ax1, ax2
 
 
 class quadratic_polynomial():
@@ -782,6 +864,27 @@ class differentials_pc_saft_1D(differentials_1D):
         self.mu_disp_conv[self.mask_conv_results] = 0.0
         self.corr[:] -= self.mu_disp_conv
 
+    def plot(self, r, show=True, mask=True):
+        """
+
+        Args:
+            r (np.ndarray): Spatial resolution
+            show (bool): Execute plt.show ?
+            mask (ndarray of bool): What to plot?
+        """
+        if mask is None:
+            mask = np.full(len(r), True, dtype=bool)
+        ax1, ax2 = differentials_1D.plot(self, r, show=False, mask=mask)
+        ax1.plot(r[mask], self.mu_disp_conv[mask], label="mu_disp", color="k")
+        if show:
+            ax1.plot(r[mask], self.corr[mask], label="corr", color="b")
+            leg = ax1.legend(loc="center left", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            leg = ax2.legend(loc="center right", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            plt.show()
+        return ax1, ax2
+
 
 def get_thermopack_model(model):
     """
@@ -802,8 +905,7 @@ def get_thermopack_model(model):
         raise ValueError("Unknown thermopack model: " + model)
     return thermo
 
-
-def get_initial_densities_vle(z, rho_g, rho_l, R):
+def get_initial_densities_vle(z, rho_g, rho_l, R, reduced_temperature):
     """
     Calculate initial densities for gas-liquid interface calculatsion
     Args:
@@ -811,17 +913,18 @@ def get_initial_densities_vle(z, rho_g, rho_l, R):
         R (np.ndarray): Hard sphere radius in reduced units
         rho_g (list of float): Gas density
         rho_l (list of float): Liquid density
-
+        reduced_temperature (float): T/Tc
     Returns:
        rho0 (densities): Initial density with liquid deinsity to the right
 
     """
     rho0 = densities(np.shape(R)[0], np.shape(z)[0])
     for i in range(np.shape(R)[0]):
+#         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
+#             (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
-            (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
+            (rho_l[i] - rho_g[i])*np.tanh(z[:]/(2*R[i])*(2.4728 - 2.3625 * reduced_temperature))
     return rho0
-
 
 if __name__ == "__main__":
     pass

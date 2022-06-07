@@ -21,7 +21,7 @@ cdft_tp = cdft_thermopack(model="PC-SAFT",
                           pressure=0.0,
                           bubble_point_pressure=True,
                           domain_length=50,
-                          grid_dr=0.05)
+                          grid=1024)
 
 # Initialize the solver
 solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, \
@@ -30,10 +30,11 @@ solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, \
                                 density_init="VLE")
 
 # Make the calculations
-solver.minimise(print_frequency=250,
-                    plot="ERROR",
-                    tolerance=1.0e-10)
-
+#solver.minimise(print_frequency=250,
+#                    plot="ERROR",
+#                    tolerance=1.0e-10)
+solver.anderson_mixing(mmax=50, beta=0.05, tolerance=1.0e-10,
+                       log_iter=True, use_scipy=False)
 # Plot the profiles
 solver.plot_equilibrium_density_profiles(
     xlim=[25.75, 35.0], ylim=[0.97, 1.005])

@@ -24,7 +24,7 @@ class cdft1D:
                  wall="HW",
                  domain_length=40.0,
                  functional="Rosenfeld",
-                 grid_dr=0.001,
+                 grid=1024,
                  temperature=1.0,
                  quadrature="None",
                  thermopack=None):
@@ -38,7 +38,7 @@ class cdft1D:
             wall (str): Wall type (HardWall, SlitHardWall, None)
             domain_length (float): Length of domain
             functional (str): Name of hard sphere functional: Rosenfeld, WhiteBear, WhiteBear Mark II, Default Rosenfeld
-            grid_dr (float) : Grid spacing
+            grid (int) : Grid size
             temperature (float): Reduced temperature
             quadrature (str): Quadrature to use during integration
         Returns:
@@ -56,6 +56,7 @@ class cdft1D:
         # Temperature
         self.T = temperature
         self.beta = 1.0 / temperature
+        self.t_div_tc = 1.0
         # Bulk density
         self.bulk_densities = bulk_densities
         if bulk_densities_g is None:
@@ -68,9 +69,10 @@ class cdft1D:
         self.bulk_fractions = bulk_densities/np.sum(bulk_densities)
         # Length
         self.domain_length = domain_length
+        # Grid size
+        self.N = grid
         # Grid spacing
-        self.dr = grid_dr
-
+        self.dr = self.domain_length / self.N
         # FFT padding of grid
         if CONVOLUTIONS in (CONV_FFTW, CONV_SCIPY_FFT):
             self.padding = 1
@@ -78,11 +80,10 @@ class cdft1D:
             self.padding = 0
 
         # Get grid info
-        self.N = round(domain_length / grid_dr)  # Should be even
         self.NinP = []
         for i in range(self.nc):
             # Number of grid points within particle
-            self.NinP.append(2 * round(self.R[i] / grid_dr))
+            self.NinP.append(2 * round(self.R[i] / self.dr))
 
         # Test if self.Nbc has been set by child class
         try:
@@ -229,7 +230,8 @@ class cdft1D:
             rho0 = get_initial_densities_vle(z_centered,
                                              self.bulk_densities_g,
                                              self.bulk_densities,
-                                             self.R)
+                                             self.R,
+                                             self.t_div_tc)
         else:
             rho0 = densities(self.nc, self.N)
             rho0.assign_components(self.bulk_densities)
@@ -376,7 +378,7 @@ class cdft_thermopack(cdft1D):
                  bubble_point_pressure=False,
                  wall="None",
                  domain_length=40.0,
-                 grid_dr=0.001,
+                 grid=1024,
                  phi_disp=1.3862,
                  kwthermoargs={}):
         """
@@ -392,7 +394,7 @@ class cdft_thermopack(cdft1D):
             bubble_point_pressure (bool): Calculate bubble point pressure
             wall (str): Wall type (HardWall, SlitHardWall)
             domain_length (float): Length of domain
-            grid_dr (float) : Grid spacing
+            grid (int) : Grid size
             phi_disp (float): Weigthing distance for disperesion term
         Returns:
             None
@@ -435,7 +437,12 @@ class cdft_thermopack(cdft1D):
         particle_diameters = np.zeros(self.thermo.nc)
         particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
         d_hs_reducing = particle_diameters[0]
+        #print("d_hs_reducing",d_hs_reducing)
         self.bulk_densities = np.zeros(self.thermo.nc)
+        #print("rhol",1.0/self.eos_vl[0])
+        #print("rhog",1.0/self.eos_vg[0])
+        #print("temperature",temperature)
+        #print("pressure",self.eos_pressure)
         self.bulk_densities[:] = self.eos_liq_comp[:]/self.eos_vl
         self.bulk_densities[:] *= NA*particle_diameters[0]**3
         self.bulk_densities_g = np.zeros(self.thermo.nc)
@@ -444,6 +451,7 @@ class cdft_thermopack(cdft1D):
         particle_diameters[:] /= particle_diameters[0]
         temp_red = temperature / self.thermo.eps_div_kb[0]
 
+        grid_dr = domain_length / grid
         self.phi_disp = phi_disp
         self.Nbc = 2 * round(self.phi_disp *
                              np.max(particle_diameters) / grid_dr)
@@ -454,13 +462,17 @@ class cdft_thermopack(cdft1D):
                         wall=wall,
                         domain_length=domain_length,
                         functional="PC-SAFT",
-                        grid_dr=grid_dr,
+                        grid=grid,
                         temperature=temp_red,
                         thermopack=self.thermo)
 
         # Reduced units
         self.eps = self.thermo.eps_div_kb[0] * KB
         self.sigma = d_hs_reducing
+
+        # Calculate reduced temperature
+        Tc, _, _ = self.thermo.critical(comp)
+        self.t_div_tc = temperature / Tc
 
     def test_initial_vle_state(self):
         """

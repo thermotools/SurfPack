@@ -406,13 +406,13 @@ class planar_weights():
         kz_abs = np.zeros_like(kz)
         kz_abs[:] = np.abs(kz[:])
         kz_abs *= 2 * np.pi * self.R
-        self.fw3.real = (4.0/3.0) * np.pi * self.R**3 * \
+        self.fw3.real[:] = (4.0/3.0) * np.pi * self.R**3 * \
             (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
-        self.fw3.imag = 0.0
-        self.fw2.real = 4 * np.pi * self.R**2 * spherical_jn(0, kz_abs)
-        self.fw2.imag = 0.0
-        self.fw2vec.real = 0.0
-        self.fw2vec.imag = -2 * np.pi * kz * self.fw3.real
+        self.fw3.imag[:] = 0.0
+        self.fw2.real[:] = 4 * np.pi * self.R**2 * spherical_jn(0, kz_abs)
+        self.fw2.imag[:] = 0.0
+        self.fw2vec.real[:] = 0.0
+        self.fw2vec.imag[:] = -2 * np.pi * kz * self.fw3.real[:]
 
 
 class planar_pc_saft_weights(planar_weights):

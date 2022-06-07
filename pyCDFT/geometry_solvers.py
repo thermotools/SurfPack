@@ -10,6 +10,10 @@ from constants import DEBUG, LCOLORS
 import ng_extrapolation
 from matplotlib.animation import FuncAnimation
 from fmt_functionals import bulk_weighted_densities
+from scipy import optimize
+from collections import deque
+from scipy.linalg.lapack import dsysv
+from dft_numerics import anderson_acceleration
 import sys
 
 
@@ -163,9 +167,13 @@ class picard_geometry_solver():
         # self.wall_update()
         # Convolution integrals for densities
         self.cDFT.weights_system.convolutions(self.mod_densities)
+
+        #self.cDFT.weights_system.comp_weighted_densities[0].plot(self.r) #, mask=self.domain_mask
+
         # Calculate one-body direct correlation function
         self.cDFT.weights_system.correlation_convolution()
-
+        #self.cDFT.weights_system.comp_differentials[0].plot(self.r, mask=self.domain_mask)
+        #sys.exit()
         # print(self.cDFT.N, self.cDFT.Nbc)
         # index = 970
         # print(self.mod_densities[0][index])
@@ -193,6 +201,54 @@ class picard_geometry_solver():
                        + self.cDFT.mu_res_scaled_beta[i] - self.cDFT.beta * self.cDFT.Vext[i][self.domain_mask])
         if DEBUG:
             print("new_density", self.new_densities)
+
+
+    def error_function(self, dens):
+        """
+        Perform one successive substitution iteration on the equation system.
+        Updates self.new_densities.
+
+        Args:
+            dens (densities): Density profiles
+        """
+
+        #print(dens)
+        self.mod_densities.assign_elements(self.densities)
+        # Calculate weighted densities
+        self.mod_densities[0][self.domain_mask] = dens[:]
+        # self.wall_update()
+        # Convolution integrals for densities
+        self.cDFT.weights_system.convolutions(self.mod_densities)
+        # Calculate one-body direct correlation function
+        self.cDFT.weights_system.correlation_convolution()
+
+        # Calculate new density profile using the variations of the functional
+        res = self.cDFT.bulk_densities[0] * \
+            np.exp(self.cDFT.weights_system.comp_differentials[0].corr[self.domain_mask] \
+                   + self.cDFT.mu_res_scaled_beta[0] - self.cDFT.beta * self.cDFT.Vext[0][self.domain_mask]) - dens[:]
+        #print("res",res)
+        return res
+
+    def anderson_mixing(self, mmax=50, beta=0.05, max_iter=200,
+                        tolerance=1e-12,
+                        log_iter=False, use_scipy=False):
+
+        dens = np.zeros_like(self.densities[0][self.domain_mask])
+        self.mod_densities.assign_elements(self.densities)
+        dens[:] = self.densities[0][self.domain_mask]
+        if use_scipy:
+            sol = optimize.anderson(self.error_function, dens, w0=beta,
+                                    M=mmax, verbose=log_iter,
+                                    f_tol=tolerance)
+            self.densities[0][self.domain_mask] = sol
+            self.converged = True
+        else:
+            sol = anderson_acceleration(self.error_function, dens, mmax=mmax,
+                                        beta=beta, tolerance=tolerance,
+                                        max_iter=max_iter,
+                                        log_iter=log_iter)
+            self.densities[0][self.domain_mask] = sol[0]
+            self.converged = sol[1]
 
     def picard_update(self):
         """
@@ -296,6 +352,7 @@ class picard_geometry_solver():
                     lw=2, color=LCOLORS[i], label=f"Comp. {i+1}")
         leg = plt.legend(loc="best", numpoints=1)
         leg.get_frame().set_linewidth(0.0)
+        plt.grid()
         plt.show()
 
     def minimise(self, tolerance=1e-12,
@@ -436,7 +493,7 @@ class picard_geometry_solver():
             return
 
         fig, ax = plt.subplots(1, 1)
-        ax.set_xlabel("$z/\sigma_1$")
+        ax.set_xlabel("$z/d_{11}$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
         for i in range(self.densities.nc):
             ax.plot(self.r[self.domain_mask],
@@ -801,20 +858,28 @@ if __name__ == "__main__":
     cdft_tp = cdft_thermopack(model="SAFT-VRQ Mie",
                               comp_names="H2",
                               comp=np.array([1.0]),
-                              temperature=20.0,
+                              temperature=15.0,
                               pressure=0.0,
                               bubble_point_pressure=True,
                               domain_length=50.0,
-                              grid_dr=0.05,
-                              kwthermoargs={"feynman_hibbs_order": 0,
-                                            "parameter_reference": "AASEN2019-FH0"})
+                              grid=1024,
+                              kwthermoargs={"feynman_hibbs_order": 1,
+                                            "parameter_reference": "AASEN2019-FH1"})
     solver = picard_geometry_solver(
-        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.9, alpha_initial=0.1, n_alpha_initial=3,
-        ng_extrapolations=10, line_search="ERROR", density_init="VLE")
-    solver.minimise(print_frequency=100,
+        cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.9, alpha_initial=0.025, n_alpha_initial=1000,
+        ng_extrapolations=None, line_search="ERROR", density_init="VLE")
+
+    solver.anderson_mixing(mmax=50, beta=0.05, tolerance=1.0e-10,
+                           log_iter=True, use_scipy=False)
+    #solver.anderson_mixing()
+    # Plot the profiles
+    solver.plot_equilibrium_density_profiles()
+
+    sys.exit()
+    solver.minimise(print_frequency=1,
                     plot="DENS",
                     tolerance=2.0e-12)
-
+    solver.plot_equilibrium_density_profiles()
     print("gamma", cdft_tp.surface_tension_real_units(solver.densities))
 
     sys.exit()
