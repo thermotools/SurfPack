@@ -2,55 +2,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS
 import pyfftw as fftw
 from pyctp import pcsaft, saftvrmie, saftvrqmie
 
 boundary_condition = {"OPEN": 0,
                       "WALL": 1}
-
-
-def allocate_real_convolution_variable(N):
-    """
-
-    Args:
-        N (int): Sice of array
-
-    Returns:
-        variable (array_like): Variable allocated using proper type
-    """
-    if CONVOLUTIONS == CONV_FFTW:
-        variable = fftw.empty_aligned(N, dtype='float64')
-        variable[:] = 0.0
-    elif CONVOLUTIONS == CONV_SCIPY_FFT:
-        variable = np.zeros(N)
-    elif CONVOLUTIONS == CONV_NO_FFT:
-        variable = np.zeros(N)
-    else:
-        raise ValueError("Wrong flag for CONVOLUTIONS")
-    return variable
-
-
-def allocate_fourier_convolution_variable(N):
-    """
-
-    Args:
-        N (int): Sice of array
-
-    Returns:
-        variable (array_like): Variable allocated using proper type
-    """
-    if CONVOLUTIONS == CONV_FFTW:
-        variable = fftw.empty_aligned(int(N//2)+1, dtype='complex128')
-    elif CONVOLUTIONS == CONV_SCIPY_FFT:
-        variable = np.zeros(N, dtype=np.cdouble)
-    elif CONVOLUTIONS == CONV_NO_FFT:
-        variable = None
-    else:
-        raise ValueError(
-            "Wrong flag for CONVOLUTIONS when allocating fourier variable")
-    return variable
-
 
 def density_from_packing_fraction(eta, d=np.array([1.0])):
     """
@@ -198,10 +154,7 @@ class densities():
         self.N = N
         self.densities = []
         for i in range(nc):
-            if is_conv_var:
-                self.densities.append(allocate_real_convolution_variable(N))
-            else:
-                self.densities.append(np.zeros(N))
+            self.densities.append(np.zeros(N))
 
     def __setitem__(self, ic, rho):
         self.densities[ic][:] = rho[:]
@@ -332,10 +285,10 @@ class weighted_densities_1D():
         self.ms = ms
         self.n0 = np.zeros(N)
         self.n1 = np.zeros(N)
-        self.n2 = allocate_real_convolution_variable(N)
-        self.n3 = allocate_real_convolution_variable(N)
+        self.n2 = np.zeros(N)
+        self.n3 = np.zeros(N)
         self.n1v = np.zeros(N)
-        self.n2v = allocate_real_convolution_variable(N)
+        self.n2v = np.zeros(N)
         # Utilities
         self.n3neg = np.zeros(N)
         self.n3neg2 = np.zeros(N)
@@ -343,9 +296,9 @@ class weighted_densities_1D():
         self.logn3neg = np.zeros(N)
         self.n32 = np.zeros(N)
         # Fourier space weighted density
-        self.fn2 = allocate_fourier_convolution_variable(N)
-        self.fn3 = allocate_fourier_convolution_variable(N)
-        self.fn2v = allocate_fourier_convolution_variable(N)
+        self.fn2 = np.zeros(N, dtype=np.cdouble)
+        self.fn3 = np.zeros(N, dtype=np.cdouble)
+        self.fn2v = np.zeros(N, dtype=np.cdouble)
         # Mask results from convolution
         if mask_conv_results is None:
             self.mask_conv_results = np.full(N, False, dtype=bool)
@@ -545,7 +498,7 @@ class weighted_densities_pc_saft_1D(weighted_densities_1D):
         """
         """
         weighted_densities_1D.__init__(self, N, R, ms, mask_conv_results)
-        self.rho_disp = allocate_real_convolution_variable(N)
+        self.rho_disp =np.zeros(N)
         self.rho_disp_array = None
         self.n_max_test = 7
 
@@ -652,25 +605,25 @@ class differentials_1D():
         self.d0 = np.zeros(N)
         self.d1 = np.zeros(N)
         self.d2 = np.zeros(N)
-        self.d3 = allocate_real_convolution_variable(N)
+        self.d3 = np.zeros(N)
         self.d1v = np.zeros(N)
         self.d2v = np.zeros(N)
         # Utilities
-        self.d2eff = allocate_real_convolution_variable(N)
-        self.d2veff = allocate_real_convolution_variable(N)
+        self.d2eff = np.zeros(N)
+        self.d2veff = np.zeros(N)
         # Utilities
-        self.d3_conv = allocate_real_convolution_variable(N)
-        self.d2eff_conv = allocate_real_convolution_variable(N)
-        self.d2veff_conv = allocate_real_convolution_variable(N)
+        self.d3_conv = np.zeros(N)
+        self.d2eff_conv = np.zeros(N)
+        self.d2veff_conv = np.zeros(N)
         # One - body direct correlation function
         self.corr = np.zeros(self.N)
         # Fourier space differentials
-        self.fd2eff = allocate_fourier_convolution_variable(N)
-        self.fd3 = allocate_fourier_convolution_variable(N)
-        self.fd2veff = allocate_fourier_convolution_variable(N)
-        self.fd3_conv = allocate_fourier_convolution_variable(N)
-        self.fd2eff_conv = allocate_fourier_convolution_variable(N)
-        self.fd2veff_conv = allocate_fourier_convolution_variable(N)
+        self.fd2eff = np.zeros(N, dtype=np.cdouble)
+        self.fd3 = np.zeros(N, dtype=np.cdouble)
+        self.fd2veff = np.zeros(N, dtype=np.cdouble)
+        self.fd3_conv = np.zeros(N, dtype=np.cdouble)
+        self.fd2eff_conv = np.zeros(N, dtype=np.cdouble)
+        self.fd2veff_conv = np.zeros(N, dtype=np.cdouble)
         # Mask results from convolution
         if mask_conv_results is None:
             self.mask_conv_results = np.full(N, False, dtype=bool)
@@ -840,8 +793,8 @@ class differentials_pc_saft_1D(differentials_1D):
             mask_conv_results:
         """
         differentials_1D.__init__(self, N, R, mask_conv_results)
-        self.mu_disp = allocate_real_convolution_variable(N)
-        self.mu_disp_conv = allocate_real_convolution_variable(N)
+        self.mu_disp = np.zeros(N)
+        self.mu_disp_conv = np.zeros(N)
 
     def set_functional_differentials(self, functional, ic=None):
         """

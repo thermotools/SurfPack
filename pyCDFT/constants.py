@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
 from collections import OrderedDict
 
-# How to do convolution integrals
-CONV_FFTW = 1
-CONV_SCIPY_FFT = 2
-CONV_NO_FFT = 3
-CONVOLUTIONS = CONV_FFTW  # CONV_SCIPY_FFT
-
 # Debug flag
 DEBUG = False
 

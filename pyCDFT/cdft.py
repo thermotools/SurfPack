@@ -8,7 +8,7 @@ from utility import packing_fraction_from_density, \
     weighted_densities_1D
 from weight_functions import planar_weights_system_mc, \
     planar_weights_system_mc_pc_saft
-from constants import CONV_FFTW, CONV_SCIPY_FFT, CONV_NO_FFT, CONVOLUTIONS, NA, KB
+from constants import NA, KB
 import sys
 
 
@@ -74,11 +74,8 @@ class cdft1D:
         # Grid spacing
         self.dr = self.domain_length / self.N
         # FFT padding of grid
-        if CONVOLUTIONS in (CONV_FFTW, CONV_SCIPY_FFT):
-            self.padding = 1
-        else:
-            self.padding = 0
-
+        self.padding = 1
+        
         # Get grid info
         self.NinP = []
         for i in range(self.nc):
