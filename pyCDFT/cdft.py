@@ -109,7 +109,6 @@ class cdft1D:
         self.mu_ig_scaled_beta = np.log(self.bulk_densities)
         self.mu_scaled_beta = self.mu_ig_scaled_beta + self.mu_res_scaled_beta
 
-        #print(self.red_pressure, self.excess_mu)
         # Mask for inner domain
         self.NiWall = self.N - self.end
         self.domain_mask = np.full(self.N, False, dtype=bool)
@@ -140,8 +139,6 @@ class cdft1D:
             self.right_boundary_mask[i][self.NiWall_array_right[i]:] = True
             self.boundary_mask[i] = np.logical_or(
                 self.left_boundary_mask[i], self.right_boundary_mask[i])
-
-        # self.print_grid()
 
         # Allocate weighted densities, differentials container and weights
         if functional.upper() in ("PC-SAFT", "PCSAFT"):
@@ -434,24 +431,28 @@ class cdft_thermopack(cdft1D):
         particle_diameters = np.zeros(self.thermo.nc)
         particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
         d_hs_reducing = particle_diameters[0]
-        #print("d_hs_reducing",d_hs_reducing)
+
+        # Store the bulk component densities (scaled) 
         self.bulk_densities = np.zeros(self.thermo.nc)
-        #print("rhol",1.0/self.eos_vl[0])
-        #print("rhog",1.0/self.eos_vg[0])
-        #print("temperature",temperature)
-        #print("pressure",self.eos_pressure)
         self.bulk_densities[:] = self.eos_liq_comp[:]/self.eos_vl
         self.bulk_densities[:] *= NA*particle_diameters[0]**3
         self.bulk_densities_g = np.zeros(self.thermo.nc)
         self.bulk_densities_g[:] = self.eos_gas_comp[:]/self.eos_vg
         self.bulk_densities_g[:] *= NA*particle_diameters[0]**3
-        particle_diameters[:] /= particle_diameters[0]
-        temp_red = temperature / self.thermo.eps_div_kb[0]
 
-        grid_dr = domain_length / grid
+        # Other quantities
+        particle_diameters[:] /= particle_diameters[0]   
+        temp_red = temperature / self.thermo.eps_div_kb[0]
+        grid_dr = domain_length / grid      
+
+        # The dispersion term Phi and grid points around that
+        # Ø to M: Why is this not a "separate grid?, could end up being
+        # just two grid-points with few grid points?
         self.phi_disp = phi_disp
         self.Nbc = 2 * round(self.phi_disp *
                              np.max(particle_diameters) / grid_dr)
+
+        # Calling now the real base class for 1D problems    
         cdft1D.__init__(self,
                         bulk_densities=self.bulk_densities,
                         bulk_densities_g=self.bulk_densities_g,
