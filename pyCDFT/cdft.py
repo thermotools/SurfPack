@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-import numpy as np
-import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-import fmt_functionals
+import sys
+from constants import NA, KB
+from weight_functions import planar_weights_system_mc, \
+    planar_weights_system_mc_pc_saft
 from utility import packing_fraction_from_density, \
     boundary_condition, densities, get_thermopack_model, \
     weighted_densities_pc_saft_1D, get_initial_densities_vle, \
     weighted_densities_1D
-from weight_functions import planar_weights_system_mc, \
-    planar_weights_system_mc_pc_saft
-from constants import NA, KB
+import fmt_functionals
+import numpy as np
+import os
 import sys
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 
 class cdft1D:
@@ -70,12 +72,13 @@ class cdft1D:
         # Length
         self.domain_length = domain_length
         # Grid size
+        self.N_grid_inner = grid
         self.N = grid
         # Grid spacing
         self.dr = self.domain_length / self.N
         # FFT padding of grid
         self.padding = 1
-        
+
         # Get grid info
         self.NinP = []
         for i in range(self.nc):
@@ -357,6 +360,36 @@ class cdft1D:
 
         return gamma
 
+    def calculate_total_mass(self, dens):
+        """
+        Calculates the overall mass of the system.
+
+        Args:
+            dens (densities): Density profiles
+
+        Returns:
+            (float): Surface tension (mol)
+        """
+
+        n_tot = 0.0
+        for ic in range(self.nc):
+            n_tot += np.sum(dens[ic])
+        n_tot *= self.dr
+        return n_tot
+
+    def integrate_df_vext(self):
+        """
+        Calculates the integral of exp(-beta(df+Vext)).
+
+        Returns:
+            (float): Integral (-)
+        """
+        integral = np.zeros(self.nc)
+        for ic in range(self.nc):
+            integral[ic] = self.dr*np.sum(np.exp(self.weights_system.comp_differentials[ic].corr[self.domain_mask]
+                                                 - self.beta * self.Vext[ic][self.domain_mask]))
+        return integral
+
 
 class cdft_thermopack(cdft1D):
     """
@@ -432,7 +465,7 @@ class cdft_thermopack(cdft1D):
         particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
         d_hs_reducing = particle_diameters[0]
 
-        # Store the bulk component densities (scaled) 
+        # Store the bulk component densities (scaled)
         self.bulk_densities = np.zeros(self.thermo.nc)
         self.bulk_densities[:] = self.eos_liq_comp[:]/self.eos_vl
         self.bulk_densities[:] *= NA*particle_diameters[0]**3
@@ -441,9 +474,9 @@ class cdft_thermopack(cdft1D):
         self.bulk_densities_g[:] *= NA*particle_diameters[0]**3
 
         # Other quantities
-        particle_diameters[:] /= particle_diameters[0]   
+        particle_diameters[:] /= particle_diameters[0]
         temp_red = temperature / self.thermo.eps_div_kb[0]
-        grid_dr = domain_length / grid      
+        grid_dr = domain_length / grid
 
         # The dispersion term Phi and grid points around that
         # Ø to M: Why is this not a "separate grid?, could end up being
@@ -452,7 +485,7 @@ class cdft_thermopack(cdft1D):
         self.Nbc = 2 * round(self.phi_disp *
                              np.max(particle_diameters) / grid_dr)
 
-        # Calling now the real base class for 1D problems    
+        # Calling now the real base class for 1D problems
         cdft1D.__init__(self,
                         bulk_densities=self.bulk_densities,
                         bulk_densities_g=self.bulk_densities_g,

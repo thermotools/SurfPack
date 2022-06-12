@@ -24,13 +24,13 @@ cdft_tp = cdft_thermopack(model="PC-SAFT",
                           grid=1024)
 
 # Initialize the solver
-solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5, \
-                                alpha_initial=0.025, n_alpha_initial=250,\
-                                ng_extrapolations=10, line_search="ERROR",\
+solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5,
+                                alpha_initial=0.025, n_alpha_initial=250,
+                                ng_extrapolations=10, line_search="ERROR",
                                 density_init="VLE")
 
 # Make the calculations
-#solver.minimise(print_frequency=250,
+# solver.minimise(print_frequency=250,
 #                    plot="ERROR",
 #                    tolerance=1.0e-10)
 solver.anderson_mixing(mmax=50, beta=0.05, tolerance=1.0e-10,

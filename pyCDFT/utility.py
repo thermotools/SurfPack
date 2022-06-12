@@ -498,7 +498,7 @@ class weighted_densities_pc_saft_1D(weighted_densities_1D):
         """
         """
         weighted_densities_1D.__init__(self, N, R, ms, mask_conv_results)
-        self.rho_disp =np.zeros(N)
+        self.rho_disp = np.zeros(N)
         self.rho_disp_array = None
         self.n_max_test = 7
 
@@ -565,7 +565,6 @@ class weighted_densities_pc_saft_1D(weighted_densities_1D):
             print("r_disp: ", self.rho_disp)
         else:
             print("r_disp: ", self.rho_disp[index])
-
 
     def plot(self, r, show=True, mask=None):
         """
@@ -648,7 +647,7 @@ class differentials_1D():
         self.d2eff_conv[self.mask_conv_results] = 0.0
         self.d2veff_conv[self.mask_conv_results] = 0.0
         self.corr[:] = -(self.d3_conv[:] +
-                           self.d2eff_conv[:] + self.d2veff_conv[:])
+                         self.d2eff_conv[:] + self.d2veff_conv[:])
         # self.corr[:] = -(self.d3_conv[:] +
         #                  self.d2eff_conv[:])
 
@@ -725,7 +724,8 @@ class differentials_1D():
         #ax1.plot(r[mask], self.n2[mask], label="n2", color="b")
         #ax1.plot(r[mask], self.n3[mask], label="n3", color="orange")
         ax2 = ax1.twinx()
-        ax2.plot(r[mask], self.d2veff_conv[mask], label="d2v_sum", color="orange")
+        ax2.plot(r[mask], self.d2veff_conv[mask],
+                 label="d2v_sum", color="orange")
         #ax2.plot(r[mask], self.n1v[mask], label="n1v", color="cyan")
         ax1.set_xlabel("$r$")
         ax1.set_ylabel("$d$")
@@ -858,6 +858,7 @@ def get_thermopack_model(model):
         raise ValueError("Unknown thermopack model: " + model)
     return thermo
 
+
 def get_initial_densities_vle(z, rho_g, rho_l, R, reduced_temperature):
     """
     Calculate initial densities for gas-liquid interface calculatsion
@@ -873,11 +874,13 @@ def get_initial_densities_vle(z, rho_g, rho_l, R, reduced_temperature):
     """
     rho0 = densities(np.shape(R)[0], np.shape(z)[0])
     for i in range(np.shape(R)[0]):
-#         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
-#             (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
+        #         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
+        #             (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
-            (rho_l[i] - rho_g[i])*np.tanh(z[:]/(2*R[i])*(2.4728 - 2.3625 * reduced_temperature))
+            (rho_l[i] - rho_g[i])*np.tanh(z[:]/(2*R[i])
+                                          * (2.4728 - 2.3625 * reduced_temperature))
     return rho0
+
 
 if __name__ == "__main__":
     pass

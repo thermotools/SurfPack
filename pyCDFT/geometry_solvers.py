@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-import numpy as np
-import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from cdft import cdft1D, cdft_thermopack
-import matplotlib.pyplot as plt
+import sys
+from dft_numerics import anderson_acceleration
+from scipy.linalg.lapack import dsysv
+from collections import deque
+from scipy import optimize
+from fmt_functionals import bulk_weighted_densities
+from matplotlib.animation import FuncAnimation
+import ng_extrapolation
+from constants import DEBUG, LCOLORS
 from utility import boundary_condition, density_from_packing_fraction, \
     get_data_container, plot_data_container, \
     quadratic_polynomial, densities
-from constants import DEBUG, LCOLORS
-import ng_extrapolation
-from matplotlib.animation import FuncAnimation
-from fmt_functionals import bulk_weighted_densities
-from scipy import optimize
-from collections import deque
-from scipy.linalg.lapack import dsysv
-from dft_numerics import anderson_acceleration
+import matplotlib.pyplot as plt
+from cdft import cdft1D, cdft_thermopack
+import numpy as np
+import os
 import sys
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 
 class picard_geometry_solver():
@@ -30,7 +32,8 @@ class picard_geometry_solver():
                  n_alpha_initial=1,
                  ng_extrapolations=None,
                  line_search="None",
-                 density_init="Constant"):
+                 density_init="Constant",
+                 restrict_total_mass=False):
         """
         Initialises arrays and fourier objects required for minimisation procedure.
 
@@ -72,6 +75,13 @@ class picard_geometry_solver():
         if self.cDFT.right_boundary == boundary_condition["WALL"]:
             self.densities.set_mask(self.cDFT.right_boundary_mask)
         self.old_densities.assign_elements(self.densities)
+
+        # Calculate initial total mass
+        self.Ntot = self.cDFT.calculate_total_mass(self.densities)
+        self.delta_mu_scaled_beta = np.zeros(self.cDFT.nc)
+        self.delta_mu_scaled_beta[:] = self.cDFT.mu_scaled_beta[:] - \
+            self.cDFT.mu_scaled_beta[0]
+        self.restrict_total_mass = restrict_total_mass
 
         # Configure PyFFTW to use multiple threads
         # fftw.config.NUM_THREADS = 2
@@ -145,12 +155,11 @@ class picard_geometry_solver():
         # Calculate one-body direct correlation function
         self.cDFT.weights_system.correlation_convolution()
 
-
         for i in range(self.cDFT.nc):
             self.functional_derivative_value[i][self.domain_mask] = \
                 np.log(self.densities[i][self.domain_mask]) + \
                 -self.cDFT.mu_scaled_beta[i] \
-                -self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask] + \
+                - self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask] + \
                 self.cDFT.beta * self.cDFT.Vext[i][self.domain_mask]
 
     def successive_substitution(self, dens):
@@ -168,12 +177,12 @@ class picard_geometry_solver():
         # Convolution integrals for densities
         self.cDFT.weights_system.convolutions(self.mod_densities)
 
-        #self.cDFT.weights_system.comp_weighted_densities[0].plot(self.r) #, mask=self.domain_mask
+        # self.cDFT.weights_system.comp_weighted_densities[0].plot(self.r) #, mask=self.domain_mask
 
         # Calculate one-body direct correlation function
         self.cDFT.weights_system.correlation_convolution()
         #self.cDFT.weights_system.comp_differentials[0].plot(self.r, mask=self.domain_mask)
-        #sys.exit()
+        # sys.exit()
         # print(self.cDFT.N, self.cDFT.Nbc)
         # index = 970
         # print(self.mod_densities[0][index])
@@ -197,25 +206,31 @@ class picard_geometry_solver():
         # Calculate new density profile using the variations of the functional
         for i in range(self.cDFT.nc):
             self.new_densities[i][self.domain_mask] = self.cDFT.bulk_densities[i] * \
-                np.exp(self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask] \
+                np.exp(self.cDFT.weights_system.comp_differentials[i].corr[self.domain_mask]
                        + self.cDFT.mu_res_scaled_beta[i] - self.cDFT.beta * self.cDFT.Vext[i][self.domain_mask])
         if DEBUG:
             print("new_density", self.new_densities)
 
-
-    def error_function(self, dens):
+    def error_function(self, xvec):
         """
-        Perform one successive substitution iteration on the equation system.
-        Updates self.new_densities.
+        Return residual for: x - f(x)
 
         Args:
-            dens (densities): Density profiles
+            x (np.ndarray): Stacked density profiles and chemical potentials
         """
 
-        #print(dens)
+        n_grid = self.cDFT.N_grid_inner
+        # Make sure boundary cells are set to bulk densities
         self.mod_densities.assign_elements(self.densities)
         # Calculate weighted densities
-        self.mod_densities[0][self.domain_mask] = dens[:]
+        for ic in range(self.cDFT.nc):
+            self.mod_densities[ic][self.domain_mask] = xvec[ic *
+                                                            n_grid:(ic+1)*n_grid]
+        n_rho = self.cDFT.nc * n_grid
+
+        if self.restrict_total_mass:
+            exp_beta_mu = np.zeros(self.cDFT.nc)
+            exp_beta_mu[:] = xvec[n_rho:n_rho + self.cDFT.nc]
         # self.wall_update()
         # Convolution integrals for densities
         self.cDFT.weights_system.convolutions(self.mod_densities)
@@ -223,32 +238,62 @@ class picard_geometry_solver():
         self.cDFT.weights_system.correlation_convolution()
 
         # Calculate new density profile using the variations of the functional
-        res = self.cDFT.bulk_densities[0] * \
-            np.exp(self.cDFT.weights_system.comp_differentials[0].corr[self.domain_mask] \
-                   + self.cDFT.mu_res_scaled_beta[0] - self.cDFT.beta * self.cDFT.Vext[0][self.domain_mask]) - dens[:]
-        #print("res",res)
+        res = np.zeros(n_rho + self.cDFT.nc *
+                       (1 if self.restrict_total_mass else 0))
+
+        for ic in range(self.cDFT.nc):
+            res[ic * n_grid:(ic+1)*n_grid] = -self.cDFT.bulk_densities[ic] * \
+                np.exp(self.cDFT.weights_system.comp_differentials[ic].corr[self.domain_mask]
+                       + self.cDFT.mu_res_scaled_beta[ic] - self.cDFT.beta * self.cDFT.Vext[ic][self.domain_mask]) \
+                + xvec[ic *
+                       n_grid:(ic+1)*n_grid]
+
+        if self.restrict_total_mass:
+            #exp_beta_mu = np.exp(mu)
+            integrals = self.cDFT.integrate_df_vext()
+            denum = np.dot(exp_beta_mu, integrals)
+            exp_mu = self.Ntot * exp_beta_mu / denum
+            # print("Ntot", self.Ntot)
+            # print("exp_beta_mu*", exp_beta_mu)
+            # print("denum", denum)
+            # print("exp_mu", exp_mu)
+            res[n_rho:] = exp_beta_mu - exp_mu
         return res
 
     def anderson_mixing(self, mmax=50, beta=0.05, max_iter=200,
                         tolerance=1e-12,
                         log_iter=False, use_scipy=False):
 
-        dens = np.zeros_like(self.densities[0][self.domain_mask])
         self.mod_densities.assign_elements(self.densities)
-        dens[:] = self.densities[0][self.domain_mask]
+        n_grid = self.cDFT.N_grid_inner
+        n_rho = self.cDFT.nc * n_grid
+        xvec = np.zeros(n_rho + self.cDFT.nc *
+                        (1 if self.restrict_total_mass else 0))
+        for ic in range(self.cDFT.nc):
+            xvec[ic * n_grid:(ic+1) *
+                 n_grid] = self.densities[ic][self.domain_mask]
+
+        if self.restrict_total_mass:
+            xvec[n_rho:n_rho + self.cDFT.nc] = np.exp(self.cDFT.mu_scaled_beta)
+
         if use_scipy:
-            sol = optimize.anderson(self.error_function, dens, w0=beta,
+            sol = optimize.anderson(self.error_function, xvec, w0=beta,
                                     M=mmax, verbose=log_iter,
                                     f_tol=tolerance)
-            self.densities[0][self.domain_mask] = sol
             self.converged = True
         else:
-            sol = anderson_acceleration(self.error_function, dens, mmax=mmax,
+            sol = anderson_acceleration(self.error_function, xvec, mmax=mmax,
                                         beta=beta, tolerance=tolerance,
                                         max_iter=max_iter,
                                         log_iter=log_iter)
-            self.densities[0][self.domain_mask] = sol[0]
+
             self.converged = sol[1]
+            sol = sol[0]
+
+        # Set solution
+        for ic in range(self.cDFT.nc):
+            self.densities[ic][self.domain_mask] = sol[ic *
+                                                       n_grid:(ic+1)*n_grid]
 
     def picard_update(self):
         """
@@ -298,19 +343,20 @@ class picard_geometry_solver():
             self.old_densities, order=self.norm)[:]
 
         # Calculate a new error based on the functional derivative
-        error2_vec=np.zeros(self.cDFT.nc)
+        error2_vec = np.zeros(self.cDFT.nc)
         self.functional_derivative()
         # Here perhaps we could have the maximum norm of functinal derivative?
         for i in range(self.cDFT.nc):
-            error2_vec[i]=np.trapz(np.abs(self.functional_derivative_value[i]),\
-                                   self.r[:])
+            error2_vec[i] = np.trapz(np.abs(self.functional_derivative_value[i]),
+                                     self.r[:])
 
         # Compute an alternative error norm
-        if self.iteration<1.0:  # Have a comparable error at first iteration (rho vs functional derivative)
-            self.error2_scale=np.max(error2_vec)/self.error[:]
+        # Have a comparable error at first iteration (rho vs functional derivative)
+        if self.iteration < 1.0:
+            self.error2_scale = np.max(error2_vec)/self.error[:]
 
         # Compute the second error based on functional derivatives
-        self.error2=np.max(error2_vec)/self.error2_scale
+        self.error2 = np.max(error2_vec)/self.error2_scale
 
         #print('Iteration',self.iteration, 'Rho-based norm', self.error[:], 'Fun-deriv based norm', self.error2)
 
@@ -422,7 +468,7 @@ class picard_geometry_solver():
         Args:
             tolerance (float): Solver tolerance
             maximum_iterations (int): Maximum number of iteration
-            print_frequency (int): HOw often should solver status be printed?
+            print_frequency (int): How often should solver status be printed?
             z_max (float): Limit plot range
         Returns:
             None
@@ -831,7 +877,7 @@ if __name__ == "__main__":
     # solver.minimise(print_frequency=50,
     #                 plot_profile=True)
 
-    #sys.exit()
+    # sys.exit()
 
     # Thermopack
     # cdft_tp = cdft_thermopack(model="PC-SAFT",
@@ -871,7 +917,7 @@ if __name__ == "__main__":
 
     solver.anderson_mixing(mmax=50, beta=0.05, tolerance=1.0e-10,
                            log_iter=True, use_scipy=False)
-    #solver.anderson_mixing()
+    # solver.anderson_mixing()
     # Plot the profiles
     solver.plot_equilibrium_density_profiles()
 
