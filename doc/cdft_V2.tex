@@ -514,13 +514,13 @@ From a numerical point of view, we would like to perform as few convolutions in 
 \begin{eqnarray}
   &&\hat{w}_i^0=\frac{\hat{w}_i^2}{4\pi R_i^2} \\
   &&\hat{w}_i^1=\frac{\hat{w}_i^2}{4\pi R_i} \\
-  &&\hat{w}_i^{V1}=\frac{\hat{w}_i^{V2}}{2\pi R_i} 
+  &&\hat{w}_i^{V1}=\frac{\hat{w}_i^{V2}}{4\pi R_i} 
 \end{eqnarray}
 where $R_i$ is a constant. This means that we only need to perform three convolutions for each component to compute the weighted densities, for $n_{2,i}$, $n_{3,i}$ and $n_{V2,i}$ (see Eq.~\ref{eq:wrho}). then the rest follow from:
 \begin{eqnarray}
   &&n_{0,i}=\frac{n_{2,i}}{4\pi R_i^2} \\
   &&n_{1,i}=\frac{n_{2,i}}{4\pi R_i} \\
-  &&n_{V1,i}=\frac{n_{V2,i}}{2\pi R_i} 
+  &&n_{V1,i}=\frac{n_{V2,i}}{4\pi R_i} 
 \end{eqnarray}
 Furthermore, we also need to compute convolutions in Eq.~\ref{eq:conv2}, and we can use the same procedure here, where:
 \begin{equation}
@@ -531,7 +531,7 @@ Furthermore, we also need to compute convolutions in Eq.~\ref{eq:conv2}, and we 
 where
 \begin{eqnarray}
 &&\Phi_{2,i,\text{eff}}^{hs}=\frac{1}{4\pi R_i^2}\frac{\partial \Phi^{hs}}{\partial n_0}+\frac{1}{4\pi R_i}\frac{\partial \Phi^{hs}}{\partial n_1}+\frac{\partial \Phi^{hs}}{\partial n_2} \\
-&&\Phi_{2V,i,\text{eff}}^{hs}=\frac{1}{2\pi R_i}\frac{\partial \Phi^{hs}}{\partial n_{V1}}+\frac{\partial \Phi^{hs}}{\partial n_{V2}}
+&&\Phi_{2V,i,\text{eff}}^{hs}=\frac{1}{4\pi R_i}\frac{\partial \Phi^{hs}}{\partial n_{V1}}+\frac{\partial \Phi^{hs}}{\partial n_{V2}}
 \end{eqnarray}
 
 \section{Numerics}
