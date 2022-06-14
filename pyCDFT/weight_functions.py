@@ -9,70 +9,6 @@ import pyfftw as fftw
 import scipy.fft as sfft
 from scipy.special import spherical_jn
 
-
-class quadrature():
-    """
-    """
-
-    def __init__(self, NinP):
-        """
-
-        Args:
-            NinP (int): Number of grid-point inside particle
-        """
-        self.N = NinP
-        self.weights = None
-
-    def get_quadrature_weights(self, quad="Roth"):
-        """
-        Args:
-            quad (str): Name of quadrature (Roth (default), Trapeze/Trapezoidal, None)
-
-        Returns:
-            weights (np.ndarray):
-        """
-        if quad.upper() == "NONE":
-            self.weights = np.ones(self.N)
-        elif self.N == 3:
-            self.set_simpsons_weights()
-        elif quad.upper() == "ROTH":
-            self.set_roth_weights()
-        elif quad.upper() in ("TRAPEZE", "TRAPEZOIDAL"):
-            self.set_trapezoidal_weights()
-        else:
-            raise ValueError("Unknown quadrature: " + quad)
-
-        return self.weights
-
-    def set_simpsons_weights(self):
-        """ Small test system weights
-        """
-        assert self.N == 3
-        self.weights = np.ones(self.N)
-        self.weights[0] = 3.0 / 8.0
-        self.weights[1] = 4.0 / 3.0
-        self.weights[2] = 3.0 / 8.0
-
-    def set_roth_weights(self):
-        """ Closed extended formula used by Roth 2010
-        """
-        self.weights = np.ones(self.N)
-        assert self.N > 6
-        self.weights[0] = 3.0 / 8.0
-        self.weights[1] = 7.0 / 6.0
-        self.weights[2] = 23.0 / 24.0
-        self.weights[-1] = 3.0 / 8.0
-        self.weights[-2] = 7.0 / 6.0
-        self.weights[-3] = 23.0 / 24.0
-
-    def set_trapezoidal_weights(self):
-        """  Trapezoidal weights
-        """
-        self.weights = np.ones(self.N)
-        self.weights[0] = 1.0 / 2.0
-        self.weights[-1] = 1.0 / 2.0
-
-
 class planar_weights():
     """
     """
@@ -89,21 +25,7 @@ class planar_weights():
         self.dr = dr
         self.R = R
         self.N = N
-        # todo Reduce NinP and make identical to Fourier transforms
-        NinP = 2 * round(R / dr) + 1
-        self.quad = quadrature(NinP)
-        self.w3 = np.zeros(NinP)
-        self.w2 = np.zeros(NinP)
-        self.w2vec = np.zeros(NinP)
-        self.x = np.linspace(-self.R, self.R, NinP)
-        self.w3[:] = np.pi * (self.R ** 2 - self.x[:] ** 2)
-        self.w2[:] = np.pi * np.ones(NinP)[:] * (self.R / 0.5)
-        self.w2vec[:] = 2 * np.pi * self.x[:]
-        # Multiply with quadrature weights
-        quad_w = self.quad.get_quadrature_weights(quad)
-        self.w3 *= quad_w * self.dr
-        self.w2 *= quad_w * self.dr
-        self.w2vec *= quad_w * self.dr
+
         # Fourier space variables
         self.fw3 = np.zeros(N, dtype=np.cdouble)
         self.fw2 = np.zeros(N, dtype=np.cdouble)
@@ -113,20 +35,8 @@ class planar_weights():
         # Real space variables used for convolution
         self.rho = None
 
-        w3_temp = np.zeros(N)
-        w2_temp = np.zeros(N)
-        w2vec_temp = np.zeros(N)
-        NinR = round(R / dr)
-        for i in range(NinP):
-            j = i - NinR
-            w3_temp[j] = self.w3[i]
-            w2_temp[j] = self.w2[i]
-            w2vec_temp[j] = self.w2vec[i]
-        self.fw2[:] = sfft.fft(w2_temp)
-        self.fw3[:] = sfft.fft(w3_temp)
-        self.fw2vec[:] = sfft.fft(w2vec_temp)
-
-        self.analytical_fourier_weigts()
+        # Extract analytics fourier transform of weights functions
+        self.analytical_fourier_weigths()
 
         # Fourier transformation objects. Allocated in separate method.
         self.fftw_rho = None
@@ -204,9 +114,9 @@ class planar_weights():
 
         diff.update_after_convolution()
 
-    def analytical_fourier_weigts(self):
+    def analytical_fourier_weigths(self):
         """
-
+        Analytical Fourier transform of w_2, w_3 and w_V2
 
         """
         # Fourier space variables
@@ -259,11 +169,12 @@ class planar_pc_saft_weights(planar_weights):
         self.fftw_mu_disp = None
         self.ifftw_mu_disp = None
 
-    def analytical_fourier_weigts(self):
+    def analytical_fourier_weigths(self):
         """
+        Analytical Fourier transform of the dispersion weight
 
         """
-        planar_weights.analytical_fourier_weigts(self)
+        planar_weights.analytical_fourier_weigths(self)
         # Fourier space variables
         kz = np.zeros(self.N)
         for k in range(int(self.N/2)):
@@ -318,7 +229,7 @@ class planar_pc_saft_weights(planar_weights):
 
 class planar_weights_system_mc():
     """
-    Multicomponent planar weigts
+    Multicomponent planar weigths
     """
 
     def __init__(self, functional,
@@ -406,7 +317,7 @@ class planar_weights_system_mc():
 
 class planar_weights_system_mc_pc_saft(planar_weights_system_mc):
     """
-    Multicomponent planar weigts including PC-SAFT dispersion
+    Multicomponent planar weigths including PC-SAFT dispersion
     """
 
     def __init__(self, functional,
