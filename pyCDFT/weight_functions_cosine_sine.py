@@ -59,8 +59,8 @@ class planar_weights():
         # Split into two terms such that rho_delta=0 when z-> inf.
         rho_inf=rho[-1]
         rho_delta=rho-rho_inf
-        
-        self.frho[:] = sfft.fft(rho)
+
+        # Fourier transfor only the rho_delta (the other is analytical)
         self.frho_delta[:] = sfft.fft(rho_delta)
         
 
@@ -89,10 +89,17 @@ class planar_weights():
             Returns:
 
             """
-        self.frho[:] = sfft.fft(rho)
+
+        # Split into two terms such that rho_delta=0 when z-> inf.
+        rho_inf=rho[-1]
+        rho_delta=rho-rho_inf
+
+        # Fourier transfor only the rho_delta (the other is analytical)
+        self.frho_delta[:] = sfft.fft(rho_delta)
+        
         # 3d weighted density
-        densities.fn3[:] = self.frho[:] * self.fw3[:]
-        densities.n3[:] = sfft.ifft(densities.fn3).real
+        densities.fn3_delta[:] = self.frho_delta[:] * self.fw3[:]
+        densities.n3[:] = sfft.ifft(densities.fn3_delta).real+rho_inf*self.w3_conv
 
     def correlation_convolution(self, diff: differentials_1D):
         """
@@ -104,22 +111,28 @@ class planar_weights():
 
         """
     
-        # Split into two terms such that rho_delta=0 when z-> inf.
+        # Split all terms into (a_delta+a_inf) such that a_delta=0 when z-> inf.
+        d3_inf=diff.d3[-1]
+        d2eff_inf=diff.d2eff[-1]
+        d2veff_inf=diff.d2veff[-1]        
 
+        d3_delta=diff.d3-d3_inf
+        d2eff_delta=diff.d2eff-d2eff_inf
+        d2veff_delta=diff.d2veff-d2veff_inf
         
-        # Fourier transform derivatives
-        diff.fd3[:] = sfft.fft(diff.d3)
-        diff.fd2eff[:] = sfft.fft(diff.d2eff)
-        diff.fd2veff[:] = sfft.fft(diff.d2veff)
+        # Fourier transform of delta derivatives
+        diff.fd3[:] = sfft.fft(d3_delta)
+        diff.fd2eff[:] = sfft.fft(d2eff_delta)
+        diff.fd2veff[:] = sfft.fft(d2veff_delta)
 
         # Fourier space multiplications
-        diff.fd2eff_conv[:] = diff.fd2eff[:] * self.fw2[:]
         diff.fd3_conv[:] = diff.fd3[:] * self.fw3[:]
+        diff.fd2eff_conv[:] = diff.fd2eff[:] * self.fw2[:]
         diff.fd2veff_conv[:] = diff.fd2veff[:] * (-1.0 * self.fw2vec[:])
 
         # Transform from Fourier space to real space
-        diff.d3_conv[:] = sfft.ifft(diff.fd3_conv).real
-        diff.d2eff_conv[:] = sfft.ifft(diff.fd2eff_conv).real
+        diff.d3_conv[:] = sfft.ifft(diff.fd3_conv).real+d3_inf*self.w3_conv
+        diff.d2eff_conv[:] = sfft.ifft(diff.fd2eff_conv).real+d2eff_inf*self.w2_conv
         diff.d2veff_conv[:] = sfft.ifft(diff.fd2veff_conv).real
 
         diff.update_after_convolution()
