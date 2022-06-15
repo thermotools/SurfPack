@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 from constants import NA, KB
-from weight_functions import planar_weights_system_mc, \
+from weight_functions_cosine_sine import planar_weights_system_mc, \
     planar_weights_system_mc_pc_saft
 from utility import packing_fraction_from_density, \
     boundary_condition, densities, get_thermopack_model, \

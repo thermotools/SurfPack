@@ -308,6 +308,12 @@ class weighted_densities_1D():
         # Utility for testing
         self.n_max_test = 6
 
+        # Preallocated delta-variables
+        self.fn2_delta = np.zeros(N, dtype=np.cdouble)
+        self.fn3_delta = np.zeros(N, dtype=np.cdouble)
+        self.fn2v_delta = np.zeros(N, dtype=np.cdouble)
+
+
     def set_convolution_result_mask(self, mask_conv_results):
         """
 
