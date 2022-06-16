@@ -40,6 +40,8 @@ class planar_weights():
         self.fw2vec = np.zeros(N, dtype=np.cdouble)
         self.frho = np.zeros(N, dtype=np.cdouble)
         self.frho_delta = np.zeros(N, dtype=np.cdouble)
+        self.frho_delta_cs = np.zeros(N)
+        self.frho_delta_cs_V = np.zeros(N)
         self.fw3_cs = np.zeros(N)
         self.fw2_cs = np.zeros(N)
         self.fw2vec_cs = np.zeros(N)
@@ -75,25 +77,26 @@ class planar_weights():
 
         """
 
-        # Split into two terms such that rho_delta=0 when z-> inf.
+         # Split into two terms such that rho_delta=0 when z-> inf.
         self.rho_inf=rho[-1]
         self.rho_delta=rho-self.rho_inf
 
-        # Fourier transfor only the rho_delta (the other is analytical)
-        self.frho_delta[:] = fft(self.rho_delta)
+        # Fourier transfor only the rho_delta (the other term is done analytically)
+        self.frho_delta_cs[:] = dct(self.rho_delta, type=2)
+        self.frho_delta_cs_V = np.roll(self.frho_delta_cs.copy(), -1) # Fourier transform of density profile for `k_sin` 
+        self.frho_delta_cs_V[-1] = 0                                  # this information is lost but usually not important
         
+        # 2d weighted density (Cosine transform)
+        densities.fn2_delta_cs[:] = self.frho_delta_cs[:] * self.fw2_cs[:]
+        densities.n2[:] = idct(densities.fn2_delta_cs, type=2)+self.rho_inf*self.w2_conv
+        
+        # 3d weighted density (Cosine transform)
+        densities.fn3_delta_cs[:] = self.frho_delta_cs[:] * self.fw3_cs[:]
+        densities.n3[:] = idct(densities.fn3_delta_cs, type=2)+self.rho_inf*self.w3_conv
 
-        # 2d weighted density
-        densities.fn2_delta[:] = self.frho_delta[:] * self.fw2[:]
-        densities.n2[:] = ifft(densities.fn2_delta).real+self.rho_inf*self.w2_conv
-
-        # 3d weighted density
-        densities.fn3_delta[:] = self.frho_delta[:] * self.fw3[:]
-        densities.n3[:] = ifft(densities.fn3_delta).real+self.rho_inf*self.w3_conv
-
-        # Vector 2d weighted density
-        densities.fn2v_delta[:] = self.frho_delta[:] * self.fw2vec[:]
-        densities.n2v[:] = ifft(densities.fn2v_delta).real
+        # Vector 2d weighted density (Sine transform)
+        densities.fn2v_delta_cs[:] = self.frho_delta_cs_V[:] * self.fw2vec_cs[:]
+        densities.n2v[:] = idst(densities.fn2v_delta_cs, type=2)
 
         # Calculate remainig weighted densities after convolutions
         densities.update_after_convolution()
@@ -258,11 +261,15 @@ class planar_pc_saft_weights(planar_weights):
         """
         planar_weights.convolutions(self, densities, rho)
 
-        # Fourier transform the rho-delta, the same as in hs-term
-        self.frho_disp_delta[:] = self.frho_delta[:]
+        # Split into two terms such that rho_delta=0 when z-> inf.
+        self.rho_inf=rho[-1]
+        self.rho_delta=rho-self.rho_inf
 
+        # Fourier transfor only the rho_delta (the other term is done analytically)
+        self.frho_disp_delta[:] = fft(self.rho_delta)
+        
          # Dispersion density
-        self.fw_rho_disp_delta[:] = self.frho_delta[:] * self.fw_disp[:]
+        self.fw_rho_disp_delta[:] = self.frho_disp_delta[:] * self.fw_disp[:]
         densities.rho_disp[:] = ifft(self.fw_rho_disp_delta).real+self.rho_inf*self.w_disp_conv
         
     def correlation_convolution(self, diff: differentials_pc_saft_1D):
