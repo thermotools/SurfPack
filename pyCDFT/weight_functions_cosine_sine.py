@@ -294,7 +294,7 @@ class planar_pc_saft_weights(planar_weights):
         
          # Dispersion density
         self.fw_rho_disp_delta_cs[:] = self.frho_disp_delta_cs[:] * self.fw_disp_cs[:]
-        densities.rho_disp[:] = idct( self.fw_rho_disp_delta_cs)+self.rho_inf*self.w_disp_conv
+        densities.rho_disp[:] = idct(self.fw_rho_disp_delta_cs, type=2)+self.rho_inf*self.w_disp_conv
         
     def correlation_convolution(self, diff: differentials_pc_saft_1D):
         """
@@ -308,19 +308,18 @@ class planar_pc_saft_weights(planar_weights):
         planar_weights.correlation_convolution(self, diff)
 
         # Split the term into (a_delta+a_inf) such that a_delta=0 when z-> inf.
-        self.mu_disp_inf=diff.mu_disp[-1]
         self.mu_disp_delta=diff.mu_disp-self.mu_disp_inf
 
         # Fourier transform derivatives
-        self.fmu_disp_delta[:] = fft(self.mu_disp_delta)
+        self.fmu_disp_delta_cs[:] = dct(self.mu_disp_delta, type=2)
 
         # Fourier space multiplications
-        self.fw_mu_disp_delta[:] = self.fmu_disp_delta[:] * self.fw_disp[:]
+        self.fw_mu_disp_delta_cs[:] = self.fmu_disp_delta_cs[:] * self.fw_disp_cs[:]
 
         # Transform from Fourier space to real space
-        diff.mu_disp_conv[:] = ifft(self.fw_mu_disp_delta).real+\
+        diff.mu_disp_conv[:] = idct(self.fw_mu_disp_delta_cs, type=2)+\
             self.mu_disp_inf*self.w_disp_conv
-
+        
         diff.update_after_convolution()
 
 
