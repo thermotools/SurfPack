@@ -77,7 +77,7 @@ class cdft1D:
         # Grid spacing
         self.dr = self.domain_length / self.N
         # FFT padding of grid
-        self.padding = 1
+        self.padding = 0
 
         # Get grid info
         self.NinP = []

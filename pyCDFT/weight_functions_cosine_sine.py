@@ -116,13 +116,13 @@ class planar_weights():
         self.rho_inf=rho[-1]
         self.rho_delta=rho-self.rho_inf
 
-        # Fourier transfor only the rho_delta (the other is analytical)
-        self.frho_delta[:] = fft(rho_delta)
+        # Fourier transfor only the rho_delta (the other term is done analytically)
+        self.frho_delta_cs[:] = dct(self.rho_delta, type=2)      
         
-        # 3d weighted density
-        densities.fn3_delta[:] = self.frho_delta[:] * self.fw3[:]
-        densities.n3[:] = ifft(densities.fn3_delta).real+\
-            self.rho_inf*self.w3_conv
+        # 3d weighted density (Cosine transform)
+        densities.fn3_delta_cs[:] = self.frho_delta_cs[:] * self.fw3_cs[:]
+        densities.n3[:] = idct(densities.fn3_delta_cs, type=2)+self.rho_inf*self.w3_conv
+
 
     def correlation_convolution(self, diff: differentials_1D):
         """
@@ -143,20 +143,24 @@ class planar_weights():
         self.d2eff_delta=diff.d2eff-self.d2eff_inf
         self.d2veff_delta=diff.d2veff-self.d2veff_inf
         
-        # Fourier transform of delta derivatives
-        diff.fd3[:] = fft(self.d3_delta)
-        diff.fd2eff[:] = fft(self.d2eff_delta)
-        diff.fd2veff[:] = fft(self.d2veff_delta)
+        # Fourier transform of delta derivatives (sine and cosine)
+        diff.fd3_cs[:] = dct(self.d3_delta, type=2)
+        diff.fd2eff_cs[:] = dct(self.d2eff_delta, type=2)
+        diff.fd2veff_cs[:] = dct(self.d2veff_delta, type=2)
 
+        # Shift the fourier transform for the sine-transform
+        diff.fd2veff_cs_V=np.roll(diff.fd2veff_cs.copy(), -1)
+        diff.fd2veff_cs_V[-1] = 0
+       
         # Fourier space multiplications
-        diff.fd3_conv[:] = diff.fd3[:] * self.fw3[:]
-        diff.fd2eff_conv[:] = diff.fd2eff[:] * self.fw2[:]
-        diff.fd2veff_conv[:] = diff.fd2veff[:] * (-1.0 * self.fw2vec[:])
-
+        diff.fd3_conv_cs[:] = diff.fd3_cs[:] * self.fw3_cs[:]
+        diff.fd2eff_conv_cs[:] = diff.fd2eff_cs[:] * self.fw2_cs[:]
+        diff.fd2veff_conv_cs[:] = diff.fd2veff_cs_V[:] * (-1.0 * self.fw2vec_cs[:])
+        
         # Transform from Fourier space to real space
-        diff.d3_conv[:] = ifft(diff.fd3_conv).real+self.d3_inf*self.w3_conv
-        diff.d2eff_conv[:] = ifft(diff.fd2eff_conv).real+self.d2eff_inf*self.w2_conv
-        diff.d2veff_conv[:] = ifft(diff.fd2veff_conv).real
+        diff.d3_conv[:] = idct(diff.fd3_conv_cs, type=2)+self.d3_inf*self.w3_conv
+        diff.d2eff_conv[:] = idct(diff.fd2eff_conv_cs, type=2)+self.d2eff_inf*self.w2_conv
+        diff.d2veff_conv[:] = idst(diff.fd2veff_conv_cs, type=2)
 
         diff.update_after_convolution()
 
@@ -200,7 +204,6 @@ class planar_weights():
         self.fw2_cs[:] = 4.0 * np.pi * self.R**2 * spherical_jn(0, self.k_cos_R)
         self.fw2vec_cs[:] = self.k_sin * \
             (4.0/3.0 * np.pi * self.R**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
-
 
 class planar_pc_saft_weights(planar_weights):
     """

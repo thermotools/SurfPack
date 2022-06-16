@@ -312,8 +312,10 @@ class weighted_densities_1D():
         self.fn2_delta = np.zeros(N, dtype=np.cdouble)
         self.fn3_delta = np.zeros(N, dtype=np.cdouble)
         self.fn2v_delta = np.zeros(N, dtype=np.cdouble)
-
-
+        self.fn2_delta_cs = np.zeros(N)
+        self.fn3_delta_cs = np.zeros(N)
+        self.fn2v_delta_cs = np.zeros(N)
+        
     def set_convolution_result_mask(self, mask_conv_results):
         """
 
@@ -620,6 +622,7 @@ class differentials_1D():
         self.d3_conv = np.zeros(N)
         self.d2eff_conv = np.zeros(N)
         self.d2veff_conv = np.zeros(N)
+       
         # One - body direct correlation function
         self.corr = np.zeros(self.N)
         # Fourier space differentials
@@ -629,6 +632,16 @@ class differentials_1D():
         self.fd3_conv = np.zeros(N, dtype=np.cdouble)
         self.fd2eff_conv = np.zeros(N, dtype=np.cdouble)
         self.fd2veff_conv = np.zeros(N, dtype=np.cdouble)
+
+        # Fourier space differentials (cosine-sine transform)
+        self.fd2eff_cs = np.zeros(N)
+        self.fd3_cs = np.zeros(N)
+        self.fd2veff_cs = np.zeros(N)
+        self.fd2veff_cs_V = np.zeros(N)
+        self.fd3_conv_cs = np.zeros(N)
+        self.fd2eff_conv_cs = np.zeros(N)
+        self.fd2veff_conv_cs = np.zeros(N)
+        
         # Mask results from convolution
         if mask_conv_results is None:
             self.mask_conv_results = np.full(N, False, dtype=bool)
