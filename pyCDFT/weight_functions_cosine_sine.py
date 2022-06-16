@@ -25,6 +25,14 @@ class planar_weights():
         self.dr = dr
         self.R = R
         self.N = N
+        self.L = self.dr*self.N    # Length
+
+        # Preallocate grids
+        self.z = np.zeros(N)
+        self.k_cos = np.zeros(N)
+        self.k_cos_R = np.zeros(N)
+        self.k_sin = np.zeros(N)
+        self.k_sin_R = np.zeros(N)
 
         # Fourier space variables
         self.fw3 = np.zeros(N, dtype=np.cdouble)
@@ -32,7 +40,9 @@ class planar_weights():
         self.fw2vec = np.zeros(N, dtype=np.cdouble)
         self.frho = np.zeros(N, dtype=np.cdouble)
         self.frho_delta = np.zeros(N, dtype=np.cdouble)
-
+        self.fw3_cs = np.zeros(N)
+        self.fw2_cs = np.zeros(N)
+        self.fw2vec_cs = np.zeros(N)
         
         # Real space variables used for convolution
         self.rho = None
@@ -48,6 +58,7 @@ class planar_weights():
 
         # Extract analytics fourier transform of weights functions
         self.analytical_fourier_weigths()
+        self.analytical_fourier_weigths_cs()
 
         # The convolution of the fourier weights
         self.w2_conv=4.0*np.pi*(self.R**2)
@@ -168,6 +179,24 @@ class planar_weights():
         self.fw2.imag[:] = 0.0
         self.fw2vec.real[:] = 0.0
         self.fw2vec.imag[:] = -2 * np.pi * kz * self.fw3.real[:]
+
+    def analytical_fourier_weigths_cs(self):
+        """
+        Analytical Fourier transform of w_2, w_3 and w_V2
+        For the combined sine (imaginary) and cosine (real) transforms
+
+        """
+        self.z = np.linspace(self.dr/2, self.L - self.dr/2, self.N)
+        self.k_cos = 2 * np.pi * np.linspace(0.0, self.N - 1, self.N) / (2 * self.L)
+        self.k_sin = 2 * np.pi * np.linspace(1.0, self.N, self.N) / (2 * self.L)
+        self.k_cos_R = self.k_cos*self.R
+        self.k_sin_R = self.k_sin*self.R
+
+        self.fw3_cs = 4/3 * np.pi * self.R**3 * \
+            (spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R))
+        self.fw2_cs[:] = 4.0 * np.pi * self.R**2 * spherical_jn(0, self.k_cos_R)
+        self.fw2vec_cs[:] = self.k_sin * \
+            (4.0/3.0 * np.pi * self.R**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
 
 
 class planar_pc_saft_weights(planar_weights):
