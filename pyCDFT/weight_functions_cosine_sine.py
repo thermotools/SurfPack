@@ -226,6 +226,12 @@ class planar_pc_saft_weights(planar_weights):
         self.fmu_disp_delta = np.zeros(N, dtype=np.cdouble)
         self.fw_mu_disp_delta = np.zeros(N, dtype=np.cdouble)
 
+        self.fw_disp_cs = np.zeros(N)
+        self.frho_disp_delta_cs = np.zeros(N)
+        self.fw_rho_disp_delta_cs = np.zeros(N)
+        self.fmu_disp_delta_cs = np.zeros(N)
+        self.fw_mu_disp_delta_cs = np.zeros(N)
+        
         #  Regular arrays
         self.mu_disp_inf=np.zeros(N)
         self.mu_disp_delta=np.zeros(N)
@@ -254,6 +260,21 @@ class planar_pc_saft_weights(planar_weights):
         self.fw_disp.real = (spherical_jn(0, kz_abs) + spherical_jn(2, kz_abs))
         self.fw_disp.imag = 0.0
 
+    def analytical_fourier_weigths_cs(self):
+        """
+        Analytical Fourier transform of w_2, w_3 and w_V2
+        For the combined sine (imaginary) and cosine (real) transforms
+
+        """
+
+        # Extract anlytical transforms for fmt weight
+        planar_weights.analytical_fourier_weigths_cs(self)
+        
+        self.k_cos_R = 4 * np.pi *self.R*self.phi_disp*\
+            np.linspace(0.0, self.N - 1, self.N) / (2 * self.L)
+
+        self.fw_disp_cs = (spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R))
+
     def convolutions(self, densities: weighted_densities_pc_saft_1D, rho: np.ndarray):
         """
 
@@ -268,12 +289,12 @@ class planar_pc_saft_weights(planar_weights):
         self.rho_inf=rho[-1]
         self.rho_delta=rho-self.rho_inf
 
-        # Fourier transfor only the rho_delta (the other term is done analytically)
-        self.frho_disp_delta[:] = fft(self.rho_delta)
+        # Fourier transform only the rho_delta (the other term is done analytically)
+        self.frho_disp_delta_cs[:] = dct(self.rho_delta, type=2)
         
          # Dispersion density
-        self.fw_rho_disp_delta[:] = self.frho_disp_delta[:] * self.fw_disp[:]
-        densities.rho_disp[:] = ifft(self.fw_rho_disp_delta).real+self.rho_inf*self.w_disp_conv
+        self.fw_rho_disp_delta_cs[:] = self.frho_disp_delta_cs[:] * self.fw_disp_cs[:]
+        densities.rho_disp[:] = idct( self.fw_rho_disp_delta_cs)+self.rho_inf*self.w_disp_conv
         
     def correlation_convolution(self, diff: differentials_pc_saft_1D):
         """
