@@ -315,6 +315,9 @@ class weighted_densities_1D():
         self.fn2_delta_cs = np.zeros(N)
         self.fn3_delta_cs = np.zeros(N)
         self.fn2v_delta_cs = np.zeros(N)
+        self.fn2_delta_sph = np.zeros(N)
+        self.fn3_delta_sph = np.zeros(N)
+        self.fn2v_delta_sph = np.zeros(N)
         
     def set_convolution_result_mask(self, mask_conv_results):
         """
