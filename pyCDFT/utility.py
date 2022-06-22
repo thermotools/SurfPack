@@ -644,7 +644,16 @@ class differentials_1D():
         self.fd3_conv_cs = np.zeros(N)
         self.fd2eff_conv_cs = np.zeros(N)
         self.fd2veff_conv_cs = np.zeros(N)
-        
+
+        # Fourier space differentials (spherical transform)
+        self.fd2eff_sph = np.zeros(N)
+        self.fd3_sph = np.zeros(N)
+        self.fd2veff_sph = np.zeros(N)
+        self.fd2veff_sph_V = np.zeros(N)
+        self.fd3_conv_sph = np.zeros(N)
+        self.fd2eff_conv_sph = np.zeros(N)
+        self.fd2veff_conv_sph = np.zeros(N)
+      
         # Mask results from convolution
         if mask_conv_results is None:
             self.mask_conv_results = np.full(N, False, dtype=bool)

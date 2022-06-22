@@ -42,6 +42,7 @@ class planar_weights():
         self.frho = np.zeros(N, dtype=np.cdouble)
         self.frho_delta = np.zeros(N, dtype=np.cdouble)
         self.frho_delta_cs = np.zeros(N)
+        self.frho_delta_sph = np.zeros(N)
         self.frho_delta_cs_V = np.zeros(N)
         self.fw3_cs = np.zeros(N)
         self.fw2_cs = np.zeros(N)
@@ -73,6 +74,12 @@ class planar_weights():
         self.w2vec_conv=0.0
         self.w_disp_conv=1.0
 
+        # Intermediate vectors for spherical convolutions
+        self.n_V2_sph_part1=np.zeros(N)
+        self.n_V2_sph_part2=np.zeros(N)
+        self.n_V2_sph_prod2=np.zeros(N)
+        self.n_V2_sph_prod2_V=np.zeros(N)     
+
     def convolutions(self, densities: weighted_densities_1D, rho: np.ndarray):
         """
         We here calculate the convolutions for the weighted densities for the
@@ -84,32 +91,35 @@ class planar_weights():
 
         """
 
+        # Make a new rho -> step function
+        rho = (3.0/np.pi) * np.ones(self.N)
+        rho[int(self.N/2):] = 0
+        
          # Split into two terms such that rho_delta=0 when z-> inf.
         self.rho_inf=rho[-1]
         self.rho_delta=rho-self.rho_inf
 
-        # Fourier transfor only the rho_delta (the other term is done analytically)
-        self.frho_delta_sph[:] = dct(self.rho_delta, type=2)
+        # Fourier transfor only the rho_delta * r (the other term is done analytically)
+        self.frho_delta_sph[:] = dst(self.rho_delta*self.z, type=2)
 
-        # 2d weighted density (Cosine transformSpheri)
-        densities.fn2_delta_cs[:] = self.frho_delta_cs[:] * self.fw2_cs[:]
-        densities.n2[:] = idct(densities.fn2_delta_cs, type=2)+self.rho_inf*self.w2_conv
+        # 2d weighted density (Spherical geometry)
+        densities.fn2_delta_sph[:] = self.frho_delta_sph[:] * self.fw2_sph[:]
+        densities.n2[:] = (1/self.z)*idst(densities.fn2_delta_sph, type=2)+self.rho_inf*self.w2_conv
+               
+        # 3d weighted density (Spherical geometry)
+        densities.fn3_delta_sph[:] = self.frho_delta_sph[:] * self.fw3_sph[:]
+        densities.n3[:] = (1/self.z)*idst(densities.fn3_delta_sph, type=2)+self.rho_inf*self.w3_conv
 
-        
-        self.frho_delta_cs_V = np.roll(self.frho_delta_cs.copy(), -1) # Fourier transform of density profile for `k_sin` 
-        self.frho_delta_cs_V[-1] = 0                                  # this information is lost but usually not important
-        
-        # 2d weighted density (Cosine transform)
-        densities.fn2_delta_cs[:] = self.frho_delta_cs[:] * self.fw2_cs[:]
-        densities.n2[:] = idct(densities.fn2_delta_cs, type=2)+self.rho_inf*self.w2_conv
-        
-        # 3d weighted density (Cosine transform)
-        densities.fn3_delta_cs[:] = self.frho_delta_cs[:] * self.fw3_cs[:]
-        densities.n3[:] = idct(densities.fn3_delta_cs, type=2)+self.rho_inf*self.w3_conv
+        # Vector 2d weighted density (Spherical geometry)
+        self.n_V2_sph_part1=(1/(self.z**2))*idst(self.frho_delta_sph[:] * self.fw3_sph[:], type=2)
 
-        # Vector 2d weighted density (Sine transform)
-        densities.fn2v_delta_cs[:] = self.frho_delta_cs_V[:] * self.fw2vec_cs[:]
-        densities.n2v[:] = idst(densities.fn2v_delta_cs, type=2)
+        # Intermediate calculations for the intermediate term (Spherical geometry)
+        self.n_V2_sph_prod2=self.fw2vec_sph*self.frho_delta_sph
+        self.n_V2_sph_prod2_V = np.roll(self.n_V2_sph_prod2.copy(), 1) 
+        self.n_V2_sph_prod2_V[0] = 0                       
+        self.n_V2_sph_part2=(1/self.z)*idct(self.n_V2_sph_prod2_V, type=2)        
+
+        densities.n2v[:] =self.n_V2_sph_part1-self.n_V2_sph_part2
 
         # Calculate remainig weighted densities after convolutions
         densities.update_after_convolution()
@@ -206,6 +216,7 @@ class planar_weights():
         For the combined sine (imaginary) and cosine (real) transforms
 
         """
+
         self.z = np.linspace(self.dr/2, self.L - self.dr/2, self.N)
         self.k_cos = 2 * np.pi * np.linspace(0.0, self.N - 1, self.N) / (2 * self.L)
         self.k_sin = 2 * np.pi * np.linspace(1.0, self.N, self.N) / (2 * self.L)
@@ -229,7 +240,7 @@ class planar_weights():
         self.k_sin_R = self.k_sin*self.R
 
         self.fw3_sph = 4/3 * np.pi * self.R**3 * \
-            (spherical_jn(0, self.sin_R) + spherical_jn(2, self.k_sin_R))
+            (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
         self.fw2_sph[:] = 4.0 * np.pi * self.R**2 * spherical_jn(0, self.k_sin_R)
         self.fw2vec_sph[:] = self.k_sin * \
             (4.0/3.0 * np.pi * self.R**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
