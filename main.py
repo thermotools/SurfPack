@@ -20,7 +20,7 @@ cdft_tp = cdft_thermopack(model="PC-SAFT",
                           temperature=100.0,
                           pressure=0.0,
                           bubble_point_pressure=True,
-                          domain_length=50,
+                          domain_length=3,
                           grid=1024)
 
 # Initialize the solver

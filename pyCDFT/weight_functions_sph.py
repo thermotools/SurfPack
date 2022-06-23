@@ -78,7 +78,12 @@ class planar_weights():
         self.n_V2_sph_part1=np.zeros(N)
         self.n_V2_sph_part2=np.zeros(N)
         self.n_V2_sph_prod2=np.zeros(N)
-        self.n_V2_sph_prod2_V=np.zeros(N)     
+        self.n_V2_sph_prod2_V=np.zeros(N)
+
+        # Intermediate variables for spherical corr. convolution
+        self.fd2veff_sph_term1=np.zeros(N)
+        self.fd2veff_sph_int_term2=np.zeros(N)
+        self.fd2veff_sph_int_term2_V=np.zeros(N)        
 
     def convolutions(self, densities: weighted_densities_1D, rho: np.ndarray):
         """
@@ -91,11 +96,7 @@ class planar_weights():
 
         """
 
-        # Make a new rho -> step function
-        rho = (3.0/np.pi) * np.ones(self.N)
-        rho[int(self.N/2):] = 0
-        
-         # Split into two terms such that rho_delta=0 when z-> inf.
+        # Split into two terms such that rho_delta=0 when z-> inf.
         self.rho_inf=rho[-1]
         self.rho_delta=rho-self.rho_inf
 
@@ -104,20 +105,20 @@ class planar_weights():
 
         # 2d weighted density (Spherical geometry)
         densities.fn2_delta_sph[:] = self.frho_delta_sph[:] * self.fw2_sph[:]
-        densities.n2[:] = (1/self.z)*idst(densities.fn2_delta_sph, type=2)+self.rho_inf*self.w2_conv
+        densities.n2[:] = self.div_z*idst(densities.fn2_delta_sph, type=2)+self.rho_inf*self.w2_conv
                
         # 3d weighted density (Spherical geometry)
         densities.fn3_delta_sph[:] = self.frho_delta_sph[:] * self.fw3_sph[:]
-        densities.n3[:] = (1/self.z)*idst(densities.fn3_delta_sph, type=2)+self.rho_inf*self.w3_conv
+        densities.n3[:] = self.div_z*idst(densities.fn3_delta_sph, type=2)+self.rho_inf*self.w3_conv
 
         # Vector 2d weighted density (Spherical geometry)
-        self.n_V2_sph_part1=(1/(self.z**2))*idst(self.frho_delta_sph[:] * self.fw3_sph[:], type=2)
+        self.n_V2_sph_part1=(self.div_z**2)*idst(self.frho_delta_sph[:] * self.fw3_sph[:], type=2)
 
         # Intermediate calculations for the intermediate term (Spherical geometry)
         self.n_V2_sph_prod2=self.fw2vec_sph*self.frho_delta_sph
         self.n_V2_sph_prod2_V = np.roll(self.n_V2_sph_prod2.copy(), 1) 
         self.n_V2_sph_prod2_V[0] = 0                       
-        self.n_V2_sph_part2=(1/self.z)*idct(self.n_V2_sph_prod2_V, type=2)        
+        self.n_V2_sph_part2=self.div_z*idct(self.n_V2_sph_prod2_V, type=2)        
 
         densities.n2v[:] =self.n_V2_sph_part1-self.n_V2_sph_part2
 
@@ -139,13 +140,12 @@ class planar_weights():
         self.rho_inf=rho[-1]
         self.rho_delta=rho-self.rho_inf
 
-        # Fourier transfor only the rho_delta (the other term is done analytically)
-        self.frho_delta_cs[:] = dct(self.rho_delta, type=2)      
-        
-        # 3d weighted density (Cosine transform)
-        densities.fn3_delta_cs[:] = self.frho_delta_cs[:] * self.fw3_cs[:]
-        densities.n3[:] = idct(densities.fn3_delta_cs, type=2)+self.rho_inf*self.w3_conv
-
+        # Fourier transfor only the rho_delta * r (the other term is done analytically)
+        self.frho_delta_sph[:] = dst(self.rho_delta*self.z, type=2)
+               
+        # 3d weighted density (Spherical geometry)
+        densities.fn3_delta_sph[:] = self.frho_delta_sph[:] * self.fw3_sph[:]
+        densities.n3[:] = self.div_z*idst(densities.fn3_delta_sph, type=2)+self.rho_inf*self.w3_conv
 
     def correlation_convolution(self, diff: differentials_1D):
         """
@@ -165,25 +165,27 @@ class planar_weights():
         self.d3_delta=diff.d3-self.d3_inf
         self.d2eff_delta=diff.d2eff-self.d2eff_inf
         self.d2veff_delta=diff.d2veff-self.d2veff_inf
-        
-        # Fourier transform of delta derivatives (sine and cosine)
-        diff.fd3_cs[:] = dct(self.d3_delta, type=2)
-        diff.fd2eff_cs[:] = dct(self.d2eff_delta, type=2)
-        diff.fd2veff_cs[:] = dct(self.d2veff_delta, type=2)
 
-        # Shift the fourier transform for the sine-transform
-        diff.fd2veff_cs_V=np.roll(diff.fd2veff_cs.copy(), -1)
-        diff.fd2veff_cs_V[-1] = 0
-       
-        # Fourier space multiplications
-        diff.fd3_conv_cs[:] = diff.fd3_cs[:] * self.fw3_cs[:]
-        diff.fd2eff_conv_cs[:] = diff.fd2eff_cs[:] * self.fw2_cs[:]
-        diff.fd2veff_conv_cs[:] = diff.fd2veff_cs_V[:] * (-1.0 * self.fw2vec_cs[:])
-        
+        # First the scalar weights (spherical coordinates)
+        diff.fd3_sph[:] = dst(self.d3_delta*self.z, type=2)
+        diff.fd2eff_sph[:] = dst(self.d2eff_delta*self.z, type=2)
+
+        # Fourier space multiplications (scalar terms)
+        diff.fd3_conv_sph[:] = diff.fd3_sph[:]*self.fw3_sph[:]
+        diff.fd2eff_conv_sph[:] = diff.fd2eff_sph[:]*self.fw2_sph[:]
+
         # Transform from Fourier space to real space
-        diff.d3_conv[:] = idct(diff.fd3_conv_cs, type=2)+self.d3_inf*self.w3_conv
-        diff.d2eff_conv[:] = idct(diff.fd2eff_conv_cs, type=2)+self.d2eff_inf*self.w2_conv
-        diff.d2veff_conv[:] = idst(diff.fd2veff_conv_cs, type=2)
+        diff.d3_conv[:] = self.div_z*idst(diff.fd3_conv_sph, type=2)+self.d3_inf*self.w3_conv
+        diff.d2eff_conv[:] = self.div_z*idst(diff.fd2eff_conv_sph, type=2)+self.d2eff_inf*self.w2_conv
+
+        # Next handle the vector term in spherical coordinates (has two terms)
+        self.fd2veff_sph_term1=-1.0*dst(self.d2veff_delta, type=2)/(self.k_sin)
+        self.fd2veff_sph_int_term2=dct(self.z*self.d2veff_delta, type=2)
+        self.fd2veff_sph_int_term2_V=np.roll(self.fd2veff_sph_int_term2.copy(), -1) 
+        self.fd2veff_sph_int_term2_V[-1] = 0.0
+        
+        diff.fd2veff_conv_sph[:] = -1.0*(self.fd2veff_sph_term1[:]+self.fd2veff_sph_int_term2_V[:])*self.fw2vec_sph[:]
+        diff.d2veff_conv[:] = self.div_z*idst(diff.fd2veff_conv_sph, type=2)
 
         diff.update_after_convolution()
 
@@ -236,14 +238,14 @@ class planar_weights():
         for a spherical geometry
         """
         self.z = np.linspace(self.dr/2, self.L - self.dr/2, self.N)
+        self.div_z = (1/self.z)
         self.k_sin = 2 * np.pi * np.linspace(1.0, self.N, self.N) / (2 * self.L)
         self.k_sin_R = self.k_sin*self.R
 
         self.fw3_sph = 4/3 * np.pi * self.R**3 * \
             (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
         self.fw2_sph[:] = 4.0 * np.pi * self.R**2 * spherical_jn(0, self.k_sin_R)
-        self.fw2vec_sph[:] = self.k_sin * \
-            (4.0/3.0 * np.pi * self.R**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
+        self.fw2vec_sph[:] = self.k_sin * self.fw3_sph
         
 class planar_pc_saft_weights(planar_weights):
     """
@@ -271,7 +273,13 @@ class planar_pc_saft_weights(planar_weights):
         self.fw_rho_disp_delta_cs = np.zeros(N)
         self.fmu_disp_delta_cs = np.zeros(N)
         self.fw_mu_disp_delta_cs = np.zeros(N)
-        
+
+        self.fw_disp_sph = np.zeros(N)
+        self.frho_disp_delta_sph = np.zeros(N)
+        self.fw_rho_disp_delta_sph = np.zeros(N)
+        self.fmu_disp_delta_sph = np.zeros(N)
+        self.fw_mu_disp_delta_sph = np.zeros(N)
+    
         #  Regular arrays
         self.mu_disp_inf=np.zeros(N)
         self.mu_disp_delta=np.zeros(N)
@@ -315,6 +323,21 @@ class planar_pc_saft_weights(planar_weights):
 
         self.fw_disp_cs = (spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R))
 
+    def analytical_fourier_weigths_sph(self):
+        """
+        Analytical Fourier transform of w_2, w_3 and w_V2
+        For the 1D spherical transform
+
+        """
+
+        # Extract anlytical transforms for fmt weight
+        planar_weights.analytical_fourier_weigths_sph(self)
+        
+        self.k_sin_R = 4 * np.pi *self.R*self.phi_disp*\
+           np.linspace(1.0, self.N, self.N) / (2 * self.L)
+
+        self.fw_disp_sph = (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
+
     def convolutions(self, densities: weighted_densities_pc_saft_1D, rho: np.ndarray):
         """
 
@@ -323,6 +346,7 @@ class planar_pc_saft_weights(planar_weights):
             rho (np.ndarray): Density profile
 
         """
+
         planar_weights.convolutions(self, densities, rho)
 
         # Split into two terms such that rho_delta=0 when z-> inf.
@@ -330,11 +354,11 @@ class planar_pc_saft_weights(planar_weights):
         self.rho_delta=rho-self.rho_inf
 
         # Fourier transform only the rho_delta (the other term is done analytically)
-        self.frho_disp_delta_cs[:] = dct(self.rho_delta, type=2)
+        self.frho_disp_delta_sph[:] = dst(self.z*self.rho_delta, type=2)
         
          # Dispersion density
-        self.fw_rho_disp_delta_cs[:] = self.frho_disp_delta_cs[:] * self.fw_disp_cs[:]
-        densities.rho_disp[:] = idct(self.fw_rho_disp_delta_cs, type=2)+self.rho_inf*self.w_disp_conv
+        self.fw_rho_disp_delta_sph[:] = self.frho_disp_delta_sph[:] * self.fw_disp_sph[:]
+        densities.rho_disp[:] = self.div_z*idst(self.fw_rho_disp_delta_sph, type=2)+self.rho_inf*self.w_disp_conv
         
     def correlation_convolution(self, diff: differentials_pc_saft_1D):
         """
@@ -351,17 +375,16 @@ class planar_pc_saft_weights(planar_weights):
         self.mu_disp_delta=diff.mu_disp-self.mu_disp_inf
 
         # Fourier transform derivatives
-        self.fmu_disp_delta_cs[:] = dct(self.mu_disp_delta, type=2)
+        self.fmu_disp_delta_sph[:] = dst(self.mu_disp_delta, type=2)
 
         # Fourier space multiplications
-        self.fw_mu_disp_delta_cs[:] = self.fmu_disp_delta_cs[:] * self.fw_disp_cs[:]
+        self.fw_mu_disp_delta_sph[:] = self.fmu_disp_delta_sph[:] * self.fw_disp_sph[:]
 
         # Transform from Fourier space to real space
-        diff.mu_disp_conv[:] = idct(self.fw_mu_disp_delta_cs, type=2)+\
+        diff.mu_disp_conv[:] = self.div_z*idst(self.fw_mu_disp_delta_sph, type=2)+\
             self.mu_disp_inf*self.w_disp_conv
-        
-        diff.update_after_convolution()
 
+        diff.update_after_convolution()
 
 class planar_weights_system_mc():
     """

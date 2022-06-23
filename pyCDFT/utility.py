@@ -625,7 +625,7 @@ class differentials_1D():
         self.d3_conv = np.zeros(N)
         self.d2eff_conv = np.zeros(N)
         self.d2veff_conv = np.zeros(N)
-       
+
         # One - body direct correlation function
         self.corr = np.zeros(self.N)
         # Fourier space differentials
@@ -910,6 +910,13 @@ def get_initial_densities_vle(z, rho_g, rho_l, R, reduced_temperature):
         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
             (rho_l[i] - rho_g[i])*np.tanh(z[:]/(2*R[i])
                                           * (2.4728 - 2.3625 * reduced_temperature))
+    
+    # Rho profile (Step-function option)
+    #N=len(z)
+    #rho=(3.0/np.pi) * np.ones(N)
+    #rho[int(N/2):] = 0
+    #rho0.densities[0][:]=rho[:]
+    
     return rho0
 
 

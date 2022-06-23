@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 from constants import NA, KB
-from weight_functions_cosine_sine import planar_weights_system_mc, \
+from weight_functions_sph import planar_weights_system_mc, \
     planar_weights_system_mc_pc_saft
 from utility import packing_fraction_from_density, \
     boundary_condition, densities, get_thermopack_model, \
@@ -92,6 +92,10 @@ class cdft1D:
             self.Nbc = 0
         self.Nbc = max(self.Nbc, np.max(self.NinP))
         self.padding *= self.Nbc
+
+        # Turn off all the padding stuff
+        self.Nbc=0
+        
         # Add boundary and padding to grid
         self.N = self.N + 2 * self.Nbc + 2 * self.padding
         self.end = self.N - self.Nbc - self.padding  # End of domain
