@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from collections import OrderedDict
+from enum import Enum
 
 # Debug flag
 DEBUG = False
@@ -13,6 +14,10 @@ RGAS = NA*KB
 # Planck’s constant
 h = 6.626069311e-34
 
+class Geometry(Enum):
+    PLANAR = 1
+    POLAR = 2
+    SPHERICAL = 3
 
 # Plot utility
 LINE_STYLES = OrderedDict(
