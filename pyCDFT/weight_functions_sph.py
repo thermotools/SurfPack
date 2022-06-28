@@ -327,7 +327,7 @@ class spherical_pc_saft_weights(spherical_weights):
         """
 
         # Extract anlytical transforms for fmt weight
-        planar_weights.analytical_fourier_weigths_sph(self)
+        spherical_weights.analytical_fourier_weigths_sph(self)
 
         self.k_sin_R = 4 * np.pi *self.R*self.phi_disp*\
            np.linspace(1.0, self.N, self.N) / (2 * self.L)
