@@ -537,7 +537,6 @@ class picard_geometry_solver():
         if not self.converged:
             self.print_perform_minimization_message()
             return
-
         fig, ax = plt.subplots(1, 1)
         ax.set_xlabel("$z/d_{11}$")
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")

@@ -28,65 +28,97 @@ class WeightFunction(object):
         rho_b (ndarray): Bulk densities
         R (ndarray): Particle radius for all components
         """
-        assert convolve==True and calc_from==None
+        assert (convolve==True and calc_from is None) or (convolve==False and calc_from is not None)
         self.wf_type = wf_type
         self.kernel_radius = kernel_radius
         self.alias = alias
         self.prefactor = lambdify(("R"), sympify(prefactor), "numpy")
         self.convolve = convolve
         self.calc_from = calc_from
+        self.fw = None
+
+    def generate_fourier_weights(self, geometry, N, R, dr, r):
+        """
+        """
+        if self.convolve:
+            if geometry == Geometry.PLANAR:
+                self.generate_planar_fourier_weights(N, R, dr, r)
+            elif geometry == Geometry.PLANAR:
+                self.generate_spherical_fourier_weights(N, R, dr, r)
+            #elif geometry == Geometry.POLAR:
+            #    self.generate_polar_fourier_weights(N, R, dr, r)
+
+    def generate_planar_fourier_weights(self, N, R, dr, r):
+        """
+        """
+        if self.wf_type in [WeightFunctionType.THETA, WeightFunctionType.NORMTHETA]:
+            pass
+        elif self.wf_type == WeightFunctionType.DELTA:
+            pass
+        elif self.wf_type == WeightFunctionType.DELTAVEC:
+            pass
+
+    def generate_spherical_fourier_weights(self, N, R, dr, r):
+        """
+        """
+        if self.wf_type in [WeightFunctionType.THETA, WeightFunctionType.NORMTHETA]:
+            pass
+        elif self.wf_type == WeightFunctionType.DELTA:
+            pass
+        elif self.wf_type == WeightFunctionType.DELTAVEC:
+            pass
 
 class WeightFunctions(object):
 
     def __init__(self):
         """
         """
-        self.wfs = []
+        self.wfs = {}
 
     def append(self, wf):
-        self.wfs.append(wf)
+        self.wfs[wf.alias] = wf
 
     def add_fmt_weights(self):
-        self.wfs.append(WeightFunction(WeightFunctionType.DELTA,
-                                       kernel_radius=1.0,
-                                       alias = "w0",
-                                       prefactor = "1.0/(4.0*pi*R**2)",
-                                       convolve=False,
-                                       calc_from="w2"))
-        self.wfs.append(WeightFunction(WeightFunctionType.DELTA,
-                                       kernel_radius=1.0,
-                                       alias = "w1",
-                                       prefactor = "1.0/(4.0*pi*R)",
-                                       convolve=False,
-                                       calc_from="w2"))
-        self.wfs.append(WeightFunction(WeightFunctionType.DELTA,
-                                       kernel_radius=1.0,
-                                       alias = "w2",
-                                       prefactor = "1.0",
-                                       convolve=True))
-        self.wfs.append(WeightFunction(WeightFunctionType.THETA,
-                                       kernel_radius=1.0,
-                                       alias = "w3",
-                                       prefactor = "1.0",
-                                       convolve=True))
-        self.wfs.append(WeightFunction(WeightFunctionType.DELTAVEC,
-                                       kernel_radius=1.0,
-                                       alias = "wv1",
-                                       prefactor = "1.0/(4.0*pi*R)",
-                                       convolve=False,
-                                       calc_from="wv2"))
-        self.wfs.append(WeightFunction(WeightFunctionType.DELTAVEC,
-                                       kernel_radius=1.0,
-                                       alias = "wv2",
-                                       prefactor = "1.0",
-                                       convolve=True))
+        self.wfs["w0"] = WeightFunction(WeightFunctionType.DELTA,
+                                        kernel_radius=1.0,
+                                        alias = "w0",
+                                        prefactor = "1.0/(4.0*pi*R**2)",
+                                        convolve=False,
+                                        calc_from="w2")
+        self.wfs["w1"] = WeightFunction(WeightFunctionType.DELTA,
+                                        kernel_radius=1.0,
+                                        alias = "w1",
+                                        prefactor = "1.0/(4.0*pi*R)",
+                                        convolve=False,
+                                        calc_from="w2")
+        self.wfs["w2"] = WeightFunction(WeightFunctionType.DELTA,
+                                        kernel_radius=1.0,
+                                        alias = "w2",
+                                        prefactor = "1.0",
+                                        convolve=True)
+        self.wfs["w3"] = WeightFunction(WeightFunctionType.THETA,
+                                        kernel_radius=1.0,
+                                        alias = "w3",
+                                        prefactor = "1.0",
+                                        convolve=True)
+        self.wfs["wv1"] = WeightFunction(WeightFunctionType.DELTAVEC,
+                                         kernel_radius=1.0,
+                                         alias = "wv1",
+                                         prefactor = "1.0/(4.0*pi*R)",
+                                         convolve=False,
+                                         calc_from="wv2")
+        self.wfs["wv2"] = WeightFunction(WeightFunctionType.DELTAVEC,
+                                         kernel_radius=1.0,
+                                         alias = "wv2",
+                                         prefactor = "1.0",
+                                         convolve=True)
 
     def add_norm_theta_weight(self, alias, kernel_radius):
-        self.wfs.append(WeightFunction(WeightFunctionType.NORMTHETA,
-                                       kernel_radius=kernel_radius,
-                                       alias = alias,
-                                       prefactor = "1.0", # Not important. Will be calculated.
-                                       convolve=True))
+        self.wfs[alias] = WeightFunction(WeightFunctionType.NORMTHETA,
+                                         kernel_radius=kernel_radius,
+                                         alias = alias,
+                                         prefactor = "1.0", # Not important. Will be calculated.
+                                         convolve=True)
 
 
 def get_functional(N, T, functional="Rosenfeld", R=np.array([0.5]), thermopack=None):

@@ -20,14 +20,14 @@ cdft_tp = cdft_thermopack(model="PC-SAFT",
                           temperature=100.0,
                           pressure=0.0,
                           bubble_point_pressure=True,
-                          domain_length=3,
-                          grid=1024)
+                          domain_length=50,
+                          grid=1024, no_bc=True)
 
 # Initialize the solver
 solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5,
                                 alpha_initial=0.025, n_alpha_initial=250,
                                 ng_extrapolations=10, line_search="ERROR",
-                                density_init="VLE")
+                                density_init="VLE", restrict_total_mass=True)
 
 # Make the calculations
 # solver.minimise(print_frequency=250,

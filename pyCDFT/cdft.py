@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import sys
-from constants import NA, KB
-from weight_functions_sph import planar_weights_system_mc, \
-    planar_weights_system_mc_pc_saft
+from constants import NA, KB, Geometry
+from weight_function_system import Weights_system_mc, \
+    Weights_system_mc_pc_saft
 from utility import packing_fraction_from_density, \
     boundary_condition, densities, get_thermopack_model, \
     weighted_densities_pc_saft_1D, get_initial_densities_vle, \
@@ -13,6 +13,22 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
+def integration_weights(n_grid, dr, geometry):
+    int_weight = np.zeros(n_grid)
+    if geometry == Geometry.PLANAR:
+        int_weight[:] = dr
+    elif geometry == Geometry.SPHERICAL:
+        for k in range(n_grid):
+            int_weight[k] = 4.0*np.pi/3.0*dr**3*(3*k**2 + 3*k + 1)
+    elif geometry == Geometry.POLAR:
+        int_weight = None
+        pass
+        #for k in range(n_grid):
+        #    int_weight[k] = 4.0*np.pi/3.0*dr**3*(3*k**2 + 3*k + 1)
+    else:
+        print("Unknown geometry!")
+        sys.exit()
+    return int_weight
 
 class cdft1D:
     """
@@ -29,7 +45,9 @@ class cdft1D:
                  grid=1024,
                  temperature=1.0,
                  quadrature="None",
-                 thermopack=None):
+                 thermopack=None,
+                 geometry=Geometry.PLANAR,
+                 no_bc=False):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
@@ -46,6 +64,7 @@ class cdft1D:
         Returns:
             None
         """
+        self.geometry = geometry
         # Thermopack
         self.thermo = thermopack
         # Reduced unit
@@ -79,6 +98,9 @@ class cdft1D:
         # FFT padding of grid
         self.padding = 0
 
+        # Volume weights
+        self.integration_weights = integration_weights(grid, self.dr, geometry)
+
         # Get grid info
         self.NinP = []
         for i in range(self.nc):
@@ -90,12 +112,16 @@ class cdft1D:
             self.Nbc
         except AttributeError:
             self.Nbc = 0
-        self.Nbc = max(self.Nbc, np.max(self.NinP))
-        self.padding *= self.Nbc
 
-        # Turn off all the padding stuff
-        self.Nbc=0
-        
+        if no_bc:
+            # Turn off all the padding stuff
+            self.Nbc = 0
+            self.padding = 0
+        else:
+            self.Nbc = max(self.Nbc, np.max(self.NinP))
+
+        self.padding += self.Nbc
+
         # Add boundary and padding to grid
         self.N = self.N + 2 * self.Nbc + 2 * self.padding
         self.end = self.N - self.Nbc - self.padding  # End of domain
@@ -150,20 +176,21 @@ class cdft1D:
         # Allocate weighted densities, differentials container and weights
         if functional.upper() in ("PC-SAFT", "PCSAFT"):
             self.weights_system = \
-                planar_weights_system_mc_pc_saft(functional=self.functional,
-                                                 dr=self.dr,
-                                                 R=self.R,
-                                                 N=self.N,
-                                                 pcsaft=self.thermo,
-                                                 mask_conv_results=self.weight_mask)
+                Weights_system_mc_pc_saft(functional=self.functional,
+                                          geometry=self.geometry,
+                                          dr=self.dr,
+                                          R=self.R,
+                                          N=self.N,
+                                          pcsaft=self.thermo,
+                                          mask_conv_results=self.weight_mask)
         else:
             self.weights_system = \
-                planar_weights_system_mc(functional=self.functional,
-                                         dr=self.dr,
-                                         R=self.R,
-                                         N=self.N,
-                                         quad=quadrature,
-                                         mask_conv_results=self.weight_mask)
+                Weights_system_mc(functional=self.functional,
+                                  geometry=self.geometry,
+                                  dr=self.dr,
+                                  R=self.R,
+                                  N=self.N,
+                                  mask_conv_results=self.weight_mask)
 
     def print_grid(self):
         """
@@ -377,8 +404,7 @@ class cdft1D:
 
         n_tot = 0.0
         for ic in range(self.nc):
-            n_tot += np.sum(dens[ic])
-        n_tot *= self.dr
+            n_tot += np.sum(dens[ic][self.domain_mask]*self.integration_weights[:])
         return n_tot
 
     def integrate_df_vext(self):
@@ -390,8 +416,9 @@ class cdft1D:
         """
         integral = np.zeros(self.nc)
         for ic in range(self.nc):
-            integral[ic] = self.dr*np.sum(np.exp(self.weights_system.comp_differentials[ic].corr[self.domain_mask]
-                                                 - self.beta * self.Vext[ic][self.domain_mask]))
+            integral[ic] = np.sum(self.integration_weights*(
+                np.exp(self.weights_system.comp_differentials[ic].corr[self.domain_mask]
+                       - self.beta * self.Vext[ic][self.domain_mask])))
         return integral
 
 
@@ -411,7 +438,9 @@ class cdft_thermopack(cdft1D):
                  domain_length=40.0,
                  grid=1024,
                  phi_disp=1.3862,
-                 kwthermoargs={}):
+                 kwthermoargs={},
+                 geometry=Geometry.PLANAR,
+                 no_bc=False):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
@@ -499,7 +528,9 @@ class cdft_thermopack(cdft1D):
                         functional="PC-SAFT",
                         grid=grid,
                         temperature=temp_red,
-                        thermopack=self.thermo)
+                        thermopack=self.thermo,
+                        geometry=geometry,
+                        no_bc=no_bc)
 
         # Reduced units
         self.eps = self.thermo.eps_div_kb[0] * KB

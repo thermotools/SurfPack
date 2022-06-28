@@ -12,6 +12,7 @@ from pyCDFT.constants import DEBUG, LCOLORS
 import pyCDFT.ng_extrapolation
 from pyCDFT.fmt_functionals import bulk_weighted_densities
 from pyCDFT.geometry_solvers import picard_geometry_solver
+from constants import Geometry
 
 # Initialize Thermopack
 cdft_tp = cdft_thermopack(model="PC-SAFT",
@@ -21,13 +22,15 @@ cdft_tp = cdft_thermopack(model="PC-SAFT",
                           pressure=0.0,
                           bubble_point_pressure=True,
                           domain_length=50,
-                          grid=1024)
+                          grid=1024,
+                          geometry=Geometry.SPHERICAL,
+                          no_bc=True)
 
 # Initialize the solver
 solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5,
                                 alpha_initial=0.025, n_alpha_initial=250,
                                 ng_extrapolations=10, line_search="ERROR",
-                                density_init="VLE")
+                                density_init="VLE",restrict_total_mass=True)
 
 # Make the calculations
 # solver.minimise(print_frequency=250,
@@ -36,8 +39,7 @@ solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5,
 solver.anderson_mixing(mmax=50, beta=0.05, tolerance=1.0e-10,
                        log_iter=True, use_scipy=False)
 # Plot the profiles
-solver.plot_equilibrium_density_profiles(
-    xlim=[25.75, 35.0], ylim=[0.97, 1.005])
+solver.plot_equilibrium_density_profiles()
 
 # Print the surface tension
 print("gamma", cdft_tp.surface_tension_real_units(solver.densities))
