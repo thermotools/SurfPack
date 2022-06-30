@@ -481,7 +481,8 @@ which is a convolution of the derivative of the reduced Helmholtz density. Furth
     n_\alpha\left(\mathbf{r}\right)&=\sum_i^{N_c}\rho_i \lb\mathbf{r}\rb \circledast w_i^\alpha\lb\mathbf{r}\rb \\
     &= \mathscr{F}^{-1}\left[\mathscr{F}\left[\rho_i\lb\mathbf{r}\rb\right]\mathscr{F}\left[w_i^\alpha\lb\mathbf{r}\rb\right]\right]\\
     &= \mathscr{F}^{-1}\left[\hat{\rho}_i\left(\mathbf{k}\right)\hat{w}_i^\alpha\left(\mathbf{k}\right)\right]\\
-    \end{split}
+  \end{split}
+  \label{eq:Fourier}
 \end{equation}
 
 where $\hat{}$ refers to the transform of the respective quantity.
@@ -531,6 +532,80 @@ where
 &&\Phi_{2,i,\text{eff}}^{hs}=\frac{1}{4\pi R_i^2}\frac{\partial \Phi^{hs}}{\partial n_0}+\frac{1}{4\pi R_i}\frac{\partial \Phi^{hs}}{\partial n_1}+\frac{\partial \Phi^{hs}}{\partial n_2} \\
 &&\Phi_{2V,i,\text{eff}}^{hs}=\frac{1}{4\pi R_i}\frac{\partial \Phi^{hs}}{\partial n_{V1}}+\frac{\partial \Phi^{hs}}{\partial n_{V2}}
 \end{eqnarray}
+
+\subsection{Fourier transforms}
+The challenging aspect of solving the DFT is to compute the convolution integrals. This is done most efficiently and probably accurately in fourier space, where convolution integrals reduce to products between Fourier transforms, as shown in Eq.~\ref{eq:Fourier}. The problem of using the Fourier transform is that it assumes that your profile is a periodic signal, and will hence use information at the end of the domain when computing the convolution at the other end of the domain. To circumvent this, one must employ padding at the start and at the end of the domain, which essentially extrapolates the profiles. It is not always straightforward what this extrapolation should be. To avoid this padding, one uses instead Cosine and Sine transforms. In fact, the Fourier transform is a sum:
+
+\begin{equation}
+\mathscr{F}(f(\mathbf{r}))=\mathscr{C}(f(\mathbf{r}))-i\mathscr{S}(f(\mathbf{r}))
+\end{equation}
+where $\mathscr{C}$ and $\mathscr{S}$ are the cosine and sine transforms respectively. We shall next exploit that for even functions ($f(\mathbf{r})=f(-\mathbf{r})$), only the cosine transform is non-zero, and for odd functions ($f(\mathbf{r})=f(-\mathbf{r})$), only the sine transform is zero. The inverse transforms follow the same symmetry. We shall use the sine and cosine transforms for three geometries, planar, cylindrical and spherical. The good thing about the sine and cosine transforms is that they only go from 0 to infinity, meaning that they assume a certain symmetry for the rest of the domain at e.g. the centre (0), which means that we don't need padding, which is very convenient.
+
+Moreover, if a different transform is used for the inverse transform than the transform, the grid has to be ``rolled'' due to a use of a different indexing for the cosine and sine transforms, as explained nicely in Sec.~4 of the paper by Stierle et al.~\cite{stierle2020a}, which we refer to for further details on this. For derivation of how the full fast Fourier transform can be replaced by sine and cosine transforms, we refer to Appendix B of the supplementary information of Ref.~\cite{stierle2020a}. Due to its nice symmetry fitting for many of the problems that we investigate, we employ the Type II sine and cosine transform (see~\cite{sinecosine_webpage} for details).
+
+\subsubsection{Planar geometry}
+As shown in Fig.~\ref{fig:planar_weights}, the scalar weight functions are even, and the vector valued weight functions are odd. That means that when we are computing the scalar weighted densities, we should use the cosine transform, and the sine transform for the vector weighted densities. Let us assume that there is only one relevant dimension, $r$, which is $k$ in Fourier space, and that $f(r)$ is a scalar function, and $\mathbf{f}(r)$ is a vector function, $w$ is the scalar weights, and $\mathbf{w}$ is  For a planar geometry we have that:
+
+\begin{equation}
+  f(r)\circledast w(r) = \mathscr{C}^{-1}\left(\mathscr{C}\left(f(r)\right)\hat{w}(k)\right)
+  \label{eq:p1}
+\end{equation}
+
+\begin{equation}
+  f(r)\circledast \mathbf{w}(r) = \mathscr{S}^{-1}\left(\mathscr{C}\left(f(r)\right)\hat{\mathbf{w}}(k)\right)\mathbf{e}_r
+   \label{eq:p2}
+\end{equation}
+
+\begin{equation}
+  \mathbf{f}(r)\circledast \mathbf{w}(r) = \mathscr{C}^{-1}\left(\mathscr{S}\left(\mathbf{f}(r)\right)\hat{\mathbf{w}}(k)\right)
+   \label{eq:p3}
+\end{equation}
+
+where $\hat{}$ is the analytic Fourier transform, but it is important that the right grid is used depending on the inverse transform to be taken. Furthermore, $\mathbf{e}_r$ is the unit vector in the $r$ direction.
+
+In the above relations, we have used that the scalar function, typically $\rho(r)$ or the functional derivatives with respect to the scalar weight are even functions ass well, which is due to the symmetry of the system around $r=0$. The vector functions that we consider in our case are $d\phi/d\mathbf{n}$, which have an odd symmetry (the sine transform should be used).
+
+In Eq.~\ref{eq:p1}, we have a product between an even and an even function, which is even and the cosine transform should be used the whole way (the Fourier transform conserves the odd/even property).
+
+In Eq.~\ref{eq:p2}, we have a product between an even function $f(r)$ and an odd function (the vector weight), which is odd. Since the product between the transformed quantities is odd, the inverse sine transform should be used.
+
+In Eq.~\ref{eq:p3}, we have a product between an odd and an odd function, which is even. Hence, for both vector functions, the sine transforms should be used for the forward transform, and the cosine transform should be used for the backwards transform.
+
+\subsubsection{Cylindrical geometry}
+For a cylindrical grid, it is, per now, necessary to have a logarithmic grid and use the Hankel transform. We have also tried the Abel transform and combine that with a regular grid, but that did not give a satisfactory accuracy as the forward and backward transform did not properly recover a sharp density profile that was used as an example. Essentially more work is needed there.
+
+To be filled in.
+
+\subsubsection{Spherical geometry}
+In the Fourier transform in spherical coordinates, the integration over angles can be done analytically, and the transform of an (even) scalar function is:
+\begin{equation}
+  f(r)\circledast w(r) = \frac{1}{r}\mathscr{S}^{-1}\left(\mathscr{S}\left(f(r)r\right)\hat{w}(k_r)\right)
+  \label{eq:s1}
+\end{equation}
+
+\begin{equation}
+  f(r)\circledast \mathbf{w}(r) = \mathbf{e}_r\left(\frac{1}{r^2}\mathscr{S}^{-1}\left(\mathscr{S}\left(f(r)r\right)\hat{w}^*(k_r)\right)-\frac{1}{r}\mathscr{C}^{-1}\left(\mathscr{S}\left(f(r)r\right)2\pi w_r\hat{w}^*(k_r)\right)\right)
+   \label{eq:s2}
+\end{equation}
+
+\begin{equation}
+  \mathbf{f}(r)\circledast \mathbf{w}(r) = \frac{1}{r}\mathscr{S}^{-1}\left(\mathscr{C}\left(f_r(r)r\right)2\pi k_r\hat{w}^*(k_r)-\mathscr{S}\left(f_r\right)\hat{w}^*(k_r)\right)
+   \label{eq:s3}
+\end{equation}
+where:
+\begin{equation}
+\mathbf{f}(r)=f_r\mathbf{e}_r
+\end{equation}
+and
+\begin{equation}
+\hat{\mathbf{w}}=-2\pi i k_r\hat{w}^*(k_r)\mathbf{e}_r
+\end{equation}
+and $k_r$ is the fourier space spatial variabel.
+
+Since $f(r)$ is even in Eq.~\ref{eq:s1}, $rf(r)$ becomes odd, and the sine transform has to be used instead of the cosine transform (as in the planar case). Furthermore, since $w(r)$ is even, odd multiplied by even becomes odd, which means that the inverse sine transformation has to be used. The fourier transform of the weight function is the same for all coordinate systems (allthough the grid changes between cosine and sine transforms).
+
+For Eqs.~\ref{eq:s2} and \ref{eq:s3}, we must keep in mind that while $\hat{\mathbf{w}}$ is odd, $\hat{w}^*$ is even. 
+
 
 \section{Numerics}
 
