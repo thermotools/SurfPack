@@ -368,10 +368,11 @@ class spherical_pc_saft_weights(spherical_weights):
         spherical_weights.correlation_convolution(self, diff)
 
         # Split the term into (a_delta+a_inf) such that a_delta=0 when z-> inf.
+        self.mu_disp_inf=diff.mu_disp[-1]
         self.mu_disp_delta=diff.mu_disp-self.mu_disp_inf
 
         # Fourier transform derivatives
-        self.fmu_disp_delta_sph[:] = dst(self.mu_disp_delta, type=2)
+        self.fmu_disp_delta_sph[:] = dst(self.z*self.mu_disp_delta, type=2)
 
         # Fourier space multiplications
         self.fw_mu_disp_delta_sph[:] = self.fmu_disp_delta_sph[:] * self.fw_disp_sph[:]

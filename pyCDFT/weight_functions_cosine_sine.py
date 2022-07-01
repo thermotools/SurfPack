@@ -138,26 +138,26 @@ class planar_cosine_sine_weights(Weights):
         self.d3_delta=diff.d3-self.d3_inf
         self.d2eff_delta=diff.d2eff-self.d2eff_inf
         self.d2veff_delta=diff.d2veff-self.d2veff_inf
-
+   
         # Fourier transform of delta derivatives (sine and cosine)
         diff.fd3_cs[:] = dct(self.d3_delta, type=2)
         diff.fd2eff_cs[:] = dct(self.d2eff_delta, type=2)
-        diff.fd2veff_cs[:] = dct(self.d2veff_delta, type=2)
-
-        # Shift the fourier transform for the sine-transform
-        diff.fd2veff_cs_V=np.roll(diff.fd2veff_cs.copy(), -1)
-        diff.fd2veff_cs_V[-1] = 0
+        diff.fd2veff_cs[:] = dst(self.d2veff_delta, type=2)       # The vector valued function is odd
 
         # Fourier space multiplications
         diff.fd3_conv_cs[:] = diff.fd3_cs[:] * self.fw3_cs[:]
         diff.fd2eff_conv_cs[:] = diff.fd2eff_cs[:] * self.fw2_cs[:]
-        diff.fd2veff_conv_cs[:] = diff.fd2veff_cs_V[:] * (-1.0 * self.fw2vec_cs[:])
+        diff.fd2veff_conv_cs[:] = diff.fd2veff_cs[:] * self.fw2vec_cs[:]
 
+        # We must roll the vector to conform with the cosine transform
+        diff.fd2veff_conv_cs_V[:]=np.roll(diff.fd2veff_conv_cs.copy(),1)
+        diff.fd2veff_conv_cs_V[0]=0
+                
         # Transform from Fourier space to real space
         diff.d3_conv[:] = idct(diff.fd3_conv_cs, type=2)+self.d3_inf*self.w3_conv
         diff.d2eff_conv[:] = idct(diff.fd2eff_conv_cs, type=2)+self.d2eff_inf*self.w2_conv
-        diff.d2veff_conv[:] = idst(diff.fd2veff_conv_cs, type=2)
-
+        diff.d2veff_conv[:] = idct(diff.fd2veff_conv_cs_V, type=2)
+ 
         diff.update_after_convolution()
 
     def analytical_fourier_weigths(self):
@@ -303,6 +303,7 @@ class planar_cosine_sine_pc_saft_weights(planar_cosine_sine_weights):
         planar_cosine_sine_weights.correlation_convolution(self, diff)
 
         # Split the term into (a_delta+a_inf) such that a_delta=0 when z-> inf.
+        self.mu_disp_inf=diff.mu_disp[-1]
         self.mu_disp_delta=diff.mu_disp-self.mu_disp_inf
 
         # Fourier transform derivatives
