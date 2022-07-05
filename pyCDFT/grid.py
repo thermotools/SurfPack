@@ -143,163 +143,6 @@ class Densities():
             nd_copy[i, :] = self.densities[i][:]
         return nd_copy
 
-
-class Grid(object):
-    """
-
-    """
-
-    def __init__(self,
-                 geometry,
-                 n_comp,
-                 domain_size=100.0,
-                 n_grid=1024,
-                 n_bc=0):
-        """Class holding specifications for a gird
-
-        Args:
-            geometry (int): PLANAR/POLAR/SPHERICAL
-            n_comp (int, optional): Number of components.
-            domain_size (float, optional): Sisze of domain. Defaults to 100.0.
-            n_grid (int, optional): Number of grid points. Defaults to 1024.
-            n_bc (int, optional): Number of boundary points. Defaults to 0.
-
-        Returns:
-            None
-        """
-        self.geometry = geometry
-        self.densities = densities(n_comp, n_grid)
-        # Length
-        self.domain_size = domain_size
-        # Grid size
-        self.n_grid_inner = n_grid
-        self.n_grid = n_grid
-        # Grid spacing
-        self.dr = self.domain_length / self.N
-        # Boundary
-        self.n_bc = n_bc
-        # FFT padding of grid
-        self.padding = 0
-        # Add boundary and padding to grid
-        self.N = self.N + 2 * self.n_bc + 2 * self.padding
-        self.end = self.N - self.n_bc - self.padding  # End of domain
-
-        # Mask for inner domain
-        self.NiWall = self.N - self.end
-        self.domain_mask = np.full(self.N, False, dtype=bool)
-        self.domain_mask[self.NiWall:self.end] = True
-        self.weight_mask = np.full(self.N, False, dtype=bool)
-
-        # Set grid positions or planar distance for plotting
-        assert Geometry.POLAR != geometry
-        self.z = np.linspace(0.5*self.dr, self.domain_size - 0.5*self.dr, self.n_grid_inner)
-        # Store bulk for access to R and particle_diamater
-        self.bulk = None
-
-        # Mask for inner domain
-        self.NiWall = self.N - self.end
-        self.domain_mask = np.full(self.N, False, dtype=bool)
-        self.domain_mask[self.NiWall:self.end] = True
-        self.weight_mask = np.full(self.N, False, dtype=bool)
-
-        # Set up wall
-        self.NiWall_array_left = [self.NiWall] * self.nc
-        self.NiWall_array_right = [self.N - self.NiWall] * self.nc
-        self.left_boundary = None  # Handled in setup_wall
-        self.right_boundary = None  # Handled in setup_wall
-
-        # self.left_boundary_mask = []
-        # self.right_boundary_mask = []
-        # self.boundary_mask = []
-        # for i in range(self.nc):
-        #     self.left_boundary_mask.append(
-        #         np.full(self.N, False, dtype=bool))
-        #     self.right_boundary_mask.append(
-        #         np.full(self.N, False, dtype=bool))
-        #     self.boundary_mask.append(
-        #         np.full(self.N, False, dtype=bool))
-        #     self.left_boundary_mask[i][:self.NiWall_array_left[i]] = True
-        #     self.right_boundary_mask[i][self.NiWall_array_right[i]:] = True
-        #     self.boundary_mask[i] = np.logical_or(
-        #         self.left_boundary_mask[i], self.right_boundary_mask[i])
-
-
-    def integrate_number_of_molecules(self):
-        """
-        Calculates the overall number of molecules (reduced) of the system.
-
-        Returns:
-            (float): Reduced number of molecules (-)
-        """
-
-        n_tot = 0.0
-        for ic in range(self.nc):
-            n_tot += np.sum(self.density[ic])
-        n_tot *= self.dr
-        return n_tot
-
-    def print_grid(self):
-        """
-        Debug function
-
-        """
-        print("N: ", self.N)
-        print("NiWall: ", self.NiWall)
-        print("NinP: ", self.NinP)
-        print("Nbc: ", self.Nbc)
-        print("end: ", self.end)
-        print("domain_mask: ", self.domain_mask)
-        print("weight_mask: ", self.weight_mask)
-        for i in range(self.nc):
-            print(f"NiWall_array_left {i}: ", self.NiWall_array_left[i])
-            print(f"NiWall_array_right {i}: ", self.NiWall_array_right[i])
-            print(f"left_boundary_mask {i}: ", self.left_boundary_mask[i])
-            print(f"right_boundary_mask {i}: ", self.right_boundary_mask[i])
-            print(f"boundary_mask {i}: ", self.boundary_mask[i])
-
-    def set_tanh_profile(bulk, reduced_temperature, rel_pos_dividing_surface=0.5):
-        """
-        Calculate initial densities for gas-liquid interface calculation
-        Args:
-            rho_left (list of float): Left side density
-            rho_right (list of float): Right side density
-            reduced_temperature (float): T/Tc
-            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
-        """
-        z_centered = np.zeros_like(self.z)
-        z_centered[:] = self.z[:] - rel_dividing_surface*self.domain_size
-
-        r_left = bulk.reduced_density_left
-        r_right = bulk.reduced_density_right
-        R = bulk.R
-        self.bulk = bulk
-        for i in range(np.shape(r_right)[0]):
-        #         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
-            #             (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
-            self.densities[i][:] = 0.5*(r_left[i] + r_right[i]) + 0.5 * \
-                (r_right[i] - r_left[i])*np.tanh(z_centered[:]/(2*R[i])
-                                                 * (2.4728 - 2.3625 * reduced_temperature))
-
-    def set_constant_profile(bulk):
-        """
-        Calculate initial densities for gas-liquid interface calculation
-        Args:
-            rho (list of float): Densities
-        """
-        self.bulk = bulk
-        r = bulk.reduced_density_left
-        for i in range(np.shape(rho)[0]):
-            self.densities[i][:] = r[i]
-
-    def set_density_profile(densities):
-        """
-        Calculate initial densities for gas-liquid interface calculation
-        Args:
-            densities (Densities): Densities
-        """
-        self.densities = densities
-
-
 class Bulk(object):
     """
 
@@ -368,3 +211,332 @@ class Bulk(object):
         partial_density = np.zeros_like(reduced_density)
         partial_density[:] = reduced_density/(NA*self.particle_diameters[0]**3)
         return partial_density
+
+
+
+class Grid(object):
+    """
+
+    """
+
+    def __init__(self,
+                 geometry,
+                 n_comp,
+                 domain_size=100.0,
+                 n_grid=1024,
+                 n_bc=0):
+        """Class holding specifications for a gird
+
+        Args:
+            geometry (int): PLANAR/POLAR/SPHERICAL
+            n_comp (int, optional): Number of components.
+            domain_size (float, optional): Sisze of domain. Defaults to 100.0.
+            n_grid (int, optional): Number of grid points. Defaults to 1024.
+            n_bc (int, optional): Number of boundary points. Defaults to 0.
+
+        Returns:
+            None
+        """
+        self.geometry = geometry
+        self.densities = densities(n_comp, n_grid)
+        # Length
+        self.domain_size = domain_size
+        # Grid size
+        self.n_grid_inner = n_grid
+        self.n_grid = n_grid
+
+        # Set up grid
+        if geometry == Geometry.PLANAR:
+            self.planar_grid(domain_size=domain_size,
+                            n_grid=n_grid)
+        elif geometry == Geometry.POLAR:
+            self.polar_grid(domain_size=domain_size,
+                            n_grid=n_grid)
+        elif geometry == Geometry.SPHERICAL:
+            self.spherical_grid(domain_size=domain_size,
+                                n_grid=n_grid)
+        else:
+            print("Wrong grid type specified!")
+            sys.exit()
+
+        # Boundary
+        self.n_bc = n_bc
+        # FFT padding of grid
+        self.padding = 0
+        # Add boundary and padding to grid
+        self.N = self.N + 2 * self.n_bc + 2 * self.padding
+        self.end = self.N - self.n_bc - self.padding  # End of domain
+
+        # Mask for inner domain
+        self.NiWall = self.N - self.end
+        self.domain_mask = np.full(self.N, False, dtype=bool)
+        self.domain_mask[self.NiWall:self.end] = True
+        self.weight_mask = np.full(self.N, False, dtype=bool)
+
+        # Store bulk for access to R and particle_diamater
+        self.bulk = None
+
+        # Mask for inner domain
+        self.NiWall = self.N - self.end
+        self.domain_mask = np.full(self.N, False, dtype=bool)
+        self.domain_mask[self.NiWall:self.end] = True
+        self.weight_mask = np.full(self.N, False, dtype=bool)
+
+        # Set up wall
+        self.NiWall_array_left = [self.NiWall] * self.nc
+        self.NiWall_array_right = [self.N - self.NiWall] * self.nc
+        self.left_boundary = None  # Handled in setup_wall
+        self.right_boundary = None  # Handled in setup_wall
+
+        # self.left_boundary_mask = []
+        # self.right_boundary_mask = []
+        # self.boundary_mask = []
+        # for i in range(self.nc):
+        #     self.left_boundary_mask.append(
+        #         np.full(self.N, False, dtype=bool))
+        #     self.right_boundary_mask.append(
+        #         np.full(self.N, False, dtype=bool))
+        #     self.boundary_mask.append(
+        #         np.full(self.N, False, dtype=bool))
+        #     self.left_boundary_mask[i][:self.NiWall_array_left[i]] = True
+        #     self.right_boundary_mask[i][self.NiWall_array_right[i]:] = True
+        #     self.boundary_mask[i] = np.logical_or(
+        #         self.left_boundary_mask[i], self.right_boundary_mask[i])
+
+
+    def integrate_number_of_molecules(self):
+        """
+        Calculates the overall number of molecules (reduced) of the system.
+
+        Returns:
+            (float): Reduced number of molecules (Unit depending on geometry)
+        """
+        n_tot = 0.0
+        for ic in range(self.nc):
+            n_tot += np.sum(self.density[ic]*self.integration_weights)
+        return n_tot
+
+    def print_grid(self):
+        """
+        Debug function
+
+        """
+        print("N: ", self.N)
+        print("NiWall: ", self.NiWall)
+        print("NinP: ", self.NinP)
+        print("Nbc: ", self.Nbc)
+        print("end: ", self.end)
+        print("domain_mask: ", self.domain_mask)
+        print("weight_mask: ", self.weight_mask)
+        for i in range(self.nc):
+            print(f"NiWall_array_left {i}: ", self.NiWall_array_left[i])
+            print(f"NiWall_array_right {i}: ", self.NiWall_array_right[i])
+            print(f"left_boundary_mask {i}: ", self.left_boundary_mask[i])
+            print(f"right_boundary_mask {i}: ", self.right_boundary_mask[i])
+            print(f"boundary_mask {i}: ", self.boundary_mask[i])
+
+    def set_tanh_profile(bulk, reduced_temperature, rel_pos_dividing_surface=0.5):
+        """
+        Calculate initial densities for gas-liquid interface calculation
+        Args:
+            rho_left (list of float): Left side density
+            rho_right (list of float): Right side density
+            reduced_temperature (float): T/Tc
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
+        """
+        z_centered = np.zeros_like(self.z)
+        z_centered[:] = self.z[:] - rel_dividing_surface*self.domain_size
+
+        r_left = bulk.reduced_density_left
+        r_right = bulk.reduced_density_right
+        R = bulk.R
+        self.bulk = bulk
+        for i in range(np.shape(r_right)[0]):
+        #         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
+            #             (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
+            self.densities[i][:] = 0.5*(r_left[i] + r_right[i]) + 0.5 * \
+                (r_right[i] - r_left[i])*np.tanh(z_centered[:]/(2*R[i])
+                                                 * (2.4728 - 2.3625 * reduced_temperature))
+
+    def set_constant_profile(bulk):
+        """
+        Calculate initial densities for gas-liquid interface calculation
+        Args:
+            rho (list of float): Densities
+        """
+        self.bulk = bulk
+        r = bulk.reduced_density_left
+        for i in range(np.shape(rho)[0]):
+            self.densities[i][:] = r[i]
+
+    def set_density_profile(densities):
+        """
+        Calculate initial densities for gas-liquid interface calculation
+        Args:
+            densities (Densities): Densities
+        """
+        self.densities = densities
+
+    def get_index_of_rel_pos(self, rel_pos_dividing_surface):
+        """
+        Calculate initial densities for gas-liquid interface calculation
+        Args:
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface.
+        """
+        idx = None
+        if self.geometry == Geometry.PLANAR or \
+           self.geometry == Geometry.SPERICAL:
+            idx = int(rel_pos_dividing_surface*self.n_grid)
+        else:
+            pos = rel_pos_dividing_surface*self.domain_size
+            for i in range(n_grid):
+                if pos >= self.z_edge[i] and pos <= self.z_edge[i+1]:
+                    idx = i
+                    break
+        return idx
+
+    def set_step_profile(bulk, rel_pos_dividing_surface=0.5):
+        """
+        Calculate initial densities for gas-liquid interface calculation
+        Args:
+            rho_left (list of float): Left side density
+            rho_right (list of float): Right side density
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
+        """
+        r_left = bulk.reduced_density_left
+        r_right = bulk.reduced_density_right
+        self.bulk = bulk
+        idx = self.get_index_of_rel_pos(rel_pos_dividing_surface)
+        for i in range(np.shape(r_right)[0]):
+            self.densities[i][0:idx+1] = r_left[i]
+            self.densities[i][idx+1:] = r_right[i]
+
+    def polar_grid(self,
+                   domain_size=15.0,
+                   n_grid=1024):
+        """Set up grid according tO Xi eta al. 2020
+        An Efficient Algorithm for Molecular Density Functional Theory in Cylindrical Geometry:
+        Application to Interfacial Statistical Associating Fluid Theory (iSAFT)
+        DOI: 10.1021/acs.iecr.9b06895
+        """
+
+        # self.basic_init(geometry=Geometry.POLAR,
+        #                 n_comp=n_comp,
+        #                 domain_size=domain_size,
+        #                 n_grid=n_grid)
+        alpha = 0.002
+        for _ in range(21):
+            alpha = -np.log(1.0 - np.exp(-alpha)) / (n_grid - 1)
+        self.alpha = alpha
+        self.x0 = 0.5 * (np.exp(-alpha * n_grid) + np.exp(-alpha * (n_grid - 1)))
+        # Setting the grid
+        self.z = np.zeros(n_grid)
+        for i in range(n_grid):
+            self.z = domain_size*self.x0*np.exp(alpha*i)
+        # Setting the edge grid
+        self.z_edge = np.zeros(n_grid+1)
+        for i in range(1:n_grid+1):
+            self.z_edge = domain_size*np.exp(-alpha*(n_grid-i))
+        # End correction factor
+        k0 = np.exp(2*alpha)*(2*np.exp(alpha) + np.exp(2*alpha) - 1)/ \
+            (1 + np.exp(alpha))**2/(np.exp(2*alpha) - 1)
+        self.k = np.ones(n_grid)
+        self.k[0] = k0
+        k0v = np.exp(2*alpha)*(2*np.exp(alpha) + np.exp(2*alpha) - 5.0/3.0)/ \
+            (1 + np.exp(alpha))**2/(np.exp(2*alpha) - 1)
+        self.kv = np.ones(n_grid)
+        self.kv[0] = k0v
+        # Hankel paramaters
+        #self.b = domain_size
+        #fac = 1.0/(2*self.x0*(np.exp(alpha*(n_grid-1)) - np.exp(alpha*(n_grid-2))))
+        #self.lam = int(0.5*fac/self.b)
+        #self.gamma = self.lam*self.b
+        # Defining integration weights
+        self.integration_weights = np.zeros(n_grid)
+        self.integration_weights[0] = k0 * np.exp(2 * alpha)
+        self.integration_weights[1] = (np.exp(2 * alpha) - k0) * np.exp(2 * alpha)
+        for i in range(2:n_grid):
+            self.integration_weights[i] = np.exp(2 * alpha * i) * (np.exp(2 * alpha) - 1.0)
+        self.integration_weights *= np.exp(-2 * alpha * n_grid) * np.pi * domain_size**2
+
+
+    def planar_grid(self,
+                    domain_size=50.0,
+                    n_grid=1024):
+        """
+        """
+
+        # self.basic_init(geometry=Geometry.POLAR,
+        #                 n_comp=n_comp,
+        #                 domain_size=domain_size,
+        #                 n_grid=n_grid)
+
+        # Grid spacing
+        self.dr = self.domain_length / n_grid
+        # Grid
+        self.z = np.linspace(0.5*self.dr, domain_size - 0.5*self.dr, n_grid)
+        # Setting the edge grid
+        self.z_edge = np.linspace(0.0, self.domain_size, n_grid + 1)
+        # Defining integration weights
+        self.integration_weights = np.zeros(n_grid)
+        self.integration_weights[:] = self.dr
+
+    def spherical_grid(self,
+                       domain_size=15.0,
+                       n_grid=1024):
+        """
+        """
+
+        # self.basic_init(geometry=Geometry.POLAR,
+        #                 n_comp=n_comp,
+        #                 domain_size=domain_size,
+        #                 n_grid=n_grid)
+
+
+        # Grid spacing
+        self.dr = self.domain_length / n_grid
+        # Grid
+        self.z = np.linspace(0.5*self.dr, domain_size - 0.5*self.dr, n_grid)
+        # Setting the edge grid
+        self.z_edge = np.linspace(0.0, self.domain_size, n_grid + 1)
+        # Defining integration weights
+        self.integration_weights = np.zeros(n_grid)
+        for k in range(n_grid):
+            self.integration_weights[k] = 4.0*np.pi/3.0*dr**3*(3*k**2 + 3*k + 1)
+
+    @staticmethod
+    def Planar(n_comp=n_comp,
+               domain_size=15.0,
+               n_grid=1024):
+        """Set up polar grid
+        """
+
+        return Grid(geometry=Geometry.PLANAR,
+                    n_comp=n_comp,
+                    domain_size=domain_size,
+                    n_grid=n_grid)
+
+    @staticmethod
+    def Polar(n_comp=n_comp,
+              domain_size=15.0,
+              n_grid=1024):
+        """Set up polar grid
+        """
+
+        return Grid(geometry=Geometry.POLAR,
+                    n_comp=n_comp,
+                    domain_size=domain_size,
+                    n_grid=n_grid)
+
+    @staticmethod
+    def Sperical(n_comp=n_comp,
+                 domain_size=15.0,
+                 n_grid=1024):
+        """Set up spherical grid
+        """
+
+        return Grid(geometry=Geometry.SPHERICAL,
+                    n_comp=n_comp,
+                    domain_size=domain_size,
+                    n_grid=n_grid)
+
