@@ -16,7 +16,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 
-class Geometry(Enum):
+class GeometryXX(Enum):
     PLANAR = 1
     POLAR = 2
     SPHERICAL = 3

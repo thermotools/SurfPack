@@ -191,6 +191,7 @@ def anderson_acceleration(residual, x0, mmax=50, beta=0.05,
 
         if np.isnan(res):
             print("Anderson Mixing failed")
+            break
 
         if res < tolerance:
             converged = True
@@ -342,8 +343,8 @@ def picard_iteration(residual, x0, max_rel_change=1.0,
             for i in range(len(x0)):
                 # Avoid too big relative change
                 beta_i = max_rel_change * \
-                    np.abs(x_sol[i]) / np.max(np.abs(res[i]), 1.0e-10)
-                beta_vec[i] = np.min(beta, beta_i)
+                    abs(x_sol[i]) / max(abs(res[i]), 1.0e-10)
+                beta_vec[i] = min(beta, beta_i)
             x_sol[:] -= res[:] * beta_vec[:]
 
         if ensure_positive_x:
@@ -351,11 +352,12 @@ def picard_iteration(residual, x0, max_rel_change=1.0,
 
         res_avg = np.linalg.norm(res) / np.sqrt(len(res))
         if log_iter:
-            print("Picard iteration {:>4} | {:.6e} | {}".format(
-                k, res, np.min(beta_vec)))
+            print("Picard iteration {:>4} | {:.6e} | {:.6e}".format(
+                k, res_avg, np.min(beta_vec)))
 
-        if np.isnan(res):
+        if np.isnan(res_avg):
             print("Picard iteration failed")
+            break
 
         if res_avg < tolerance:
             converged = True

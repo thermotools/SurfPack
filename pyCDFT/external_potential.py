@@ -16,7 +16,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 
-class Geometry(Enum):
+class Wall_potential(Enum):
     HARDWALL = 1
     LJ93SS = 2
     LJ93SF = 3

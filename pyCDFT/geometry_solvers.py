@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 import sys
-from dft_numerics import anderson_acceleration
+from dft_numerics import anderson_acceleration, picard_iteration
 from scipy.linalg.lapack import dsysv
 from collections import deque
 from scipy import optimize
 from fmt_functionals import bulk_weighted_densities
 from matplotlib.animation import FuncAnimation
 import ng_extrapolation
-from constants import DEBUG, LCOLORS
+from constants import DEBUG, LCOLORS, Geometry, Specification, Lenght_unit
 from utility import boundary_condition, density_from_packing_fraction, \
     get_data_container, plot_data_container, \
     quadratic_polynomial, densities
@@ -33,7 +33,7 @@ class picard_geometry_solver():
                  ng_extrapolations=None,
                  line_search="None",
                  density_init="Constant",
-                 restrict_total_mass=False):
+                 specification=Specification.NUMBER_OF_MOLES):
         """
         Initialises arrays and fourier objects required for minimisation procedure.
 
@@ -43,7 +43,7 @@ class picard_geometry_solver():
             alpha_max (float): Maximum value for Picard parameter
             ng_extrapolations (int): Extrapolation with method of Ng? Value set update frequency.
             line_search (str): Perform line search ("None", "GP", "Error")
-            density_init (str): How to initialize density profiles? ("Constant", "VLE")
+            density_init (str): How to initialize density profiles? ("Constant", "VLE", "VEXT")
         Returns:
             None
         """
@@ -54,9 +54,8 @@ class picard_geometry_solver():
         self.domain_mask = self.cDFT.domain_mask
 
         # Set radius for plotting
-        self.r = np.linspace(-self.NiWall * self.cDFT.dr,
-                             (self.cDFT.end - 1) * self.cDFT.dr, self.cDFT.N)
-
+        self.r = np.linspace(-self.NiWall * self.cDFT.dr + 0.5*self.cDFT.dr,
+                             self.cDFT.end * self.cDFT.dr - 0.5*self.cDFT.dr, self.cDFT.N)
         # Density profiles
         self.densities = densities(self.cDFT.nc, self.cDFT.N)
         self.old_densities = densities(self.cDFT.nc, self.cDFT.N)
@@ -78,10 +77,12 @@ class picard_geometry_solver():
 
         # Calculate initial total mass
         self.Ntot = self.cDFT.calculate_total_mass(self.densities)
+        print("self.Ntot",self.Ntot)
+        #sys.exit()
         self.delta_mu_scaled_beta = np.zeros(self.cDFT.nc)
         self.delta_mu_scaled_beta[:] = self.cDFT.mu_scaled_beta[:] - \
             self.cDFT.mu_scaled_beta[0]
-        self.restrict_total_mass = restrict_total_mass
+        self.specification = specification
 
         # Configure PyFFTW to use multiple threads
         # fftw.config.NUM_THREADS = 2
@@ -120,6 +121,8 @@ class picard_geometry_solver():
         self.tolerance = 1.0e-12
         self.print_frequency = 50
         self.maximum_iterations = 10000000
+        self.do_plot = False
+        self.do_exp_mu = True
 
     def picard_density(self, mix_densities, alpha, new_densities=None, old_densities=None):
         """
@@ -226,11 +229,48 @@ class picard_geometry_solver():
         for ic in range(self.cDFT.nc):
             self.mod_densities[ic][self.domain_mask] = xvec[ic *
                                                             n_grid:(ic+1)*n_grid]
+
+        if self.do_plot:
+            fig, ax = plt.subplots(1, 1)
+            ax.set_xlabel("$z/d_{11}$")
+            ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+            plot_var = self.mod_densities
+            for i in range(self.mod_densities.nc):
+                ax.plot(self.r[:],
+                        plot_var[i],
+                        lw=2, color=LCOLORS[i], label=f"Comp. {i+1}")
+                leg = plt.legend(loc="best", numpoints=1)
+                leg.get_frame().set_linewidth(0.0)
+                plt.grid()
+                plt.show()
+
         n_rho = self.cDFT.nc * n_grid
 
-        if self.restrict_total_mass:
-            exp_beta_mu = np.zeros(self.cDFT.nc)
-            exp_beta_mu[:] = xvec[n_rho:n_rho + self.cDFT.nc]
+        beta_mu = np.zeros(self.cDFT.nc)
+        if self.specification == Specification.NUMBER_OF_MOLES:
+            if self.do_exp_mu:
+                exp_beta_mu = np.zeros(self.cDFT.nc)
+                exp_beta_mu[:] = xvec[n_rho:n_rho + self.cDFT.nc]
+                beta_mu[:] = np.log(exp_beta_mu[:])
+            else:
+                beta_mu[:] = xvec[n_rho:n_rho + self.cDFT.nc]
+                exp_beta_mu = np.zeros(self.cDFT.nc)
+                exp_beta_mu[:] = np.exp(beta_mu[:])
+            exp_beta_mu_grid = np.zeros(self.cDFT.nc)
+            integrals = self.cDFT.integrate_df_vext()
+            #print("integrals",integrals)
+            denum = np.dot(exp_beta_mu, integrals)
+            exp_beta_mu_grid[:] = self.Ntot * exp_beta_mu / denum
+            beta_mu_grid = np.zeros(self.cDFT.nc)
+            beta_mu_grid[:] = np.log(exp_beta_mu_grid[:])
+            if self.cDFT.geometry is Geometry.PLANAR:
+                # We know the chemical potential - use it
+                beta_mu[:] = self.cDFT.mu_scaled_beta[:]
+
+            #beta_mu[:] = beta_mu_grid[:]
+            #exp_beta_mu[:] = exp_beta_mu_grid[:]
+        else:
+            beta_mu[:] = self.cDFT.mu_scaled_beta[:]
         # self.wall_update()
         # Convolution integrals for densities
         self.cDFT.weights_system.convolutions(self.mod_densities)
@@ -239,42 +279,93 @@ class picard_geometry_solver():
 
         # Calculate new density profile using the variations of the functional
         res = np.zeros(n_rho + self.cDFT.nc *
-                       (1 if self.restrict_total_mass else 0))
+                       (1 if self.specification ==
+                        Specification.NUMBER_OF_MOLES else 0))
+
+        # for ic in range(self.cDFT.nc):
+        #     res[ic * n_grid:(ic+1)*n_grid] = -self.cDFT.bulk_densities[ic] * \
+        #         np.exp(self.cDFT.weights_system.comp_differentials[ic].corr[self.domain_mask]
+        #                + self.cDFT.mu_res_scaled_beta[ic] - self.cDFT.beta * self.cDFT.Vext[ic][self.domain_mask]) \
+        #         + xvec[ic *
+        #                n_grid:(ic+1)*n_grid]
 
         for ic in range(self.cDFT.nc):
-            res[ic * n_grid:(ic+1)*n_grid] = -self.cDFT.bulk_densities[ic] * \
-                np.exp(self.cDFT.weights_system.comp_differentials[ic].corr[self.domain_mask]
-                       + self.cDFT.mu_res_scaled_beta[ic] - self.cDFT.beta * self.cDFT.Vext[ic][self.domain_mask]) \
+            res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.cDFT.weights_system.comp_differentials[ic].corr[self.domain_mask]
+                       + beta_mu[:] - self.cDFT.beta * self.cDFT.Vext[ic][self.domain_mask]) \
                 + xvec[ic *
                        n_grid:(ic+1)*n_grid]
 
-        if self.restrict_total_mass:
+        if self.specification == Specification.NUMBER_OF_MOLES:
             #exp_beta_mu = np.exp(mu)
-            integrals = self.cDFT.integrate_df_vext()
-            denum = np.dot(exp_beta_mu, integrals)
-            exp_mu = self.Ntot * exp_beta_mu / denum
+            #integrals = self.cDFT.integrate_df_vext()
+            #print("integrals",integrals)
+            #sys.exit()
+            #denum = np.dot(exp_beta_mu, integrals)
+            #exp_mu = self.Ntot * exp_beta_mu / denum
             # print("Ntot", self.Ntot)
             # print("exp_beta_mu*", exp_beta_mu)
             # print("denum", denum)
             # print("exp_mu", exp_mu)
-            res[n_rho:] = exp_beta_mu - exp_mu
+            #print("beta_mu[:]",beta_mu[:])
+            if self.do_exp_mu:
+                res[n_rho:] = exp_beta_mu - exp_beta_mu_grid
+            else:
+                res[n_rho:] = beta_mu - beta_mu_grid
+            #print("exp_beta_mu, exp_mu_grid",exp_beta_mu, exp_beta_mu_grid)
+            #print("beta_mu, mu_grid",beta_mu, beta_mu_grid)
+            #print("Ntot",self.cDFT.calculate_total_mass(self.mod_densities))
+            #sys.exit()
+
+        # fig, ax = plt.subplots(1, 1)
+        # ax.set_xlabel("$z/d_{11}$")
+        # ax.set_ylabel(r"res")
+        # for i in range(self.mod_densities.nc):
+        #     ax.plot(res[:],
+        #             lw=2, color=LCOLORS[i], label=f"res")
+        #     leg = plt.legend(loc="best", numpoints=1)
+        #     leg.get_frame().set_linewidth(0.0)
+        #     plt.grid()
+        #     plt.show()
+
         return res
 
     def anderson_mixing(self, mmax=50, beta=0.05, max_iter=200,
                         tolerance=1e-12,
                         log_iter=False, use_scipy=False):
 
+        #self.do_plot = True
         self.mod_densities.assign_elements(self.densities)
         n_grid = self.cDFT.N_grid_inner
         n_rho = self.cDFT.nc * n_grid
         xvec = np.zeros(n_rho + self.cDFT.nc *
-                        (1 if self.restrict_total_mass else 0))
+                        (1 if self.specification ==
+                         Specification.NUMBER_OF_MOLES else 0))
         for ic in range(self.cDFT.nc):
             xvec[ic * n_grid:(ic+1) *
                  n_grid] = self.densities[ic][self.domain_mask]
 
-        if self.restrict_total_mass:
-            xvec[n_rho:n_rho + self.cDFT.nc] = np.exp(self.cDFT.mu_scaled_beta)
+        if self.specification == Specification.NUMBER_OF_MOLES:
+            # Convolution integrals for densities
+            self.cDFT.weights_system.convolutions(self.mod_densities)
+            # Calculate one-body direct correlation function
+            self.cDFT.weights_system.correlation_convolution()
+            integrals = self.cDFT.integrate_df_vext()
+            #denum = np.dot(exp_beta_mu, integrals)
+            exp_mu = self.Ntot / integrals
+
+            #self.cDFT.mu_scaled_beta[:] = np.log(0.02276177)
+            if self.do_exp_mu:
+                xvec[n_rho:n_rho + self.cDFT.nc] = exp_mu
+            else:
+                xvec[n_rho:n_rho + self.cDFT.nc] = np.log(exp_mu)
+
+            #np.exp(self.cDFT.mu_scaled_beta)
+            #exp_mu
+            #print("exp_mu initial",exp_mu)
+            #print(np.exp(self.cDFT.mu_scaled_beta))
+            #print("exp_mu", exp_mu, np.exp(self.cDFT.mu_scaled_beta))
+            #xvec[n_rho:n_rho + self.cDFT.nc] = np.exp(self.cDFT.mu_scaled_beta)
+
 
         if use_scipy:
             sol = optimize.anderson(self.error_function, xvec, w0=beta,
@@ -285,7 +376,8 @@ class picard_geometry_solver():
             sol = anderson_acceleration(self.error_function, xvec, mmax=mmax,
                                         beta=beta, tolerance=tolerance,
                                         max_iter=max_iter,
-                                        log_iter=log_iter)
+                                        log_iter=log_iter,
+                                        ensure_positive_x=False)
 
             self.converged = sol[1]
             sol = sol[0]
@@ -294,6 +386,58 @@ class picard_geometry_solver():
         for ic in range(self.cDFT.nc):
             self.densities[ic][self.domain_mask] = sol[ic *
                                                        n_grid:(ic+1)*n_grid]
+
+        if self.cDFT.geometry == Geometry.SPHERICAL:
+            self.cDFT.test_laplace(self.densities, sigma0=0.0010842767372437523)
+
+    def picard_iteration_if(self, beta=0.15, max_iter=200,
+                            tolerance=1e-12,
+                            log_iter=False):
+
+        self.mod_densities.assign_elements(self.densities)
+        n_grid = self.cDFT.N_grid_inner
+        n_rho = self.cDFT.nc * n_grid
+        xvec = np.zeros(n_rho + self.cDFT.nc *
+                        (1 if self.specification ==
+                         Specification.NUMBER_OF_MOLES else 0))
+        for ic in range(self.cDFT.nc):
+            xvec[ic * n_grid:(ic+1) *
+                 n_grid] = self.densities[ic][self.domain_mask]
+
+        if self.specification == Specification.NUMBER_OF_MOLES:
+            # Convolution integrals for densities
+            self.cDFT.weights_system.convolutions(self.mod_densities)
+            # Calculate one-body direct correlation function
+            self.cDFT.weights_system.correlation_convolution()
+            integrals = self.cDFT.integrate_df_vext()
+            #denum = np.dot(exp_beta_mu, integrals)
+            exp_mu = self.Ntot / integrals
+            if self.do_exp_mu:
+                xvec[n_rho:n_rho + self.cDFT.nc] = exp_mu
+            else:
+                xvec[n_rho:n_rho + self.cDFT.nc] = np.log(exp_mu)
+
+            #xvec[n_rho:n_rho + self.cDFT.nc] = np.exp(self.cDFT.mu_scaled_beta)
+            #exp_mu
+            #print("exp_mu initial",exp_mu)
+            #print(np.exp(self.cDFT.mu_scaled_beta))
+            #print("exp_mu", exp_mu, np.exp(self.cDFT.mu_scaled_beta))
+            #xvec[n_rho:n_rho + self.cDFT.nc] = np.exp(self.cDFT.mu_scaled_beta)
+
+        sol = picard_iteration(self.error_function, xvec,
+                               beta=beta, tolerance=tolerance,
+                               max_iter=max_iter,
+                               log_iter=log_iter)
+
+        self.converged = sol[1]
+        sol = sol[0]
+
+        # Set solution
+        for ic in range(self.cDFT.nc):
+            self.densities[ic][self.domain_mask] = sol[ic *
+                                                       n_grid:(ic+1)*n_grid]
+
+        #self.cDFT.test_laplace(self.densities, sigma0=0.0010842767372437523)
 
     def picard_update(self):
         """
@@ -528,7 +672,12 @@ class picard_geometry_solver():
                          (nd_densities[:, self.domain_mask].T / self.cDFT.bulk_densities).T],
                    header="# r, rho, rho/rho_bulk")
 
-    def plot_equilibrium_density_profiles(self, data_dict=None, xlim=None, ylim=None):
+    def plot_equilibrium_density_profiles(self,
+                                          data_dict=None,
+                                          xlim=None,
+                                          ylim=None,
+                                          plot_equimolar_surface=False,
+                                          unit=Lenght_unit.REDUCED):
         """
         Plot equilibrium density profile
         Args:
@@ -538,12 +687,16 @@ class picard_geometry_solver():
             self.print_perform_minimization_message()
             return
         fig, ax = plt.subplots(1, 1)
-        ax.set_xlabel("$z/d_{11}$")
+        if unit==Lenght_unit.REDUCED:
+            ax.set_xlabel("$z/d_{11}$")
+            len_fac = 1.0
+        elif unit==Lenght_unit.ANGSTROM:
+            ax.set_xlabel("$z$ (Å)")
+            len_fac = self.cDFT.sigma*1e10
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
         for i in range(self.densities.nc):
-            ax.plot(self.r[self.domain_mask],
-                    self.densities[i][self.domain_mask] /
-                    self.cDFT.bulk_densities[i],
+            ax.plot(self.r[self.domain_mask]*len_fac,
+                    self.densities[i][self.domain_mask] / self.cDFT.bulk_densities[i],
                     lw=2, color="k", label=f"cDFT comp. {i+1}")
         if data_dict is not None:
             plot_data_container(data_dict, ax)
@@ -553,8 +706,17 @@ class picard_geometry_solver():
         if ylim is not None:
             plt.ylim(ylim)
 
-        leg = plt.legend(loc="best", numpoints=1)
-        leg.get_frame().set_linewidth(0.0)
+        if plot_equimolar_surface:
+            # Plot equimolar dividing surface
+            Re = self.cDFT.get_equimolar_dividing_surface(self.densities)
+            yl = ax.get_ylim()
+            ax.plot([Re, Re],
+                    [0.0, yl[1]],
+                    lw=1, color="k",
+                    linestyle="--",
+                    label="Eq. mol. surf.")
+
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
         filename = self.case_name + ".pdf"
         plt.savefig(filename)

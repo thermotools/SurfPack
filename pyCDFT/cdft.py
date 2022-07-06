@@ -11,9 +11,10 @@ import fmt_functionals
 import numpy as np
 import os
 import sys
+import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
-def integration_weights(n_grid, dr, geometry):
+def integration_weights(n_grid, dr, l, geometry):
     int_weight = np.zeros(n_grid)
     if geometry == Geometry.PLANAR:
         int_weight[:] = dr
@@ -21,10 +22,8 @@ def integration_weights(n_grid, dr, geometry):
         for k in range(n_grid):
             int_weight[k] = 4.0*np.pi/3.0*dr**3*(3*k**2 + 3*k + 1)
     elif geometry == Geometry.POLAR:
-        int_weight = None
-        pass
-        #for k in range(n_grid):
-        #    int_weight[k] = 4.0*np.pi/3.0*dr**3*(3*k**2 + 3*k + 1)
+        p = polar(domain_size=l, n_grid=n_grid)
+        int_weight = p.integration_weights
     else:
         print("Unknown geometry!")
         sys.exit()
@@ -99,7 +98,10 @@ class cdft1D:
         self.padding = 0
 
         # Volume weights
-        self.integration_weights = integration_weights(grid, self.dr, geometry)
+        self.integration_weights = integration_weights(grid,
+                                                       self.dr,
+                                                       domain_length,
+                                                       geometry)
 
         # Get grid info
         self.NinP = []
@@ -260,10 +262,16 @@ class cdft1D:
                                              self.bulk_densities,
                                              self.R,
                                              self.t_div_tc)
-        else:
+        elif density_init.upper() == "CONSTANT":
             rho0 = densities(self.nc, self.N)
             rho0.assign_components(self.bulk_densities)
-
+        elif density_init.upper() == "VEXT":
+            rho0 = densities(self.nc, self.N)
+            rho0.assign_components(self.bulk_densities)
+            for i in range(self.nc):
+                rho0[i] *= np.minimum(np.exp(-self.Vext[i]), 1.0)
+                #plt.plot(rho0[i])
+            #plt.show()
         return rho0
 
     def grand_potential(self, dens, update_convolutions=True):
@@ -300,7 +308,7 @@ class cdft1D:
             omega_a[self.domain_mask] += dens[i][self.domain_mask] \
                 * (self.Vext[i][self.domain_mask] - mu[i])
 
-        omega_a[:] *= self.dr
+        omega_a[:] *= self.integration_weights
 
         for i in range(self.nc):
             omega_a[self.boundary_mask[i]] = 0.0  # Don't include wall
@@ -366,7 +374,8 @@ class cdft1D:
         """
 
         _, omega_a = self.grand_potential(dens, update_convolutions)
-        omega_a += self.red_pressure * self.dr
+        
+        omega_a += self.red_pressure * self.integration_weights
         for i in range(self.nc):
             omega_a[self.boundary_mask[i]] = 0.0  # Don't include wall
 
@@ -414,6 +423,35 @@ class cdft1D:
         Returns:
             (float): Integral (-)
         """
+        #
+        # np.set_printoptions(threshold=sys.maxsize)
+        # print("d3_conv",self.weights_system.comp_differentials[0].d3_conv[self.domain_mask])
+        # print("d2eff_conv",self.weights_system.comp_differentials[0].d2eff_conv[self.domain_mask])
+        # print("d2veff_conv",self.weights_system.comp_differentials[0].d2veff_conv[self.domain_mask])
+        # print("mu_disp_conv",self.weights_system.comp_differentials[0].mu_disp_conv[self.domain_mask])
+        # print("corr",self.weights_system.comp_differentials[0].corr[self.domain_mask])
+
+        try:
+            self.hist
+        except AttributeError:
+            self.hist = np.zeros_like(self.weights_system.comp_differentials[0].d2veff_conv[self.domain_mask])
+
+        # r = np.linspace(self.dr/2, self.domain_length - self.dr/2, self.N)
+        # fig, ax = plt.subplots(1, 1)
+        # ax.set_xlabel("$z/d_{11}$")
+        # #ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+        # ax.plot(r[:], self.weights_system.comp_differentials[0].d3_conv[self.domain_mask], lw=2, label=f"d3")
+        # #ax.plot(r[:], self.weights_system.comp_differentials[0].d2eff_conv[self.domain_mask], lw=2, label=f"d2")
+        # #ax.plot(r[:], self.weights_system.comp_differentials[0].d2veff_conv[self.domain_mask], lw=2, label=f"d2v")
+        # ax.plot(r[:], self.hist[:], lw=2, label=f"old")
+        # #ax.plot(r[:], self.weights_system.comp_differentials[0].mu_disp_conv[self.domain_mask], lw=2, label=f"mu")
+        # #ax.plot(r[:], self.weights_system.comp_differentials[0].corr[self.domain_mask], lw=2, label=f"corr")
+        # leg = plt.legend(loc="best", numpoints=1)
+        # leg.get_frame().set_linewidth(0.0)
+        # plt.grid()
+        # plt.show()
+        # self.hist[:] = self.weights_system.comp_differentials[0].d3_conv[self.domain_mask]
+
         integral = np.zeros(self.nc)
         for ic in range(self.nc):
             integral[ic] = np.sum(self.integration_weights*(
@@ -421,6 +459,39 @@ class cdft1D:
                        - self.beta * self.Vext[ic][self.domain_mask])))
         return integral
 
+
+    def test_laplace(self, dens, sigma0):
+        """
+        Calculates the integral of exp(-beta(df+Vext)).
+
+        Returns:
+            (float): Integral (-)
+        """
+        #
+        return 0.0
+
+    def get_equimolar_dividing_surface(self, dens):
+        """
+
+        """
+        rho1 = 0.0
+        rho2 = 0.0
+        for i in range(self.nc):
+            rho1 += dens[i][1]
+            rho2 += dens[i][-2]
+        N = self.calculate_total_mass(dens)
+        if self.geometry == Geometry.PLANAR:
+            V = self.domain_length
+            prefac = 1.0
+            exponent = 1.0
+        elif self.geometry == Geometry.SPHERICAL:
+            prefac = 4*np.pi/3
+            V = prefac*self.domain_length**3
+            exponent = 1.0/3.0
+        R = ((N - V*rho2)/(rho1 - rho2)/prefac)**exponent
+        print("Re, Re/R", R, R/self.domain_length)
+
+        return R
 
 class cdft_thermopack(cdft1D):
     """
@@ -476,6 +547,7 @@ class cdft_thermopack(cdft1D):
             self.eos_gas_comp = flash[1]
             self.eos_beta_gas = flash[2]
             self.eos_phase = flash[4]
+            print(flash)
 
         if self.eos_phase == self.thermo.TWOPH:
             self.eos_vl = self.thermo.specific_volume(temperature,
@@ -487,12 +559,14 @@ class cdft_thermopack(cdft1D):
                                                       self.eos_gas_comp,
                                                       self.thermo.VAPPH)
         else:
+            self.eos_liq_comp = self.comp
             self.eos_vl = self.thermo.specific_volume(temperature,
                                                       self.eos_pressure,
                                                       comp,
                                                       self.eos_phase)
-            self.eos_vg = np.ones_like(self.eos_vl)
-            self.eos_gas_comp = np.zeros_like(self.eos_vl)
+            self.eos_vg = self.eos_vl
+            self.eos_gas_comp = np.zeros_like(self.eos_liq_comp)
+            self.eos_gas_comp[:] = self.eos_liq_comp[:]
 
         particle_diameters = np.zeros(self.thermo.nc)
         particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
@@ -506,6 +580,12 @@ class cdft_thermopack(cdft1D):
         self.bulk_densities_g[:] = self.eos_gas_comp[:]/self.eos_vg
         self.bulk_densities_g[:] *= NA*particle_diameters[0]**3
 
+        temp = np.zeros_like(self.bulk_densities)
+        temp[:] = self.bulk_densities_g[:]
+        self.bulk_densities_g[:] = self.bulk_densities[:]
+        self.bulk_densities[:] = temp[:]
+
+        #print("self.bulk_densities_g",self.bulk_densities_g)
         # Other quantities
         particle_diameters[:] /= particle_diameters[0]
         temp_red = temperature / self.thermo.eps_div_kb[0]
@@ -572,6 +652,41 @@ class cdft_thermopack(cdft1D):
         print("pressure + omega:", self.red_pressure + omega)
 
 
+    def test_laplace(self, dens, sigma0):
+        """
+        Calculates the integral of exp(-beta(df+Vext)).
+
+        Returns:
+            (float): Integral (-)
+        """
+        R = self.get_equimolar_dividing_surface(dens)
+
+        rho1 = np.zeros(self.nc)
+        rho2 = np.zeros(self.nc)
+        for i in range(self.nc):
+            rho1[i] = dens[i][1]
+            rho2[i] = dens[i][-2]
+        print("rho1",rho1)
+        print("rho2",rho2)
+
+        rho1 *= 1.0/(NA*self.functional.d_hs[0]**3)
+        rho_mix = np.sum(rho1)
+        V = 1.0/rho_mix
+        n = rho1/rho_mix
+        P1, = self.thermo.pressure_tv(self.functional.T, V, n)
+
+        rho2 *= 1.0/(NA*self.functional.d_hs[0]**3)
+        rho_mix = np.sum(rho2)
+        V = 1.0/rho_mix
+        n = rho2/rho_mix
+        P2, = self.thermo.pressure_tv(self.functional.T, V, n)
+        print("P1, P2", P1*1e-6, P2*1e-6)
+        R_m = R*self.functional.d_hs[0]
+        print("R_m",R_m)
+        print(P1-P2,2*sigma0/R_m, (P1-P2 - 2*sigma0/R_m)/(P1-P2))
+        return R
+
+
 if __name__ == "__main__":
     # cdft_tp = cdft_thermopack(model="PC-SAFT",
     #                           comp_names="C1",
@@ -593,7 +708,7 @@ if __name__ == "__main__":
                               pressure=0.0,
                               bubble_point_pressure=True,
                               domain_length=40.0,
-                              grid_dr=0.001,
+                              grid=16,
                               kwthermoargs={"feynman_hibbs_order": 1,
                                             "parameter_reference": "AASEN2019-FH1"})
 

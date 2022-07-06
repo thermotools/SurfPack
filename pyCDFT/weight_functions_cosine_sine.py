@@ -282,14 +282,16 @@ class planar_cosine_sine_pc_saft_weights(planar_cosine_sine_weights):
 
         # Split into two terms such that rho_delta=0 when z-> inf.
         self.rho_inf=rho[-1]
-        self.rho_delta=rho-self.rho_inf
-
+        self.rho_delta[:] = rho - self.rho_inf
+        #print("self.rho_delta[:]",self.rho_delta[:])
+        #print("self.rho_inf", self.rho_inf)
         # Fourier transform only the rho_delta (the other term is done analytically)
         self.frho_disp_delta_cs[:] = dct(self.rho_delta, type=2)
 
          # Dispersion density
         self.fw_rho_disp_delta_cs[:] = self.frho_disp_delta_cs[:] * self.fw_disp_cs[:]
         densities.rho_disp[:] = idct(self.fw_rho_disp_delta_cs, type=2)+self.rho_inf*self.w_disp_conv
+        #print(densities.rho_disp)
 
     def correlation_convolution(self, diff: differentials_pc_saft_1D):
         """
@@ -303,7 +305,7 @@ class planar_cosine_sine_pc_saft_weights(planar_cosine_sine_weights):
         planar_cosine_sine_weights.correlation_convolution(self, diff)
 
         # Split the term into (a_delta+a_inf) such that a_delta=0 when z-> inf.
-        self.mu_disp_inf=diff.mu_disp[-1]
+        self.mu_disp_inf = diff.mu_disp[-1]
         self.mu_disp_delta=diff.mu_disp-self.mu_disp_inf
 
         # Fourier transform derivatives
@@ -315,7 +317,7 @@ class planar_cosine_sine_pc_saft_weights(planar_cosine_sine_weights):
         # Transform from Fourier space to real space
         diff.mu_disp_conv[:] = idct(self.fw_mu_disp_delta_cs, type=2)+\
             self.mu_disp_inf*self.w_disp_conv
-
+        #print("self.mu_disp_inf, self.w_disp_conv", self.mu_disp_inf,self.w_disp_conv)
         diff.update_after_convolution()
 
 if __name__ == "__main__":

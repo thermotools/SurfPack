@@ -5,6 +5,7 @@ from utility import weighted_densities_1D, differentials_1D, \
     weighted_densities_pc_saft_1D, differentials_pc_saft_1D
 from weight_functions_sph import spherical_weights, spherical_pc_saft_weights
 from weight_functions_cosine_sine import planar_cosine_sine_weights, planar_cosine_sine_pc_saft_weights
+from weight_functions_polar import polar_weights, polar_pc_saft_weights
 from weight_functions import planar_weights, planar_pc_saft_weights
 from constants import Geometry
 import matplotlib.pyplot as plt
@@ -58,6 +59,8 @@ class Weights_system_mc(object):
                     plweights=planar_weights
             elif geometry == Geometry.SPHERICAL:
                 plweights=spherical_weights
+            elif geometry == Geometry.POLAR:
+                plweights=polar_weights
 
         if wd is None:
             wd=weighted_densities_1D
@@ -157,6 +160,8 @@ class Weights_system_mc_pc_saft(Weights_system_mc):
                     plweights=planar_pc_saft_weights
             elif geometry == Geometry.SPHERICAL:
                 plweights=spherical_pc_saft_weights
+            elif geometry == Geometry.POLAR:
+                plweights=polar_pc_saft_weights
 
         if wd is None:
             wd=weighted_densities_pc_saft_1D
