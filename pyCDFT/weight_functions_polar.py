@@ -10,7 +10,7 @@ from scipy.fft import dct, idct, dst, idst, fft, ifft
 from scipy.special import jv
 from weight_functions import Weights
 
-def polar(object):
+class polar(object):
 
     def __init__(self,
                  domain_size=15.0,
@@ -20,28 +20,30 @@ def polar(object):
         Application to Interfacial Statistical Associating Fluid Theory (iSAFT)
         DOI: 10.1021/acs.iecr.9b06895
         """
+        self.n_grid = n_grid
         alpha = 0.002
         for _ in range(21):
             alpha = -np.log(1.0 - np.exp(-alpha)) / (n_grid - 1)
         self.alpha = alpha
+        print("alpha",alpha)
         self.x0 = 0.5 * (np.exp(-alpha * n_grid) + np.exp(-alpha * (n_grid - 1)))
         # Setting the grid
         self.z = np.zeros(n_grid)
         for i in range(n_grid):
-            self.z = domain_size*self.x0*np.exp(alpha*i)
+            self.z[i] = domain_size*self.x0*np.exp(alpha*i)
         # Setting the edge grid
         self.z_edge = np.zeros(n_grid+1)
         for i in range(1,n_grid+1):
-            self.z_edge = domain_size*np.exp(-alpha*(n_grid-i))
+            self.z_edge[i] = domain_size*np.exp(-alpha*(n_grid-i))
         # End correction factor
         k0 = np.exp(2*alpha)*(2*np.exp(alpha) + np.exp(2*alpha) - 1)/ \
             (1 + np.exp(alpha))**2/(np.exp(2*alpha) - 1)
         k0v = np.exp(2*alpha)*(2*np.exp(alpha) + np.exp(2*alpha) - 5.0/3.0)/ \
             (1 + np.exp(alpha))**2/(np.exp(2*alpha) - 1)
-        self.k = np.ones(n_grid)
-        self.k[0] = k0
-        self.kv = np.ones(n_grid)
-        self.kv[0] = k0v
+        self.k0 = k0
+        self.kv0 = k0v
+        print("k0", k0)
+        print("k0v", k0v)
         # Hankel paramaters
         self.b = domain_size
         #fac = 1.0/(2*self.x0*(np.exp(alpha*(n_grid-1)) - np.exp(alpha*(n_grid-2))))
@@ -54,6 +56,41 @@ def polar(object):
         for i in range(2,n_grid):
             self.integration_weights[i] = np.exp(2 * alpha * i) * (np.exp(2 * alpha) - 1.0)
         self.integration_weights *= np.exp(-2 * alpha * n_grid) * np.pi * domain_size**2
+
+        print("z",self.z)
+        print("z_edge",self.z_edge)
+        print("gamma", np.exp(alpha * (n_grid-1)))
+        print("l", domain_size)
+        print("iv",self.integration_weights)
+        print("sum_iv",sum(self.integration_weights), np.pi * domain_size**2)
+
+    def tests(self):
+        """
+        Code testing
+
+        """
+        n_grid = self.n_grid
+        x0 = self.x0
+        alpha = self.alpha
+        gamma = np.exp(alpha * (n_grid - 1))
+        l = self.b
+        k_grid = np.zeros(n_grid)
+        for i in range(n_grid):
+            k_grid[i] = x0 * np.exp(alpha * i) * gamma / l
+
+        #print("k_grid", k_grid)
+        self.j = np.zeros(2*n_grid, dtype=np.cdouble)
+        self.jv = np.zeros(2*n_grid, dtype=np.cdouble)
+        for i in range(2*n_grid):
+            self.j[i] = jv(1, gamma * x0 * np.exp(alpha * (i + 1 - n_grid))) # / (2 * n_grid)
+            self.jv[i] = jv(2, gamma * x0 * np.exp(alpha * (i + 1 - n_grid))) # / (2 * n_grid)
+
+        #print("j", self.j)
+        #print("jv", self.jv)
+        self.j = ifft(self.j)
+        self.jv = ifft(self.jv)
+        #print(self.jv)
+
 
 class polar_weights(Weights):
     """
@@ -81,17 +118,12 @@ class polar_weights(Weights):
         self.fw3 = np.zeros(N, dtype=np.cdouble)
         self.fw2 = np.zeros(N, dtype=np.cdouble)
         self.fw2vec = np.zeros(N, dtype=np.cdouble)
+
         self.frho = np.zeros(N, dtype=np.cdouble)
         self.frho_delta = np.zeros(N, dtype=np.cdouble)
         self.frho_delta_cs = np.zeros(N)
         self.frho_delta_sph = np.zeros(N)
         self.frho_delta_cs_V = np.zeros(N)
-        self.fw3_cs = np.zeros(N)
-        self.fw2_cs = np.zeros(N)
-        self.fw2vec_cs = np.zeros(N)
-        self.fw3_sph = np.zeros(N)
-        self.fw2_sph = np.zeros(N)
-        self.fw2vec_sph = np.zeros(N)
 
         # Real space variables used for convolution
         self.rho = None
@@ -238,21 +270,21 @@ class polar_weights(Weights):
         """
         n_grid = self.n_grid
         x0 = self.pol.x0
-        alpha = self.alpha
+        alpha = self.pol.alpha
         gamma = np.exp(alpha * (n_grid - 1))
-        l = self.L
+        l = self.b
         k_grid = np.zeros(n_grid)
         for i in range(n_grid):
             k_grid[i] = x0 * np.exp(alpha * i) * gamma / l
 
-        jv1 = np.zeros(2*n_grid, dtype=np.cdouble)
-        jv2 = np.zeros(2*n_grid, dtype=np.cdouble)
+        self.j = np.zeros(2*n_grid, dtype=np.cdouble)
+        self.jv = np.zeros(2*n_grid, dtype=np.cdouble)
         for i in range(2*n_grid):
-            j[i] = jv(1, gamma * x0 * (alpha * np.exp((i + 1) - n_grid))) / (2 * n_grid)
-            jv[i] = jv(2, gamma * x0 * (alpha * np.exp((i + 1) - n_grid))) / (2 * n_grid)
+            self.j[i] = jv(1, gamma * x0 * np.exp(alpha * (i + 1 - n_grid))) # / (2 * n_grid)
+            self.jv[i] = jv(2, gamma * x0 * np.exp(alpha * (i + 1 - n_grid))) # / (2 * n_grid)
 
-        self.jv1 = sfft.ifft(jv1)
-        self.jv2 = sfft.ifft(jv2)
+        self.j = ifft(self.j)
+        self.jv = ifft(self.jv)
 
 
 class polar_pc_saft_weights(polar_weights):
