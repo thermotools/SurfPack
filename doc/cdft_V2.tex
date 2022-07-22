@@ -571,10 +571,29 @@ In Eq.~\ref{eq:p2}, we have a product between an even function $f(r)$ and an odd
 
 In Eq.~\ref{eq:p3}, we have a product between an odd and an odd function, which is even. Hence, for both vector functions, the sine transforms should be used for the forward transform, and the cosine transform should be used for the backwards transform.
 
-\subsubsection{Cylindrical geometry}
-For a cylindrical grid, it is, per now, necessary to have a logarithmic grid and use the Hankel transform. We have also tried the Abel transform and combine that with a regular grid, but that did not give a satisfactory accuracy as the forward and backward transform did not properly recover a sharp density profile that was used as an example. Essentially more work is needed there.
+\subsubsection{Polar symmetric geometry}
+For a cylindrical/polar grid, it is, per now, necessary to have a
+logarithmic grid and use the Hankel transform. We have also tried the
+Abel transform and combine that with a regular grid, but that did not
+give a satisfactory accuracy as the forward and backward transform did
+not properly recover a sharp density profile that was used as an
+example. Essentially more work is needed there.
 
 To be filled in.
+
+For polar symmetric geometries we adapt the exponential/logaritmic
+grid approach described by Xi et al.\cite{xi2020}. The method contains
+and end correction factor to improve the predictions for the initial
+cell starting at origo. The method is therefore an improvement of the
+ealrer work of Botan et al.\cite{botan2009}.
+
+\begin{equation}
+  f(r)\circledast w(r) = \frac{1}{r}\mathscr{S}^{-1}\left(\mathscr{S}\left(f(r)r\right)\hat{w}(k_r)\right)
+  \label{eq:s1}
+\end{equation}
+
+
+Adaptions by Philip Rehner in FEOS: Extensisons to include direct formulations for vector weights.
 
 \subsubsection{Spherical geometry}
 In the Fourier transform in spherical coordinates, the integration over angles can be done analytically, and the transform of an (even) scalar function is:

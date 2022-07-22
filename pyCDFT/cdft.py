@@ -7,6 +7,7 @@ from utility import packing_fraction_from_density, \
     boundary_condition, densities, get_thermopack_model, \
     weighted_densities_pc_saft_1D, get_initial_densities_vle, \
     weighted_densities_1D
+from weight_functions_polar import polar
 import fmt_functionals
 import numpy as np
 import os
@@ -22,7 +23,7 @@ def integration_weights(n_grid, dr, l, geometry):
         for k in range(n_grid):
             int_weight[k] = 4.0*np.pi/3.0*dr**3*(3*k**2 + 3*k + 1)
     elif geometry == Geometry.POLAR:
-        p = polar(domain_size=l, n_grid=n_grid)
+        p = polar(R=0.0, domain_size=l, n_grid=n_grid)
         int_weight = p.integration_weights
     else:
         print("Unknown geometry!")
@@ -102,6 +103,10 @@ class cdft1D:
                                                        self.dr,
                                                        domain_length,
                                                        geometry)
+
+        # plt.plot(self.integration_weights)
+        # plt.show()
+        # sys.exit()
 
         # Get grid info
         self.NinP = []
@@ -488,6 +493,11 @@ class cdft1D:
             prefac = 4*np.pi/3
             V = prefac*self.domain_length**3
             exponent = 1.0/3.0
+        elif self.geometry == Geometry.POLAR:
+            prefac = np.pi
+            V = self.domain_length**2
+            exponent = 0.5
+
         R = ((N - V*rho2)/(rho1 - rho2)/prefac)**exponent
         print("Re, Re/R", R, R/self.domain_length)
 

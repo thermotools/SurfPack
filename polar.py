@@ -25,12 +25,23 @@ from pyCDFT.weight_functions_polar import polar
 #                           geometry=Geometry.SPHERICAL,
 #                           no_bc=True)
 
-pol = polar(domain_size=15.0,
-                 n_grid=16)
-
-pol.tests()
-
+pol = polar(R=0.5,
+            domain_size=3.0,
+            n_grid=4096)
+pol.test_weigthed_densities()
 sys.exit()
+
+#  # wf_i = [[31.235829714960325,
+          
+# pol = polar(R=1.5780162409077065,
+#             domain_size=15.0,
+#             n_grid=64)
+
+# #pol.test_weigthed_densities()
+# pol.test_pd()
+# #pol.tests()
+# sys.exit()
+
 
 cdft_tp = cdft_thermopack(model="SAFT-VRQ Mie",
                           comp_names="H2",
@@ -38,15 +49,14 @@ cdft_tp = cdft_thermopack(model="SAFT-VRQ Mie",
                           temperature=25.0,
                           pressure=0.0,
                           bubble_point_pressure=True,
-                          domain_length=40.0,
-                          grid=512,
+                          domain_length=20.0,
+                          grid=4048,
                           geometry=Geometry.POLAR,
                           no_bc=True,
                           kwthermoargs={"feynman_hibbs_order": 1,
                                         "parameter_reference": "AASEN2019-FH1"})
 cdft_tp.thermo.print_saft_parameters(1)
 print(cdft_tp.thermo.hard_sphere_diameters(25.0))
-sys.exit()
 
 # Initialize the solver
 solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5,
@@ -60,7 +70,7 @@ solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5,
 #                 plot="ERROR",
 #                 tolerance=1.0e-10)
 solver.picard_iteration_if(beta=0.05, tolerance=1.0e-10,
-                           log_iter=True, max_iter=600)
+                           log_iter=True, max_iter=500)
 
 solver.anderson_mixing(mmax=50, beta=0.05, tolerance=1.0e-10,
                        log_iter=True, use_scipy=False, max_iter=200)
