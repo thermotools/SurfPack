@@ -187,6 +187,7 @@ class Bulk(object):
             self.reduced_density_right)
         self.mu_ig_scaled_beta = np.log(self.reduced_density_right)
         self.mu_scaled_beta = self.mu_ig_scaled_beta + self.mu_res_scaled_beta
+        self.real_mu = functional.thermo.chemical_potential(self.temperature, volume=1.0, n=left_state.partial_density())
 
     def get_reduced_density(self, partial_density):
         """
@@ -221,7 +222,6 @@ class Grid(object):
 
     def __init__(self,
                  geometry,
-                 n_comp,
                  domain_size=100.0,
                  n_grid=1024,
                  n_bc=0):
@@ -229,7 +229,6 @@ class Grid(object):
 
         Args:
             geometry (int): PLANAR/POLAR/SPHERICAL
-            n_comp (int, optional): Number of components.
             domain_size (float, optional): Sisze of domain. Defaults to 100.0.
             n_grid (int, optional): Number of grid points. Defaults to 1024.
             n_bc (int, optional): Number of boundary points. Defaults to 0.
@@ -238,7 +237,6 @@ class Grid(object):
             None
         """
         self.geometry = geometry
-        self.densities = densities(n_comp, n_grid)
         # Length
         self.domain_size = domain_size
         # Grid size
@@ -272,9 +270,6 @@ class Grid(object):
         self.domain_mask = np.full(self.N, False, dtype=bool)
         self.domain_mask[self.NiWall:self.end] = True
         self.weight_mask = np.full(self.N, False, dtype=bool)
-
-        # Store bulk for access to R and particle_diamater
-        self.bulk = None
 
         # Mask for inner domain
         self.NiWall = self.N - self.end
@@ -335,48 +330,6 @@ class Grid(object):
             print(f"right_boundary_mask {i}: ", self.right_boundary_mask[i])
             print(f"boundary_mask {i}: ", self.boundary_mask[i])
 
-    def set_tanh_profile(bulk, reduced_temperature, rel_pos_dividing_surface=0.5):
-        """
-        Calculate initial densities for gas-liquid interface calculation
-        Args:
-            rho_left (list of float): Left side density
-            rho_right (list of float): Right side density
-            reduced_temperature (float): T/Tc
-            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
-        """
-        z_centered = np.zeros_like(self.z)
-        z_centered[:] = self.z[:] - rel_dividing_surface*self.domain_size
-
-        r_left = bulk.reduced_density_left
-        r_right = bulk.reduced_density_right
-        R = bulk.R
-        self.bulk = bulk
-        for i in range(np.shape(r_right)[0]):
-        #         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
-            #             (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
-            self.densities[i][:] = 0.5*(r_left[i] + r_right[i]) + 0.5 * \
-                (r_right[i] - r_left[i])*np.tanh(z_centered[:]/(2*R[i])
-                                                 * (2.4728 - 2.3625 * reduced_temperature))
-
-    def set_constant_profile(bulk):
-        """
-        Calculate initial densities for gas-liquid interface calculation
-        Args:
-            rho (list of float): Densities
-        """
-        self.bulk = bulk
-        r = bulk.reduced_density_left
-        for i in range(np.shape(rho)[0]):
-            self.densities[i][:] = r[i]
-
-    def set_density_profile(densities):
-        """
-        Calculate initial densities for gas-liquid interface calculation
-        Args:
-            densities (Densities): Densities
-        """
-        self.densities = densities
-
     def get_index_of_rel_pos(self, rel_pos_dividing_surface):
         """
         Calculate initial densities for gas-liquid interface calculation
@@ -394,22 +347,6 @@ class Grid(object):
                     idx = i
                     break
         return idx
-
-    def set_step_profile(bulk, rel_pos_dividing_surface=0.5):
-        """
-        Calculate initial densities for gas-liquid interface calculation
-        Args:
-            rho_left (list of float): Left side density
-            rho_right (list of float): Right side density
-            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
-        """
-        r_left = bulk.reduced_density_left
-        r_right = bulk.reduced_density_right
-        self.bulk = bulk
-        idx = self.get_index_of_rel_pos(rel_pos_dividing_surface)
-        for i in range(np.shape(r_right)[0]):
-            self.densities[i][0:idx+1] = r_left[i]
-            self.densities[i][idx+1:] = r_right[i]
 
     def polar_grid(self,
                    domain_size=15.0,
@@ -505,38 +442,137 @@ class Grid(object):
             self.integration_weights[k] = 4.0*np.pi/3.0*dr**3*(3*k**2 + 3*k + 1)
 
     @staticmethod
-    def Planar(n_comp=n_comp,
-               domain_size=15.0,
+    def Planar(domain_size=15.0,
                n_grid=1024):
         """Set up polar grid
         """
 
         return Grid(geometry=Geometry.PLANAR,
-                    n_comp=n_comp,
                     domain_size=domain_size,
                     n_grid=n_grid)
 
     @staticmethod
-    def Polar(n_comp=n_comp,
-              domain_size=15.0,
+    def Polar(domain_size=15.0,
               n_grid=1024):
         """Set up polar grid
         """
 
         return Grid(geometry=Geometry.POLAR,
-                    n_comp=n_comp,
                     domain_size=domain_size,
                     n_grid=n_grid)
 
     @staticmethod
-    def Sperical(n_comp=n_comp,
-                 domain_size=15.0,
+    def Sperical(domain_size=15.0,
                  n_grid=1024):
         """Set up spherical grid
         """
 
         return Grid(geometry=Geometry.SPHERICAL,
-                    n_comp=n_comp,
                     domain_size=domain_size,
                     n_grid=n_grid)
+
+
+class Profile(object):
+    """
+    Profile and methods to initialize profiles
+    """
+
+    def __init__(self,
+                 dens):
+        """Class holding density profiles
+
+        Args:
+            geometry (int): PLANAR/POLAR/SPHERICAL
+            n_comp (int, optional): Number of components.
+            domain_size (float, optional): Sisze of domain. Defaults to 100.0.
+            n_grid (int, optional): Number of grid points. Defaults to 1024.
+            n_bc (int, optional): Number of boundary points. Defaults to 0.
+
+        Returns:
+            None
+        """
+        self.densities = dens
+
+    @staticmethod
+    def tanh_profile(grid, bulk, reduced_temperature, rel_pos_dividing_surface=0.5):
+        """
+        Calculate initial densities for gas-liquid interface calculation
+        Args:
+            rho_left (list of float): Left side density
+            rho_right (list of float): Right side density
+            reduced_temperature (float): T/Tc
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
+        """
+        z_centered = np.zeros_like(grid.z)
+        z_centered[:] = grid.z[:] - rel_dividing_surface*grid.domain_size
+
+        r_left = bulk.reduced_density_left
+        r_right = bulk.reduced_density_right
+        R = bulk.R
+        n_comp = np.shape(r_right)[0]
+        dens = densities(n_comp, grid.n_grid)
+        for i in range(n_comp):
+        #         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
+            #             (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
+            dens[i][:] = 0.5*(r_left[i] + r_right[i]) + 0.5 * \
+                (r_right[i] - r_left[i])*np.tanh(z_centered[:]/(2*R[i])
+                                                 * (2.4728 - 2.3625 * reduced_temperature))
+        return Profile(dens)
+
+    @staticmethod
+    def constant_profile(grid, bulk, v_ext=None):
+        """
+        Calculate initial densities for gas-liquid interface calculation
+        Args:
+            grid (Grid): Grid
+            bulk (Bulk): Bulk states
+            v_ext (array, optional): Array of potentials evalauted in grid positions
+        """
+        r = bulk.reduced_density_left
+        n_comp = np.shape(r)[0]
+        dens = densities(n_comp, grid.n_grid)
+        dens.assign_components(r)
+        if v_ext:
+            for i in range(n_comp):
+                dens[i] *= np.minimum(np.exp(-self.Vext[i]), 1.0)
+        return Profile(dens)
+
+    @staticmethod
+    def step_profile(grid, bulk, rel_pos_dividing_surface=0.5):
+        """
+        Calculate initial densities for gas-liquid interface calculation
+        Args:
+            grid (Grid): Grid
+            bulk (Bulk): Bulk states
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
+        """
+        r_left = bulk.reduced_density_left
+        r_right = bulk.reduced_density_right
+        idx = grid.get_index_of_rel_pos(rel_pos_dividing_surface)
+        n_comp = np.shape(r_right)[0]
+        dens = densities(n_comp, grid.n_grid)
+        for i in range(n_comp):
+            dens[i][0:idx+1] = r_left[i]
+            dens[i][idx+1:] = r_right[i]
+        return Profile(dens)
+
+    @staticmethod
+    def empty_profile(n_comp, n_grid):
+        """
+        Allocate memory for profile
+        Args:
+            n_comp (int): Number of components.
+            n_grid (int): Number of grid points.
+        """
+        dens = densities(n_comp, n_grid)
+        return Profile(dens)
+
+    def copy_profile(self, prof):
+        """
+        Copy exsisting profile
+        Args:
+            prof (Profile): Exsisting profile
+        """
+        self.dens = densities(prof.nc, prof.N)
+        self.dens.assign_elements(prof.densities)
 

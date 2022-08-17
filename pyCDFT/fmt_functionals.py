@@ -45,8 +45,8 @@ class WeightFunction(object):
                 self.generate_planar_fourier_weights(N, R, dr, r)
             elif geometry == Geometry.PLANAR:
                 self.generate_spherical_fourier_weights(N, R, dr, r)
-            #elif geometry == Geometry.POLAR:
-            #    self.generate_polar_fourier_weights(N, R, dr, r)
+            elif geometry == Geometry.POLAR:
+                self.generate_polar_fourier_weights(N, R, dr, r)
 
     def generate_planar_fourier_weights(self, N, R, dr, r):
         """
@@ -59,6 +59,16 @@ class WeightFunction(object):
             pass
 
     def generate_spherical_fourier_weights(self, N, R, dr, r):
+        """
+        """
+        if self.wf_type in [WeightFunctionType.THETA, WeightFunctionType.NORMTHETA]:
+            pass
+        elif self.wf_type == WeightFunctionType.DELTA:
+            pass
+        elif self.wf_type == WeightFunctionType.DELTAVEC:
+            pass
+
+    def generate_polar_fourier_weights(self, N, R, dr, r):
         """
         """
         if self.wf_type in [WeightFunctionType.THETA, WeightFunctionType.NORMTHETA]:
@@ -464,7 +474,7 @@ class Whitebear(Rosenfeld):
             N (integer): Grid size
             R (ndarray): Particle radius for all components
         """
-        super(Whitebear, self).__init__(N, R)
+        Rosenfeld.__init__(self, N, R)
         self.name = "White Bear"
         self.short_name = "WB"
         self.numerator = None
@@ -578,7 +588,7 @@ class WhitebearMarkII(Whitebear):
         Args:
             R (ndarray): Radius of particles
         """
-        super(WhitebearMarkII, self).__init__(N, R)
+        Whitebear.__init__(self, N, R)
         self.name = "White Bear Mark II"
         self.short_name = "WBII"
         self.phi2_div3 = None

@@ -55,12 +55,12 @@ class dft_solver():
         """
 
         # Add default solver if none specified
-        if not self.dft_solver_param:
-            self.dft_solver_param.append(dft_solver_param())
+        if not self.dft_solver_params:
+            self.dft_solver_params.append(dft_solver_param())
 
         x_sol = np.zeros_like(x0)
         x_sol[:] = x0[:]
-        for sp in self.dft_solver_param:
+        for sp in self.dft_solver_params:
             if sp.solver == PICARD:
                 x_sol[:], converged = picard_iteration(residual, x_sol, max_rel_change=sp.max_rel_change,
                                                        tolerance=sp.tolerance, max_iter=sp.max_iter, beta=sp.beta,
@@ -88,12 +88,13 @@ class dft_solver():
             ensure_positive_x (bool, optional): Reset negative x values?. Defaults to True.
             ng_frequency (int, optional): When to do Ng extrapolations. Used with Picard solver. Typical value 10. Defaults to None.
         """
-        self.dft_solver_param.append(dft_solver_param(solver=PICARD,
-                                                      beta=beta,
-                                                      tolerance=tolerance,
-                                                      max_iter=max_iter,
-                                                      ensure_positive_x=ensure_positive_x,
-                                                      ng_frequency=ng_frequency))
+        self.dft_solver_params.append(dft_solver_param(algorithm=PICARD,
+                                                       beta=beta,
+                                                       tolerance=tolerance,
+                                                       max_iter=max_iter,
+                                                       ensure_positive_x=ensure_positive_x,
+                                                       ng_frequency=ng_frequency))
+        return self
 
     def anderson(self,
                  tolerance=1.0e-10,
@@ -110,12 +111,13 @@ class dft_solver():
             ensure_positive_x (bool, optional): Reset negative x values?. Defaults to True.
             mmax (int, optional): How many iterations to include in the Anderson scheme. Defaults to 50.
         """
-        self.dft_solver_param.append(dft_solver_param(solver=ANDERSON,
-                                                      beta=beta,
-                                                      tolerance=tolerance,
-                                                      max_iter=max_iter,
-                                                      ensure_positive_x=ensure_positive_x,
-                                                      mmax=mmax))
+        self.dft_solver_params.append(dft_solver_param(algorithm=ANDERSON,
+                                                       beta=beta,
+                                                       tolerance=tolerance,
+                                                       max_iter=max_iter,
+                                                       ensure_positive_x=ensure_positive_x,
+                                                       mmax=mmax))
+        return self
 
 
 def anderson_acceleration(residual, x0, mmax=50, beta=0.05,
@@ -367,3 +369,5 @@ def picard_iteration(residual, x0, max_rel_change=1.0,
 
 if __name__ == "__main__":
     print("dft_numerics")
+    solver = dft_solver().picard().anderson()
+    print("len(solver.dft_solver_params)", len(solver.dft_solver_params))
