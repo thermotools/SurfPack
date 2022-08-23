@@ -5,7 +5,7 @@ from constants import NA, KB, Geometry, Specification, LenghtUnit
 from grid import Grid, Bulk, Profile
 from convolver import Convolver
 from pyctp import pcsaft
-import fmt_functionals
+from pcsaft_functional import pc_saft
 import numpy as np
 import os
 import sys
@@ -38,7 +38,7 @@ class Interface(object):
         # Create functional
         if isinstance(thermopack, pcsaft.pcsaft):
             t_red = temperature/thermopack.eps_div_kb[0]
-            self.functional = fmt_functionals.pc_saft(n_grid, thermopack, t_red)
+            self.functional = pc_saft(n_grid, thermopack, t_red)
         else:
             raise TypeError("No DFT functional for thermopack model: " + type(thermopack))
         # Set up grid
@@ -46,13 +46,13 @@ class Interface(object):
         # Set defaults
         self.profile = None
         self.converged = False
-        self.v_ext = None
+        self.v_ext = np.zeros((self.functional.nc, self.grid.n_grid))
         self.bulk = None
         self.specification = specification
         self.Ntot = None
         self.do_exp_mu = True
         self.convolver = None
-
+        self.n_tot = None
 
     def unpack_profile(self, xvec):
         # Set profile
@@ -79,15 +79,14 @@ class Interface(object):
 
         if self.specification == Specification.NUMBER_OF_MOLES:
             # Convolution integrals for densities
-            # self.cDFT.weights_system.convolutions(self.mod_densities)
-            # # Calculate one-body direct correlation function
-            # self.cDFT.weights_system.correlation_convolution()
-            # integrals = self.cDFT.integrate_df_vext()
+            self.convolver.convolve_density_profile(self.profile.densities)
+            integrals = self.integrate_df_vext()
             # #denum = np.dot(exp_beta_mu, integrals)
-            # exp_mu = self.Ntot / integrals
-
+            #print("integrals",integrals)
+            exp_mu = self.n_tot / integrals
+            #print("exp_mu",exp_mu)
             #self.cDFT.mu_scaled_beta[:] = np.log(0.02276177)
-            exp_mu = self.bulk.mu_scaled_beta
+            exp_mu = np.exp(self.bulk.mu_scaled_beta)
             if self.do_exp_mu:
                 xvec[n_rho:n_rho + n_c] = exp_mu
             else:
@@ -136,7 +135,7 @@ class Interface(object):
 
         for ic in range(n_c):
             res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.convolver.correlation(ic)[:]
-                       + beta_mu[:] - self.cDFT.beta * self.v_ext[ic][:]) \
+                       + beta_mu[:] - self.bulk.beta * self.v_ext[ic][:]) \
                 + xvec[ic * n_grid:(ic+1)*n_grid]
 
         if self.specification == Specification.NUMBER_OF_MOLES:
@@ -152,9 +151,13 @@ class Interface(object):
             self.converged = False
             print("Interface need to be initialized before calling solve")
         else:
+            self.n_tot = self.calculate_total_mass()
+            #print("n_tot", self.n_tot)
             # Set up convolver
             self.convolver = Convolver(self.grid, self.functional, self.bulk.R)
             x0 = self.pack_x_vec()
+            #print("x0:", x0)
+            #sys.exit()
             x_sol, self.converged = solver.solve(
                 x0, self.residual, log_iter)
             if self.converged:
@@ -226,7 +229,7 @@ class Interface(object):
                 (np.log(dens[i][:]) - 1.0)
             # Extrinsic part
             omega_a[:] += dens[i][:] \
-                * (self.Vext[i][:] - mu[i])
+                * (self.v_ext[i][:] - mu[i])
 
         omega_a[:] *= self.dr
 
@@ -289,7 +292,7 @@ class Interface(object):
         """
 
         n_tot = 0.0
-        for ic in range(self.nc):
+        for ic in range(self.functional.nc):
             n_tot += np.sum(self.profile.densities[ic][:]*self.grid.integration_weights[:])
         return n_tot
 
@@ -305,7 +308,7 @@ class Interface(object):
         for ic in range(n_c):
             integral[ic] = np.sum(self.grid.integration_weights*
                 np.exp(self.convolver.correlation(ic)[:]
-                       - self.beta * self.Vext[ic][:]))
+                       - self.bulk.beta * self.v_ext[ic][:]))
         return integral
 
 

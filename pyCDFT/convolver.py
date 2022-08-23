@@ -6,6 +6,7 @@ from grid import Grid
 import numpy as np
 import os
 import sys
+from scipy.fft import dct, idct, dst, idst, fft, ifft
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 
@@ -83,6 +84,9 @@ class WeightedDensities():
         # self.n0[:] = self.n2[:] / (4 * np.pi * self.R ** 2)
         # self.n1[:] = self.n2[:] / (4 * np.pi * self.R)
     #     self.update_utility_variables()
+
+    def __getitem__(self, wd):
+        return self.n[wd]
 
     def set_zero(self):
         """
@@ -296,10 +300,10 @@ class CompWeightedDifferentials():
         Returns:
         """
         self.corr.fill(0.0)
-        for wf in self.wfs.items():
-            alias = wfs[wf].alias
+        for wf in self.wfs:
+            alias = self.wfs[wf].alias
             if self.corr_contribution[alias] > 0.0:
-                self.corr[:] -= self.corr_contribution[alias]*self.d_conv[:]
+                self.corr[:] -= self.corr_contribution[alias]*self.d_conv[alias][:]
 
     def set_functional_differentials(self, functional, ic):
         """
@@ -320,9 +324,9 @@ class CompWeightedDifferentials():
         self.d2eff[:] = functional.d2eff[:]
         self.d2veff[:] = functional.d2veff[:]
 
-        for wf in self.wfs.wfs:
-            alias = wfs.wfs[wf].alias
-            if alias not in wfs.fmt_aliases:
+        for wf in self.wfs:
+            alias = self.wfs[wf].alias
+            if alias not in self.wfs.fmt_aliases:
                 self.d[alias][:] = functional.diff[alias][:, ic]
 
 
@@ -410,9 +414,6 @@ class Convolver(object):
         # Overall weighted densities
         self.weighted_densities = WeightedDensitiesMaster(n_grid=grid.n_grid, wfs=functional.wf, nc=functional.thermo.nc)
 
-        # One particle correlation
-        self.correlation =  np.zeros(grid.n_grid)
-
     def convolve_density_profile(self, rho):
         """
         Perform convolutions for weighted densities
@@ -421,15 +422,15 @@ class Convolver(object):
             rho (array_like): Density profile
         """
         self.weighted_densities.set_zero()
-        rho_delta = np.zeros(grid.n_grid)
+        rho_delta = np.zeros(self.grid.n_grid)
         for i in range(self.functional.thermo.nc):
             rho_inf = rho.densities[i][-1]
             rho_delta[:] = rho.densities[i][:] - rho_inf
-            if grid.geometry == Geometry.PLANAR:
-                frho_delta = dct(self.rho_delta, type=2)
-            elif grid.geometry == Geometry.SPHERICAL:
-                frho_delta = dst(self.rho_delta*grid.z, type=2)
-            elif grid.geometry == Geometry.POLAR:
+            if self.grid.geometry == Geometry.PLANAR:
+                frho_delta = dct(rho_delta, type=2)
+            elif self.grid.geometry == Geometry.SPHERICAL:
+                frho_delta = dst(rho_delta*self.grid.z, type=2)
+            elif self.grid.geometry == Geometry.POLAR:
                 pass
             # Loop all weight functions
             for wf in self.comp_wfs[i]:
@@ -440,18 +441,25 @@ class Convolver(object):
                 self.comp_wfs[i].wfs[wf].update_dependencies(self.comp_weighted_densities[i])
             # Account for segments
             self.comp_weighted_densities[i].update_after_convolution()
+            # print("n0",self.comp_weighted_densities[i].n["w0"])
+            # print("n1",self.comp_weighted_densities[i].n["w1"])
+            # print("n2",self.comp_weighted_densities[i].n["w2"])
+            # print("n3",self.comp_weighted_densities[i].n["w3"])
+            # print("nv1",self.comp_weighted_densities[i].n["wv1"])
+            # print("nv2",self.comp_weighted_densities[i].n["wv2"])
+            # print("n_disp",self.comp_weighted_densities[i].n["w_disp"])
             # Add component contribution to overall density
             self.weighted_densities += self.comp_weighted_densities[i]
             for wf in self.comp_wfs[i]:
                 alias = self.comp_wfs[i].wfs[wf].alias
-                if alias not in wfs.fmt_aliases:
-                    self.weighted_densities.d[alias][i, :] = \
-                        self.comp_weighted_densities[i].d[alias][:]
+                if alias not in self.comp_wfs[i].fmt_aliases:
+                    self.weighted_densities.n[alias][i, :] = \
+                        self.comp_weighted_densities[i].n[alias][:]
         self.weighted_densities.update_utility_variables()
 
         # Calculate differentials
         self.functional.differentials(self.weighted_densities)
-        for i in range(self.nc):
+        for i in range(self.functional.nc):
             self.comp_differentials[i].set_functional_differentials(
                 self.functional, i)
             # Loop all weight functions
@@ -460,6 +468,14 @@ class Convolver(object):
                                                             self.comp_differentials[i].d_conv[wf])
             # Calculate one-particle correlation
             self.comp_differentials[i].update_after_convolution()
+
+        # print("d2eff",self.comp_differentials[0].d_conv["w2"]*self.comp_differentials[0].corr_contribution["w2"])
+        # print("d2 corr",self.comp_differentials[0].corr_contribution["w2"])
+        # print("d3",self.comp_differentials[0].d_conv["w3"])
+        # print("d2v",self.comp_differentials[0].d_conv["wv2"])
+        # self.comp_differentials[i].d_conv[wf]
+        # print("corr", self.correlation(0))
+
 
     def correlation(self, i):
         """
