@@ -14,7 +14,7 @@ RGAS = NA*KB
 # Planck’s constant
 h = 6.626069311e-34
 
-class Dft_enum(Enum):
+class DftEnum(Enum):
     def __eq__(self, other):
         #print("isinstance",other.__class__, self.__class__, isinstance(other, self.__class__))
         #if isinstance(other, self.__class__):
@@ -23,16 +23,16 @@ class Dft_enum(Enum):
         except AttributeError:
             return False
 
-class Geometry(Dft_enum):
+class Geometry(DftEnum):
     PLANAR = 1
     POLAR = 2
     SPHERICAL = 3
 
-class Specification(Dft_enum):
+class Specification(DftEnum):
     NUMBER_OF_MOLES = 10
     CHEMICHAL_POTENTIAL = 20
 
-class Lenght_unit(Dft_enum):
+class LenghtUnit(DftEnum):
     ANGSTROM = 100
     REDUCED = 200
 

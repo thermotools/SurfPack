@@ -1,607 +1,471 @@
 #!/usr/bin/env python3
-from enum import Enum
-from dft_numerics import dft_solver
 import sys
-from constants import NA, KB
-from weight_functions_cosine_sine import planar_weights_system_mc, \
-    planar_weights_system_mc_pc_saft
-from utility import packing_fraction_from_density, \
-    boundary_condition, densities, get_thermopack_model, \
-    weighted_densities_pc_saft_1D, get_initial_densities_vle, \
-    weighted_densities_1D
-import fmt_functionals
+from constants import Geometry
+from fmt_functionals import WeightFunctions
+from grid import Grid
 import numpy as np
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 
-class GeometryXX(Enum):
-    PLANAR = 1
-    POLAR = 2
-    SPHERICAL = 3
+class WeightedDensities():
+    """
+    """
+
+    def __init__(self, n_grid: int, wfs: WeightFunctions, ms: float):
+        """
+
+        Args:
+            n_grid:
+            wfs:
+            ms:
+        """
+        self.n_grid = n_grid
+        self.ms = ms
+        self.wfs = wfs
+        # Hard-coded FMT densities
+        self.n0 = np.zeros(n_grid)
+        self.n1 = np.zeros(n_grid)
+        self.n2 = np.zeros(n_grid)
+        self.n3 = np.zeros(n_grid)
+        self.n1v = np.zeros(n_grid)
+        self.n2v = np.zeros(n_grid)
+        # Utilities
+        # self.n3neg = np.zeros(n_grid)
+        # self.n3neg2 = np.zeros(n_grid)
+        # self.n2v2 = np.zeros(n_grid)
+        # self.logn3neg = np.zeros(n_grid)
+        # self.n32 = np.zeros(n_grid)
+        # Additional densities
+        self.n = {}
+        for wf in wfs.wfs:
+            alias = wfs.wfs[wf].alias
+            if alias not in wfs.fmt_aliases:
+                self.n[alias] = np.zeros(n_grid)
+            else:
+                if "v" in alias:
+                    if "1" in alias:
+                        self.n[alias] = self.n1v
+                    else:
+                        self.n[alias] = self.n2v
+                elif "0" in alias:
+                    self.n[alias] = self.n0
+                elif "1" in alias:
+                    self.n[alias] = self.n1
+                elif "2" in alias:
+                    self.n[alias] = self.n2
+                elif "3" in alias:
+                    self.n[alias] = self.n3
+
+    # def update_utility_variables(self):
+    #     """
+    #     """
+    #     self.n3neg[:] = 1.0 - self.n3[:]
+    #     self.n3neg2[:] = self.n3neg[:] ** 2
+    #     self.n2v2[:] = self.n2v[:] ** 2
+    #     self.logn3neg[:] = np.log(self.n3neg[:])
+    #     self.n32[:] = self.n3[:] ** 2
+
+    def update_after_convolution(self):
+        """
+        """
+        # Account for segments
+        for wd in self.n:
+            if wd in self.wfs.fmt_aliases:
+                self.n[wd][:] *= self.ms
+
+        # self.n2[:] *= self.ms
+        # self.n3[:] *= self.ms
+        # self.n2v[:] *= self.ms
+        # Get remaining densities from convoultion results
+        # self.n1v[:] = self.n2v[:] / (4 * np.pi * self.R)
+        # self.n0[:] = self.n2[:] / (4 * np.pi * self.R ** 2)
+        # self.n1[:] = self.n2[:] / (4 * np.pi * self.R)
+    #     self.update_utility_variables()
+
+    def set_zero(self):
+        """
+        Set weights to zero
+        """
+        # self.n2[:] = 0.0
+        # self.n3[:] = 0.0
+        # self.n2v[:] = 0.0
+        # self.n0[:] = 0.0
+        # self.n1[:] = 0.0
+        # self.n1v[:] = 0.0
+        for wd in self.n:
+            self.n[wd].fill(0.0)
+
+    def __iadd__(self, other):
+        """
+        Add weights
+        """
+        # self.n2[:] += other.n2[:]
+        # self.n3[:] += other.n3[:]
+        # self.n2v[:] += other.n2v[:]
+        # self.n0[:] += other.n0[:]
+        # self.n1[:] += other.n1[:]
+        # self.n1v[:] += other.n1v[:]
+        # Add FMT densities
+        for wd in self.n:
+            if wd in self.wfs.fmt_aliases:
+                self.n[wd][:] = other.n[wd][:]
+        return self
+
+    def set_testing_values(self, rho=None):
+        """
+        Set some dummy values for testing differentials
+        """
+        if rho is not None:
+            self.n0[:] = np.sum(rho)
+            self.n1[:] = np.sum(self.R * rho)
+            self.n2[:] = 4 * np.pi * np.sum(self.R ** 2 * rho)
+            self.n3[:] = 4 * np.pi * np.sum(self.R ** 3 * rho) / 3
+            self.n1v[:] = - 1.0e-3*self.n0[:]
+            self.n2v[:] = 4*np.pi*np.average(self.R)*self.n1v[:]
+        else:
+            self.n2[:] = 3.0
+            self.n3[:] = 0.5
+            self.n2v[:] = 6.0
+            self.n0[:] = 1.0
+            self.n1[:] = 2.0
+            self.n1v[:] = 5.0
+
+        self.N = 1
+        self.update_utility_variables()
+
+    def print(self, index=None):
+        """
+
+        Args:
+            print_utilities (bool): Print also utility variables
+        """
+        print("\nWeighted densities:")
+        for wd in self.n:
+            if index is None:
+                print(wd.replace("w", "n") +": ", self.n[wd][:])
+            else:
+                print(wd.replace("w", "n") +": ", self.n[wd][index])
 
 
-class Interface(object):
+        # if print_utilities:
+        #     if index is None:
+        #         print("n3neg: ", self.n3neg)
+        #         print("n3neg2: ", self.n3neg2)
+        #         print("n2v2: ", self.n2v2)
+        #         print("logn3neg: ", self.logn3neg)
+        #         print("n32: ", self.n32)
+        #     else:
+        #         print("n3neg: ", self.n3neg[index])
+        #         print("n3neg2: ", self.n3neg2[index])
+        #         print("n2v2: ", self.n2v2[index])
+        #         print("logn3neg: ", self.logn3neg[index])
+        #         print("n32: ", self.n32[index])
+
+    def plot(self, r, show=True):
+        """
+
+        Args:
+            r (np.ndarray): Spatial resolution
+            show (bool): Execute plt.show ?
+            mask (ndarray of bool): What to plot?
+        """
+        fig, ax1 = plt.subplots()
+        ax2 = ax1.twinx()
+        for i, wd in enumerate(self.n):
+            label = wd.replace("w", "n")
+            if "wv" in wd:
+                ax2.plot(r, self.n[wd][:], label=label, color=LCOLORS[i])
+            else:
+                ax1.plot(r, self.n[wd][:], label=label, color=LCOLORS[i])
+        ax1.set_xlabel("$r$")
+        ax1.set_ylabel("$n$")
+        ax2.set_ylabel("$n_v$")
+        if show:
+            leg = ax1.legend(loc="best", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            leg = ax2.legend(loc="best", numpoints=1)
+            leg.get_frame().set_linewidth(0.0)
+            plt.show()
+        return ax1, ax2
+
+class WeightedDensitiesMaster(WeightedDensities):
+    """
+    """
+
+    def __init__(self, n_grid: int, wfs: WeightFunctions, nc: int):
+        """
+
+        Args:
+            n_grid:
+            wfs:
+            ms:
+        """
+        WeightedDensities.__init__(self, n_grid, wfs, ms=1.0)
+        # Utilities
+        self.n3neg = np.zeros(n_grid)
+        self.n3neg2 = np.zeros(n_grid)
+        self.n2v2 = np.zeros(n_grid)
+        self.logn3neg = np.zeros(n_grid)
+        self.n32 = np.zeros(n_grid)
+        # Additional densities as nc arrays
+        for wf in wfs.wfs:
+            alias = wfs.wfs[wf].alias
+            if alias not in wfs.fmt_aliases:
+                self.n[alias] = np.zeros((nc, n_grid))
+
+    def update_utility_variables(self):
+        """
+        """
+        self.n3neg[:] = 1.0 - self.n3[:]
+        self.n3neg2[:] = self.n3neg[:] ** 2
+        self.n2v2[:] = self.n2v[:] ** 2
+        self.logn3neg[:] = np.log(self.n3neg[:])
+        self.n32[:] = self.n3[:] ** 2
+
+class CompWeightedDifferentials():
+    """
+    """
+
+    def __init__(self, n_grid: int, wfs: WeightFunctions, ms: float, R: float):
+        """
+
+        Args:
+            N:
+            R:
+            mask_conv_results:
+        """
+        self.n_grid = n_grid
+        self.ms = ms
+        self.wfs = wfs
+        # Hard coded FMT differentials
+        self.d0 = np.zeros(n_grid)
+        self.d1 = np.zeros(n_grid)
+        self.d2 = np.zeros(n_grid)
+        self.d3 = np.zeros(n_grid)
+        self.d1v = np.zeros(n_grid)
+        self.d2v = np.zeros(n_grid)
+        # Utilities
+        self.d2eff = np.zeros(n_grid)
+        self.d2veff = np.zeros(n_grid)
+
+        # Convolved properties
+        # self.d3_conv = np.zeros(n_grid)
+        # self.d2eff_conv = np.zeros(n_grid)
+        # self.d2veff_conv = np.zeros(n_grid)
+        # self.d_conv["w3"] = self.d3_conv
+        # self.d_conv["w2eff"] = self.d2eff_conv
+        # self.d_conv["wv2eff"] = self.d2veff_conv
+        self.d_conv = {}
+
+        # Additional differentials
+        self.d = {}
+        self.corr_contribution = {}
+        for wf in wfs:
+            print("wf: ", wf)
+            alias = wfs[wf].alias
+            self.corr_contribution[alias] = wfs.get_correlation_factor(alias, R)
+            if self.corr_contribution[alias] > 0.0:
+                self.d_conv[alias] = np.zeros(n_grid)
+            else:
+                self.d_conv[alias] = None
+            if alias not in wfs.fmt_aliases:
+                self.d[alias] = np.zeros(n_grid)
+            else:
+                if "v" in alias:
+                    if "1" in alias:
+                        self.d[alias] = self.d1v
+                    else:
+                        self.d[alias] = self.d2v
+                elif "0" in alias:
+                    self.d[alias] = self.d0
+                elif "1" in alias:
+                    self.d[alias] = self.d1
+                elif "2" in alias:
+                    self.d[alias] = self.d2
+                elif "3" in alias:
+                    self.d[alias] = self.d3
+
+        # One - body direct correlation function
+        self.corr = np.zeros(n_grid)
+
+    def update_after_convolution(self):
+        """
+
+        Returns:
+        """
+        self.corr.fill(0.0)
+        for wf in self.wfs.items():
+            alias = wfs[wf].alias
+            if self.corr_contribution[alias] > 0.0:
+                self.corr[:] -= self.corr_contribution[alias]*self.d_conv[:]
+
+    def set_functional_differentials(self, functional, ic):
+        """
+
+        Args:
+            functional:
+            ic:
+
+        Returns:
+
+        """
+        self.d0[:] = functional.d0[:]
+        self.d1[:] = functional.d1[:]
+        self.d2[:] = functional.d2[:]
+        self.d3[:] = functional.d3[:]
+        self.d1v[:] = functional.d1v[:]
+        self.d2v[:] = functional.d2v[:]
+        self.d2eff[:] = functional.d2eff[:]
+        self.d2veff[:] = functional.d2veff[:]
+
+        for wf in self.wfs.wfs:
+            alias = wfs.wfs[wf].alias
+            if alias not in wfs.fmt_aliases:
+                self.d[alias][:] = functional.diff[alias][:, ic]
+
+
+    def print(self, index=None):
+        """
+        """
+        print("\nDifferentials")
+        for wd in self.d:
+            if index is None:
+                print(wd.replace("w", "d") +": ", self.d[wd][:])
+            else:
+                print(wd.replace("w", "d") +": ", self.d[wd][index])
+        print("d2_eff: ", self.d2eff)
+        print("d2v_eff: ", self.d2veff)
+        # print("\nConvolution results")
+        # print("d2eff_conv: ", self.d2eff_conv)
+        # print("d3_conv: ", self.d3_conv)
+        # print("d2veff_conv: ", self.d2veff_conv)
+        # print("corr: ", self.corr)
+
+    # def plot(self, r, show=True):
+    #     """
+
+    #     Args:
+    #         r (np.ndarray): Spatial resolution
+    #         show (bool): Execute plt.show ?
+    #         mask (ndarray of bool): What to plot?
+    #     """
+    #     if mask is None:
+    #         mask = np.full(len(r), True, dtype=bool)
+    #     fig, ax1 = plt.subplots()
+    #     ax1.plot(r[mask], self.d2eff_conv[mask], label="d2_sum", color="r")
+    #     ax1.plot(r[mask], self.d3_conv[mask], label="d3", color="g")
+    #     #ax1.plot(r[mask], self.n2[mask], label="n2", color="b")
+    #     #ax1.plot(r[mask], self.n3[mask], label="n3", color="orange")
+    #     ax2 = ax1.twinx()
+    #     ax2.plot(r[mask], self.d2veff_conv[mask],
+    #              label="d2v_sum", color="orange")
+    #     #ax2.plot(r[mask], self.n1v[mask], label="n1v", color="cyan")
+    #     ax1.set_xlabel("$r$")
+    #     ax1.set_ylabel("$d$")
+    #     ax2.set_ylabel("$d_v$")
+    #     if show:
+    #         ax1.plot(r[mask], self.corr[mask], label="corr", color="b")
+    #         leg = ax1.legend(loc="best", numpoints=1)
+    #         leg.get_frame().set_linewidth(0.0)
+    #         leg = ax2.legend(loc="best", numpoints=1)
+    #         leg.get_frame().set_linewidth(0.0)
+    #         plt.show()
+    #     return ax1, ax2
+
+class Convolver(object):
     """
 
     """
 
     def __init__(self,
-                 geometry,
+                 grid: Grid,
                  functional,
-                 domain_size=100.0,
-                 n_grid=1024):
-        """Class holding specifications for an interface calculation
+                 R: np.ndarray):
+        """Class handeling convolution
 
         Args:
-            geometry (int): PLANAR/POLAR/SPHERICAL
+            grid (Grid): Grid class
             functional (Functional): DFT functional
-            domain_size (float, optional): Sisze of domain. Defaults to 100.0.
-            n_grid (int, optional): Number of grid points. Defaults to 1024.
 
         Returns:
             None
         """
         self.functional = functional
-        self.grid = Grid(geometry, domain_size, n_grid)
-        self.is_initialized = False
-        self.converged = False
-        self.v_ext = None
+        self.grid = grid
 
-    def residual(self, x):
-        return self.grid.convolve(x).residual
+        # Set up storage for weigted densities and differentials
+        self.comp_weighted_densities = []
+        self.comp_differentials = []
+        self.comp_wfs = []
+        for i in range(functional.thermo.nc):
+            self.comp_weighted_densities.append(WeightedDensities(n_grid=grid.n_grid, wfs=functional.wf, ms=functional.thermo.m[i]))
+            self.comp_differentials.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=functional.wf, ms=functional.thermo.m[i], R=R[i]))
+            self.comp_wfs.append(WeightFunctions.Copy(functional.wf))
+            # Set up Fourier weights
+            for wfun in self.comp_wfs[i]:
+                self.comp_wfs[i][wfun].generate_fourier_weights(grid, R[i])
 
-    def solve(self, solver=dft_solver(), log_iter=False):
-        if not self.is_initialized:
-            self.converged = False
-            print("Interface need to be initialized before calling solve")
-        else:
-            self.grid.x_sol[:], self.converged = solver.solve(
-                self.grid.x0, self.residual, log_iter)
-            if not self.converged:
-                print("Interface solver did not converge")
+        # Overall weighted densities
+        self.weighted_densities = WeightedDensitiesMaster(n_grid=grid.n_grid, wfs=functional.wf, nc=functional.thermo.nc)
 
+        # One particle correlation
+        self.correlation =  np.zeros(grid.n_grid)
 
-class Pore(Interface):
-    """
-
-    """
-
-    def __init__(self,
-                 geometry,
-                 functional,
-                 external_potential,
-                 domain_size=100.0,
-                 n_grid=1024):
+    def convolve_density_profile(self, rho):
         """
-        Object holding specifications for classical DFT problem.
-        Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
+        Perform convolutions for weighted densities
 
         Args:
-            bulk_densities (ndarray): Bulk fluid density ()
-            particle_diameters (ndarray): Particle diameter
-            wall (str): Wall type (HardWall, SlitHardWall, None)
-            domain_length (float): Length of domain
-            functional (str): Name of hard sphere functional: Rosenfeld, WhiteBear, WhiteBear Mark II, Default Rosenfeld
-            grid (int) : Grid size
-            temperature (float): Reduced temperature
-            quadrature (str): Quadrature to use during integration
-        Returns:
-            None
+            rho (array_like): Density profile
         """
+        self.weighted_densities.set_zero()
+        rho_delta = np.zeros(grid.n_grid)
+        for i in range(self.functional.thermo.nc):
+            rho_inf = rho.densities[i][-1]
+            rho_delta[:] = rho.densities[i][:] - rho_inf
+            if grid.geometry == Geometry.PLANAR:
+                frho_delta = dct(self.rho_delta, type=2)
+            elif grid.geometry == Geometry.SPHERICAL:
+                frho_delta = dst(self.rho_delta*grid.z, type=2)
+            elif grid.geometry == Geometry.POLAR:
+                pass
+            # Loop all weight functions
+            for wf in self.comp_wfs[i]:
+                self.comp_wfs[i].wfs[wf].convolve_densities(rho_inf,
+                                                            frho_delta,
+                                                            self.comp_weighted_densities[i].n[wf])
+            for wf in self.functional.wf.wfs:
+                self.comp_wfs[i].wfs[wf].update_dependencies(self.comp_weighted_densities[i])
+            # Account for segments
+            self.comp_weighted_densities[i].update_after_convolution()
+            # Add component contribution to overall density
+            self.weighted_densities += self.comp_weighted_densities[i]
+            for wf in self.comp_wfs[i]:
+                alias = self.comp_wfs[i].wfs[wf].alias
+                if alias not in wfs.fmt_aliases:
+                    self.weighted_densities.d[alias][i, :] = \
+                        self.comp_weighted_densities[i].d[alias][:]
+        self.weighted_densities.update_utility_variables()
 
-        # Init of base class
-        Interface.__init__(self,
-                           geometry=geometry,
-                           functional=functional,
-                           domain_size=domain_size,
-                           n_grid=n_grid)
-        self.v_ext = external_potential
-
-    def residual(self, x):
-        return self.grid.convolve(x).residual
-
-
-class PairCorrelation(Pore):
-
-    def __init__(self,
-                 functional,
-                 state,
-                 comp=0,
-                 domain_size=15.0,
-                 n_grid=1024):
-        """
-        Object holding specifications for classical DFT problem.
-        Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
-
-        Args:
-            bulk_densities (ndarray): Bulk fluid density ()
-            particle_diameters (ndarray): Particle diameter
-            wall (str): Wall type (HardWall, SlitHardWall, None)
-            domain_length (float): Length of domain
-            functional (str): Name of hard sphere functional: Rosenfeld, WhiteBear, WhiteBear Mark II, Default Rosenfeld
-            grid (int) : Grid size
-            temperature (float): Reduced temperature
-            quadrature (str): Quadrature to use during integration
-        Returns:
-            None
-        """
-
-        v_ext = []
-        for i in functional.nc:
-            v_ext.append(functional.potential(i, comp, state.T))
-        # Init of base class
-        Pore.__init__(self,
-                           geometry=Geometry.SPHERICAL,
-                           functional=functional,
-                           external_potential=v_ext,
-                           domain_size=domain_size,
-                           n_grid=n_grid)
-
-
-class Surface(Pore):
-
-    def __init__(self,
-                 geometry,
-                 functional,
-                 external_potential,
-                 surface_position,
-                 domain_size=100.0,
-                 n_grid=1024):
-        """
-        Object holding specifications for classical DFT problem.
-        Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
-
-        Args:
-            bulk_densities (ndarray): Bulk fluid density ()
-            particle_diameters (ndarray): Particle diameter
-            wall (str): Wall type (HardWall, SlitHardWall, None)
-            domain_length (float): Length of domain
-            functional (str): Name of hard sphere functional: Rosenfeld, WhiteBear, WhiteBear Mark II, Default Rosenfeld
-            grid (int) : Grid size
-            temperature (float): Reduced temperature
-            quadrature (str): Quadrature to use during integration
-        Returns:
-            None
-        """
-
-        # Init of base class
-        Pore.__init__(self,
-                           geometry=geometry,
-                           functional=functional,
-                           external_potential=external_potential,
-                           domain_size=domain_size,
-                           n_grid=n_grid)
-
-   def print_grid(self):
-        """
-        Debug function
-
-        """
-        print("N: ", self.N)
-        print("NiWall: ", self.NiWall)
-        print("NinP: ", self.NinP)
-        print("Nbc: ", self.Nbc)
-        print("end: ", self.end)
-        print("domain_mask: ", self.domain_mask)
-        print("weight_mask: ", self.weight_mask)
+        # Calculate differentials
+        self.functional.differentials(self.weighted_densities)
         for i in range(self.nc):
-            print(f"NiWall_array_left {i}: ", self.NiWall_array_left[i])
-            print(f"NiWall_array_right {i}: ", self.NiWall_array_right[i])
-            print(f"left_boundary_mask {i}: ", self.left_boundary_mask[i])
-            print(f"right_boundary_mask {i}: ", self.right_boundary_mask[i])
-            print(f"boundary_mask {i}: ", self.boundary_mask[i])
+            self.comp_differentials[i].set_functional_differentials(
+                self.functional, i)
+            # Loop all weight functions
+            for wf in self.comp_wfs[i]:
+                self.comp_wfs[i][wf].convolve_differentials(self.comp_differentials[i].d[wf],
+                                                            self.comp_differentials[i].d_conv[wf])
+            # Calculate one-particle correlation
+            self.comp_differentials[i].update_after_convolution()
 
-    def wall_setup(self, wall):
+    def correlation(self, i):
         """
-
-        Args:
-            wall (str): Wall type
-
+        Access to one particle correlation
         """
-        self.left_boundary = boundary_condition["OPEN"]
-        self.right_boundary = boundary_condition["OPEN"]
-        if wall.upper() == "NONE":
-            self.wall = "NONE"
-        # Wall setup
-        hw = ("HW", "HARDWALL", "SHW")
-        is_hard_wall = len([w for w in hw if w in wall.upper()]) > 0
-        slit = ("SLIT", "SHW")
-        is_slit = len([s for s in slit if s in wall.upper()]) > 0
-        if is_hard_wall:
-            self.left_boundary = boundary_condition["WALL"]
-            self.wall = "HW"
-            self.weight_mask[:self.NiWall + 1] = True
-            for i in range(self.nc):
-                self.NiWall_array_left[i] += round(self.NinP[i]/2)
-                self.Vext[i][:self.NiWall_array_left[i]] = 500.0
-            if is_slit:
-                # Add right wall setup
-                self.right_boundary = boundary_condition["WALL"]
-                self.wall = "SHW"
-                self.weight_mask[self.end - 1:] = True
-                for i in range(self.nc):
-                    self.NiWall_array_right[i] -= round(self.NinP[i] / 2)
-                    self.Vext[i][self.NiWall_array_right[i]:] = 500.0
-
-    def get_density_profile(self, density_init, z):
-        """
-
-        Args:
-            density_init (str): How to initialize density profiles? ("Constant", "VLE")
-        Return:
-            rho0 (densitiies): Initial density profiles
-
-        """
-        if density_init.upper() == "VLE":
-            z_centered = np.zeros_like(z)
-            z_centered[:] = z[:] - 0.5*(z[0] + z[-1])
-            rho0 = get_initial_densities_vle(z_centered,
-                                             self.bulk_densities_g,
-                                             self.bulk_densities,
-                                             self.R,
-                                             self.t_div_tc)
-        else:
-            rho0 = densities(self.nc, self.N)
-            rho0.assign_components(self.bulk_densities)
-
-        return rho0
-
-    def grand_potential(self, dens, update_convolutions=True):
-        """
-        Calculates the grand potential in the system.
-
-        Args:
-            dens (densities): Density profile
-            update_convolutions(bool): Flag telling if convolutions should be calculated
-
-        Returns:
-            (float): Grand potential
-            (array): Grand potential contribution for each grid point
-        """
-
-        # Make sure weighted densities are up-to-date
-        if update_convolutions:
-            self.weights_system.convolutions(dens)
-
-        # Calculate chemical potential (excess + ideal)
-        mu = self.T * (self.mu_res_scaled_beta + np.log(self.bulk_densities))
-
-        # FMT hard-sphere part
-        omega_a = self.T * \
-            self.functional.excess_free_energy(
-                self.weights_system.weighted_densities)
-
-        # Add ideal part and extrinsic part
-        for i in range(self.nc):
-            # Ideal part
-            omega_a[self.domain_mask] += self.T * dens[i][self.domain_mask] * \
-                (np.log(dens[i][self.domain_mask]) - 1.0)
-            # Extrinsic part
-            omega_a[self.domain_mask] += dens[i][self.domain_mask] \
-                * (self.Vext[i][self.domain_mask] - mu[i])
-
-        omega_a[:] *= self.dr
-
-        for i in range(self.nc):
-            omega_a[self.boundary_mask[i]] = 0.0  # Don't include wall
-
-        # Integrate
-        omega = np.sum(omega_a[:])
-
-        return omega, omega_a
-
-    def grand_potential_bulk(self, wdens, Vext=0.0):
-        """
-        Calculates the grand potential in the system in bulk.
-        Method used for testing.
-        Args:
-            dens : Weigthed densities
-            Vext (float): External potential in bulk
-
-        Returns:
-            (float): Grand potential per volume
-        """
-
-        # Calculate chemical potential (excess + ideal)
-        mu = self.T * (self.mu_res_scaled_beta + np.log(self.bulk_densities))
-
-        # FMT hard-sphere part
-        omega_a = self.T * \
-            self.functional.excess_free_energy(wdens)
-
-        # Add ideal part and extrinsic part
-        for i in range(self.nc):
-            # Ideal part
-            omega_a[:] += self.T * self.bulk_densities[i] * \
-                (np.log(self.bulk_densities[i]) - 1.0)
-            # Extrinsic part
-            omega_a[:] += self.bulk_densities[i] \
-                * (Vext - mu[i])
-
-        return omega_a[0]
-
-    def test_grand_potential_bulk(self):
-        """
-        """
-        # Test grand potential in bulk phase
-        wdens = weighted_densities_1D(
-            1, self.functional.R, ms=np.ones(self.nc))
-        wdens.set_testing_values(rho=self.bulk_densities)
-        wdens.n1v[:] = 0.0
-        wdens.n2v[:] = 0.0
-        omega = self.grand_potential_bulk(wdens, Vext=0.0)
-        print("omega:", omega)
-        print("pressure + omega:", self.red_pressure + omega)
-
-    def surface_tension(self, dens, update_convolutions=True):
-        """
-        Calculates the surface tension of the system.
-
-        Args:
-            dens (densities): Density profile
-            update_convolutions(bool): Flag telling if convolutions should be updated
-
-        Returns:
-            (float): Surface tension
-        """
-
-        _, omega_a = self.grand_potential(dens, update_convolutions)
-        omega_a += self.red_pressure * self.dr
-        for i in range(self.nc):
-            omega_a[self.boundary_mask[i]] = 0.0  # Don't include wall
-
-        gamma = np.sum(omega_a)
-
-        return gamma
-
-    def surface_tension_real_units(self, dens, update_convolutions=True):
-        """
-        Calculates the surface tension of the system.
-
-        Args:
-            dens (densities): Density profile
-            update_convolutions(bool): Flag telling if convolutions should be updated
-
-        Returns:
-            (float): Surface tension (J/m2)
-        """
-
-        gamma_star = self.surface_tension(dens, update_convolutions)
-        gamma = gamma_star * self.eps / self.sigma ** 2
-
-        return gamma
-
-    def calculate_total_mass(self, dens):
-        """
-        Calculates the overall mass of the system.
-
-        Args:
-            dens (densities): Density profiles
-
-        Returns:
-            (float): Surface tension (mol)
-        """
-
-        n_tot = 0.0
-        for ic in range(self.nc):
-            n_tot += np.sum(dens[ic])
-        n_tot *= self.dr
-        return n_tot
-
-    def integrate_df_vext(self):
-        """
-        Calculates the integral of exp(-beta(df+Vext)).
-
-        Returns:
-            (float): Integral (-)
-        """
-        integral = np.zeros(self.nc)
-        for ic in range(self.nc):
-            integral[ic] = self.dr*np.sum(np.exp(self.weights_system.comp_differentials[ic].corr[self.domain_mask]
-                                                 - self.beta * self.Vext[ic][self.domain_mask]))
-        return integral
-
-
-class cdft_thermopack(cdft1D):
-    """
-    Base classical DFT class for 1D problems
-    """
-
-    def __init__(self,
-                 model,
-                 comp_names,
-                 comp,
-                 temperature,
-                 pressure,
-                 bubble_point_pressure=False,
-                 wall="None",
-                 domain_length=40.0,
-                 grid=1024,
-                 phi_disp=1.3862,
-                 kwthermoargs={}):
-        """
-        Object holding specifications for classical DFT problem.
-        Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
-
-        Args:
-            model (str): Themopack model "PC-SAFT", "SAFT-VR Mie"
-            comp_names (str): Component names
-            comp (array like): Composition
-            temperature (float): Temperature (K)
-            pressure (float): Pressure (MPa)
-            bubble_point_pressure (bool): Calculate bubble point pressure
-            wall (str): Wall type (HardWall, SlitHardWall)
-            domain_length (float): Length of domain
-            grid (int) : Grid size
-            phi_disp (float): Weigthing distance for disperesion term
-        Returns:
-            None
-        """
-        self.thermo = get_thermopack_model(model)
-        self.thermo.init(comp_names, **kwthermoargs)
-        self.thermo.set_tmin(0.75 * temperature)
-        self.comp = comp
-        if bubble_point_pressure:
-            # print(temperature, comp)
-            self.eos_pressure, self.eos_gas_comp = self.thermo.bubble_pressure(
-                temperature, comp)
-            self.eos_liq_comp = self.comp
-            self.eos_phase = self.thermo.TWOPH
-        else:
-            flash = self.thermo.two_phase_tpflash(temperature, pressure, comp)
-            self.eos_pressure = pressure
-            self.eos_liq_comp = flash[0]
-            self.eos_gas_comp = flash[1]
-            self.eos_beta_gas = flash[2]
-            self.eos_phase = flash[4]
-
-        if self.eos_phase == self.thermo.TWOPH:
-            self.eos_vl = self.thermo.specific_volume(temperature,
-                                                      self.eos_pressure,
-                                                      self.eos_liq_comp,
-                                                      self.thermo.LIQPH)
-            self.eos_vg = self.thermo.specific_volume(temperature,
-                                                      self.eos_pressure,
-                                                      self.eos_gas_comp,
-                                                      self.thermo.VAPPH)
-        else:
-            self.eos_vl = self.thermo.specific_volume(temperature,
-                                                      self.eos_pressure,
-                                                      comp,
-                                                      self.eos_phase)
-            self.eos_vg = np.ones_like(self.eos_vl)
-            self.eos_gas_comp = np.zeros_like(self.eos_vl)
-
-        particle_diameters = np.zeros(self.thermo.nc)
-        particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
-        d_hs_reducing = particle_diameters[0]
-
-        # Store the bulk component densities (scaled)
-        self.bulk_densities = np.zeros(self.thermo.nc)
-        self.bulk_densities[:] = self.eos_liq_comp[:]/self.eos_vl
-        self.bulk_densities[:] *= NA*particle_diameters[0]**3
-        self.bulk_densities_g = np.zeros(self.thermo.nc)
-        self.bulk_densities_g[:] = self.eos_gas_comp[:]/self.eos_vg
-        self.bulk_densities_g[:] *= NA*particle_diameters[0]**3
-
-        # Other quantities
-        particle_diameters[:] /= particle_diameters[0]
-        temp_red = temperature / self.thermo.eps_div_kb[0]
-        grid_dr = domain_length / grid
-
-        # The dispersion term Phi and grid points around that
-        # Ø to M: Why is this not a "separate grid?, could end up being
-        # just two grid-points with few grid points?
-        self.phi_disp = phi_disp
-        self.Nbc = 2 * round(self.phi_disp *
-                             np.max(particle_diameters) / grid_dr)
-
-        # Calling now the real base class for 1D problems
-        cdft1D.__init__(self,
-                        bulk_densities=self.bulk_densities,
-                        bulk_densities_g=self.bulk_densities_g,
-                        particle_diameters=particle_diameters,
-                        wall=wall,
-                        domain_length=domain_length,
-                        functional="PC-SAFT",
-                        grid=grid,
-                        temperature=temp_red,
-                        thermopack=self.thermo)
-
-        # Reduced units
-        self.eps = self.thermo.eps_div_kb[0] * KB
-        self.sigma = d_hs_reducing
-
-        # Calculate reduced temperature
-        Tc, _, _ = self.thermo.critical(comp)
-        self.t_div_tc = temperature / Tc
-
-    def test_initial_vle_state(self):
-        """
-        """
-        # Test bulk differentials
-        self.functional.test_bulk_differentials(self.bulk_densities)
-        z_l = self.functional.bulk_compressibility(self.bulk_densities)
-        print("z_l", z_l)
-        z_g = self.functional.bulk_compressibility(self.bulk_densities_g)
-        print("z_g", z_g)
-        mu_l = self.functional.bulk_excess_chemical_potential(
-            self.bulk_densities) + np.log(self.bulk_densities)
-        mu_g = self.functional.bulk_excess_chemical_potential(
-            self.bulk_densities_g) + np.log(self.bulk_densities_g)
-        print("mu_l, mu_g, mu_l-mu_g", mu_l, mu_g, mu_l-mu_g)
-        P_g = z_g*np.sum(self.bulk_densities_g) * self.T
-        P_l = z_l*np.sum(self.bulk_densities) * self.T
-        print("P_l, P_g", P_l, P_g, P_l-P_g)
-
-    def test_grand_potential_bulk(self):
-        """
-        """
-        # Test grand potential in bulk phase
-        wdens = weighted_densities_pc_saft_1D(
-            1, self.functional.R, ms=self.thermo.m)
-        wdens.set_testing_values(rho=self.bulk_densities)
-        wdens.n1v[:] = 0.0
-        wdens.n2v[:] = 0.0
-        omega = self.grand_potential_bulk(wdens, Vext=0.0)
-        print("omega:", omega)
-        print("pressure + omega:", self.red_pressure + omega)
-
+        return self.comp_differentials[i].corr
 
 if __name__ == "__main__":
-    # cdft_tp = cdft_thermopack(model="PC-SAFT",
-    #                           comp_names="C1",
-    #                           comp=np.array([1.0]),
-    #                           temperature=100.0,
-    #                           pressure=0.0,
-    #                           bubble_point_pressure=True,
-    #                           domain_length=40.0,
-    #                           grid_dr=0.001)
-
-    # cdft_tp.test_initial_vle_state()
-    # cdft_tp.test_grand_potential_bulk()
-
-    # sys.exit()
-    cdft_tp = cdft_thermopack(model="SAFT-VRQ MIE",
-                              comp_names="H2",
-                              comp=np.array([1.0]),
-                              temperature=25.0,
-                              pressure=0.0,
-                              bubble_point_pressure=True,
-                              domain_length=40.0,
-                              grid_dr=0.001,
-                              kwthermoargs={"feynman_hibbs_order": 1,
-                                            "parameter_reference": "AASEN2019-FH1"})
-
-    cdft_tp.test_initial_vle_state()
-    cdft_tp.test_grand_potential_bulk()
-
-    cdft_tp.thermo.print_saft_parameters(1)
-
-    sys.exit()
-    from utility import density_from_packing_fraction
-    d = np.array([1.0, 3.0/5.0])
-    bulk_density = density_from_packing_fraction(
-        eta=np.array([0.3105, 0.0607]), d=d)
-    cdft1 = cdft1D(bulk_densities=bulk_density,
-                   particle_diameters=d,
-                   domain_length=40.0,
-                   functional="Rosenfeld",
-                   grid_dr=0.001,
-                   temperature=1.0,
-                   quadrature="None")
-    cdft1.test_grand_potential_bulk()
-
-    d = np.array([1.0])
-    bulk_density = density_from_packing_fraction(eta=np.array([0.2]), d=d)
-    # bulk_density = np.array([0.74590459])
-    cdft2 = cdft1D(bulk_densities=bulk_density,
-                   particle_diameters=d,
-                   domain_length=40.0,
-                   functional="WHITEBEAR",
-                   grid_dr=0.001,
-                   temperature=0.8664933679930681,
-                   quadrature="None")
-    cdft2.test_grand_potential_bulk()
+    pass

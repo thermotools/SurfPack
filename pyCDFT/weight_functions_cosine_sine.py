@@ -138,7 +138,7 @@ class planar_cosine_sine_weights(Weights):
         self.d3_delta=diff.d3-self.d3_inf
         self.d2eff_delta=diff.d2eff-self.d2eff_inf
         self.d2veff_delta=diff.d2veff-self.d2veff_inf
-   
+
         # Fourier transform of delta derivatives (sine and cosine)
         diff.fd3_cs[:] = dct(self.d3_delta, type=2)
         diff.fd2eff_cs[:] = dct(self.d2eff_delta, type=2)
@@ -152,12 +152,12 @@ class planar_cosine_sine_weights(Weights):
         # We must roll the vector to conform with the cosine transform
         diff.fd2veff_conv_cs_V[:]=np.roll(diff.fd2veff_conv_cs.copy(),1)
         diff.fd2veff_conv_cs_V[0]=0
-                
+
         # Transform from Fourier space to real space
         diff.d3_conv[:] = idct(diff.fd3_conv_cs, type=2)+self.d3_inf*self.w3_conv
         diff.d2eff_conv[:] = idct(diff.fd2eff_conv_cs, type=2)+self.d2eff_inf*self.w2_conv
         diff.d2veff_conv[:] = idct(diff.fd2veff_conv_cs_V, type=2)
- 
+
         diff.update_after_convolution()
 
     def analytical_fourier_weigths(self):

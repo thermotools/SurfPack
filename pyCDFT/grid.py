@@ -1,15 +1,6 @@
 #!/usr/bin/env python3
-from enum import Enum
-from dft_numerics import dft_solver
 import sys
 from constants import NA, KB, Geometry
-from weight_functions_cosine_sine import planar_weights_system_mc, \
-    planar_weights_system_mc_pc_saft
-from utility import packing_fraction_from_density, \
-    boundary_condition, densities, get_thermopack_model, \
-    weighted_densities_pc_saft_1D, get_initial_densities_vle, \
-    weighted_densities_1D
-import fmt_functionals
 import numpy as np
 import os
 import sys
@@ -164,15 +155,16 @@ class Bulk(object):
         Returns:
             None
         """
+        self.functional = functional
         self.left_state = left_state
         self.right_state = right_state
-        self.particle_diameters = left_state.eos.hard_sphere_diameters(left_state.temperature)
-        self.R = np.zeros_like(particle_diameters) # Particle radius (Reduced)
-        self.R[:] = 0.5*particle_diameters/particle_diameters[0]
+        self.particle_diameters = left_state.eos.hard_sphere_diameters(left_state.T)
+        self.R = np.zeros_like(self.particle_diameters) # Particle radius (Reduced)
+        self.R[:] = 0.5*self.particle_diameters/self.particle_diameters[0]
 
         # Temperature
-        self.temperature = left_state.temperature
-        self.beta = 1.0 / temperature
+        self.temperature = left_state.T
+        self.beta = 1.0 / self.temperature
         # Bulk density
         self.reduced_density_left = self.get_reduced_density(left_state.partial_density())
         self.reduced_density_right = self.get_reduced_density(right_state.partial_density())
@@ -180,14 +172,14 @@ class Bulk(object):
         self.bulk_fractions = self.reduced_density_left/np.sum(self.reduced_density_left)
 
         # Calculate reduced pressure and excess chemical potential
-        self.red_pressure = np.sum(self.reduced_density_right) * self.T * \
+        self.red_pressure = np.sum(self.reduced_density_right) * self.temperature * \
             functional.bulk_compressibility(self.reduced_density_right)
         # Extract normalized chemical potential (multiplied by beta) (mu/kbT)
         self.mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(
             self.reduced_density_right)
         self.mu_ig_scaled_beta = np.log(self.reduced_density_right)
         self.mu_scaled_beta = self.mu_ig_scaled_beta + self.mu_res_scaled_beta
-        self.real_mu = functional.thermo.chemical_potential(self.temperature, volume=1.0, n=left_state.partial_density())
+        self.real_mu = functional.thermo.chemical_potential_tv(self.temperature, volume=1.0, n=left_state.partial_density())
 
     def get_reduced_density(self, partial_density):
         """
@@ -262,24 +254,24 @@ class Grid(object):
         # FFT padding of grid
         self.padding = 0
         # Add boundary and padding to grid
-        self.N = self.N + 2 * self.n_bc + 2 * self.padding
-        self.end = self.N - self.n_bc - self.padding  # End of domain
+        self.N = self.n_grid + 2 * self.n_bc + 2 * self.padding
+        self.end = self.n_grid - self.n_bc - self.padding  # End of domain
 
         # Mask for inner domain
-        self.NiWall = self.N - self.end
+        self.NiWall = self.n_grid - self.end
         self.domain_mask = np.full(self.N, False, dtype=bool)
         self.domain_mask[self.NiWall:self.end] = True
         self.weight_mask = np.full(self.N, False, dtype=bool)
 
         # Mask for inner domain
-        self.NiWall = self.N - self.end
+        self.NiWall = self.n_grid - self.end
         self.domain_mask = np.full(self.N, False, dtype=bool)
         self.domain_mask[self.NiWall:self.end] = True
         self.weight_mask = np.full(self.N, False, dtype=bool)
 
         # Set up wall
-        self.NiWall_array_left = [self.NiWall] * self.nc
-        self.NiWall_array_right = [self.N - self.NiWall] * self.nc
+        # self.NiWall_array_left = [self.NiWall] * self.nc
+        # self.NiWall_array_right = [self.n_grid - self.NiWall] * self.nc
         self.left_boundary = None  # Handled in setup_wall
         self.right_boundary = None  # Handled in setup_wall
 
@@ -372,7 +364,7 @@ class Grid(object):
             self.z = domain_size*self.x0*np.exp(alpha*i)
         # Setting the edge grid
         self.z_edge = np.zeros(n_grid+1)
-        for i in range(1:n_grid+1):
+        for i in range(1,n_grid+1):
             self.z_edge = domain_size*np.exp(-alpha*(n_grid-i))
         # End correction factor
         k0 = np.exp(2*alpha)*(2*np.exp(alpha) + np.exp(2*alpha) - 1)/ \
@@ -392,7 +384,7 @@ class Grid(object):
         self.integration_weights = np.zeros(n_grid)
         self.integration_weights[0] = k0 * np.exp(2 * alpha)
         self.integration_weights[1] = (np.exp(2 * alpha) - k0) * np.exp(2 * alpha)
-        for i in range(2:n_grid):
+        for i in range(2,n_grid):
             self.integration_weights[i] = np.exp(2 * alpha * i) * (np.exp(2 * alpha) - 1.0)
         self.integration_weights *= np.exp(-2 * alpha * n_grid) * np.pi * domain_size**2
 
@@ -409,7 +401,7 @@ class Grid(object):
         #                 n_grid=n_grid)
 
         # Grid spacing
-        self.dr = self.domain_length / n_grid
+        self.dr = self.domain_size / n_grid
         # Grid
         self.z = np.linspace(0.5*self.dr, domain_size - 0.5*self.dr, n_grid)
         # Setting the edge grid
@@ -431,7 +423,7 @@ class Grid(object):
 
 
         # Grid spacing
-        self.dr = self.domain_length / n_grid
+        self.dr = self.domain_size / n_grid
         # Grid
         self.z = np.linspace(0.5*self.dr, domain_size - 0.5*self.dr, n_grid)
         # Setting the edge grid
@@ -504,13 +496,13 @@ class Profile(object):
             rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
         """
         z_centered = np.zeros_like(grid.z)
-        z_centered[:] = grid.z[:] - rel_dividing_surface*grid.domain_size
+        z_centered[:] = grid.z[:] - rel_pos_dividing_surface*grid.domain_size
 
         r_left = bulk.reduced_density_left
         r_right = bulk.reduced_density_right
         R = bulk.R
         n_comp = np.shape(r_right)[0]
-        dens = densities(n_comp, grid.n_grid)
+        dens = Densities(n_comp, grid.n_grid)
         for i in range(n_comp):
         #         rho0.densities[i][:] = 0.5*(rho_g[i] + rho_l[i]) + 0.5 * \
             #             (rho_l[i] - rho_g[i])*np.tanh(0.3*z[:]/R[i])
@@ -530,7 +522,7 @@ class Profile(object):
         """
         r = bulk.reduced_density_left
         n_comp = np.shape(r)[0]
-        dens = densities(n_comp, grid.n_grid)
+        dens = Densities(n_comp, grid.n_grid)
         dens.assign_components(r)
         if v_ext:
             for i in range(n_comp):
@@ -550,7 +542,7 @@ class Profile(object):
         r_right = bulk.reduced_density_right
         idx = grid.get_index_of_rel_pos(rel_pos_dividing_surface)
         n_comp = np.shape(r_right)[0]
-        dens = densities(n_comp, grid.n_grid)
+        dens = Densities(n_comp, grid.n_grid)
         for i in range(n_comp):
             dens[i][0:idx+1] = r_left[i]
             dens[i][idx+1:] = r_right[i]
@@ -564,7 +556,7 @@ class Profile(object):
             n_comp (int): Number of components.
             n_grid (int): Number of grid points.
         """
-        dens = densities(n_comp, n_grid)
+        dens = Densities(n_comp, n_grid)
         return Profile(dens)
 
     def copy_profile(self, prof):
@@ -573,6 +565,6 @@ class Profile(object):
         Args:
             prof (Profile): Exsisting profile
         """
-        self.dens = densities(prof.nc, prof.N)
+        self.dens = Densities(prof.nc, prof.N)
         self.dens.assign_elements(prof.densities)
 

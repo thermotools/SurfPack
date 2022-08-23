@@ -7,7 +7,7 @@ from scipy import optimize
 from fmt_functionals import bulk_weighted_densities
 from matplotlib.animation import FuncAnimation
 import ng_extrapolation
-from constants import DEBUG, LCOLORS, Geometry, Specification, Lenght_unit
+from constants import DEBUG, LCOLORS, Geometry, Specification, LenghtUnit
 from utility import boundary_condition, density_from_packing_fraction, \
     get_data_container, plot_data_container, \
     quadratic_polynomial, densities
@@ -679,7 +679,7 @@ class picard_geometry_solver():
                                           xlim=None,
                                           ylim=None,
                                           plot_equimolar_surface=False,
-                                          unit=Lenght_unit.REDUCED):
+                                          unit=LenghtUnit.REDUCED):
         """
         Plot equilibrium density profile
         Args:
