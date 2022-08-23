@@ -121,7 +121,7 @@ class picard_geometry_solver():
         self.tolerance = 1.0e-12
         self.print_frequency = 50
         self.maximum_iterations = 10000000
-        self.do_plot = True
+        self.do_plot = False
         self.do_exp_mu = True
 
     def picard_density(self, mix_densities, alpha, new_densities=None, old_densities=None):
@@ -252,14 +252,13 @@ class picard_geometry_solver():
                 exp_beta_mu = np.zeros(self.cDFT.nc)
                 exp_beta_mu[:] = xvec[n_rho:n_rho + self.cDFT.nc]
                 beta_mu[:] = np.log(exp_beta_mu[:])
-                print(beta_mu[:])
             else:
                 beta_mu[:] = xvec[n_rho:n_rho + self.cDFT.nc]
                 exp_beta_mu = np.zeros(self.cDFT.nc)
                 exp_beta_mu[:] = np.exp(beta_mu[:])
             exp_beta_mu_grid = np.zeros(self.cDFT.nc)
             integrals = self.cDFT.integrate_df_vext()
-            print("integrals",integrals)
+            #print("integrals",integrals)
             denum = np.dot(exp_beta_mu, integrals)
             exp_beta_mu_grid[:] = self.Ntot * exp_beta_mu / denum
             beta_mu_grid = np.zeros(self.cDFT.nc)
@@ -310,7 +309,7 @@ class picard_geometry_solver():
             #print("beta_mu[:]",beta_mu[:])
             if self.do_exp_mu:
                 res[n_rho:] = exp_beta_mu - exp_beta_mu_grid
-                print("exp_beta_mu,exp_beta_mu_grid",exp_beta_mu,exp_beta_mu_grid,res[n_rho:])
+                #print("exp_beta_mu,exp_beta_mu_grid",exp_beta_mu,exp_beta_mu_grid,res[n_rho:])
             else:
                 res[n_rho:] = beta_mu - beta_mu_grid
             #print("exp_beta_mu, exp_mu_grid",exp_beta_mu, exp_beta_mu_grid)
@@ -318,16 +317,16 @@ class picard_geometry_solver():
             #print("Ntot",self.cDFT.calculate_total_mass(self.mod_densities))
             #sys.exit()
 
-        fig, ax = plt.subplots(1, 1)
-        ax.set_xlabel("$z/d_{11}$")
-        ax.set_ylabel(r"res")
-        for i in range(self.mod_densities.nc):
-            ax.plot(res[:],
-                    lw=2, color=LCOLORS[i], label=f"res")
-            leg = plt.legend(loc="best", numpoints=1)
-            leg.get_frame().set_linewidth(0.0)
-            plt.grid()
-            plt.show()
+        # fig, ax = plt.subplots(1, 1)
+        # ax.set_xlabel("$z/d_{11}$")
+        # ax.set_ylabel(r"res")
+        # for i in range(self.mod_densities.nc):
+        #     ax.plot(res[:],
+        #             lw=2, color=LCOLORS[i], label=f"res")
+        #     leg = plt.legend(loc="best", numpoints=1)
+        #     leg.get_frame().set_linewidth(0.0)
+        #     plt.grid()
+        #     plt.show()
 
         return res
 
@@ -689,10 +688,10 @@ class picard_geometry_solver():
             self.print_perform_minimization_message()
             return
         fig, ax = plt.subplots(1, 1)
-        if unit==Lenght_unit.REDUCED:
+        if unit==LenghtUnit.REDUCED:
             ax.set_xlabel("$z/d_{11}$")
             len_fac = 1.0
-        elif unit==Lenght_unit.ANGSTROM:
+        elif unit==LenghtUnit.ANGSTROM:
             ax.set_xlabel("$z$ (Å)")
             len_fac = self.cDFT.sigma*1e10
         ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
