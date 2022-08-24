@@ -480,12 +480,10 @@ class Convolver(object):
             # Calculate one-particle correlation
             self.comp_differentials[i].update_after_convolution()
 
-        #print("d2eff",self.comp_differentials[0].d_conv["w2"])
-        # print("d2 corr",self.comp_differentials[0].corr_contribution["w2"])
+        # print("d2eff",self.comp_differentials[0].d_conv["w2"])
         # print("d3",self.comp_differentials[0].d_conv["w3"])
-        # print("d2v",self.comp_differentials[0].d_conv["wv2"])
-        # self.comp_differentials[i].d_conv[wf]
-        # print("corr", self.correlation(0))
+        # print("d2veff",self.comp_differentials[0].d_conv["wv2"])
+        # print("d_disp",self.comp_differentials[0].d_conv["w_disp"])
 
 
     def correlation(self, i):

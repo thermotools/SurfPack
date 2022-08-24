@@ -32,7 +32,7 @@ class pc_saft(Whitebear):
         # Add normalized theta weight
         self.mu_disp = np.zeros((N, pcs.nc))
         self.disp_name = "w_disp"
-        self.wf.add_norm_theta_weight(self.disp_name, kernel_radius=phi_disp)
+        self.wf.add_norm_theta_weight(self.disp_name, kernel_radius=2*phi_disp)
         self.diff[self.disp_name] = self.mu_disp
 
     def excess_free_energy(self, dens):

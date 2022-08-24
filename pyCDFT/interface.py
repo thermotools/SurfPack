@@ -9,6 +9,7 @@ from pcsaft_functional import pc_saft
 import numpy as np
 import os
 import sys
+import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from grid import Grid
 
@@ -49,7 +50,7 @@ class Interface(object):
         self.v_ext = np.zeros((self.functional.nc, self.grid.n_grid))
         self.bulk = None
         self.specification = specification
-        self.Ntot = None
+        self.n_tot = None
         self.do_exp_mu = True
         self.convolver = None
         self.n_tot = None
@@ -80,13 +81,14 @@ class Interface(object):
         if self.specification == Specification.NUMBER_OF_MOLES:
             # Convolution integrals for densities
             self.convolver.convolve_density_profile(self.profile.densities)
+            #print("corr", self.convolver.correlation(0))
             integrals = self.integrate_df_vext()
             # #denum = np.dot(exp_beta_mu, integrals)
             #print("integrals",integrals)
             exp_mu = self.n_tot / integrals
             #print("exp_mu",exp_mu)
             #self.cDFT.mu_scaled_beta[:] = np.log(0.02276177)
-            exp_mu = np.exp(self.bulk.mu_scaled_beta)
+            #exp_mu = np.exp(self.bulk.mu_scaled_beta)
             if self.do_exp_mu:
                 xvec[n_rho:n_rho + n_c] = exp_mu
             else:
@@ -107,7 +109,7 @@ class Interface(object):
                 exp_beta_mu = np.zeros(n_c)
                 exp_beta_mu[:] = xvec[n_rho:n_rho + n_c]
                 beta_mu[:] = np.log(exp_beta_mu[:])
-                print(beta_mu[:])
+                #print(beta_mu[:])
             else:
                 beta_mu[:] = xvec[n_rho:n_rho + n_c]
                 exp_beta_mu = np.zeros(n_c)
@@ -116,10 +118,10 @@ class Interface(object):
             integrals = self.integrate_df_vext()
             #print("integrals",integrals)
             denum = np.dot(exp_beta_mu, integrals)
-            exp_beta_mu_grid[:] = self.Ntot * exp_beta_mu / denum
+            exp_beta_mu_grid[:] = self.n_tot * exp_beta_mu / denum
             beta_mu_grid = np.zeros(n_c)
             beta_mu_grid[:] = np.log(exp_beta_mu_grid[:])
-            if self.geometry is Geometry.PLANAR:
+            if self.grid.geometry is Geometry.PLANAR:
                 # We know the chemical potential - use it
                 beta_mu[:] = self.bulk.mu_scaled_beta[:]
         else:
@@ -152,7 +154,7 @@ class Interface(object):
             print("Interface need to be initialized before calling solve")
         else:
             self.n_tot = self.calculate_total_mass()
-            #print("n_tot", self.n_tot)
+            print("n_tot", self.n_tot)
             # Set up convolver
             self.convolver = Convolver(self.grid, self.functional, self.bulk.R)
             x0 = self.pack_x_vec()
@@ -328,28 +330,32 @@ class Interface(object):
         """
         mu = self.bulk.real_mu
 
-        rho_1 = self.profile.densities[i][1]
+        rho_1 = np.zeros_like(mu)
+        rho_2 = np.zeros_like(mu)
+        for i in range(self.functional.nc):
+            rho_1[i] = self.profile.densities[i][1]
+            rho_2[i] = self.profile.densities[i][-2]
+
         rho_1_real = self.bulk.get_real_density(rho_1)
-        rho_1_real = self.functinal.thermo.solve_mu_t(self.temperature, mu, rho_initial=rho_1_real)
+        rho_1_real = self.functional.thermo.solve_mu_t(self.bulk.temperature, mu, rho_initial=rho_1_real)
         rho_1 = self.bulk.get_reduced_density(rho_1_real)
         rho1 = np.sum(rho_1)
 
-        rho_2 = self.profile.densities[i][-2]
         rho_2_real = self.bulk.get_real_density(rho_2)
-        rho_2_real = self.functinal.thermo.solve_mu_t(self.temperature, mu, rho_initial=rho_2_real)
+        rho_2_real = self.functional.thermo.solve_mu_t(self.bulk.temperature, mu, rho_initial=rho_2_real)
         rho_2 = self.bulk.get_reduced_density(rho_2_real)
         rho2 = np.sum(rho_2)
 
         N = self.calculate_total_mass()
-        if self.geometry == Geometry.PLANAR:
+        if self.grid.geometry == Geometry.PLANAR:
             V = self.grid.domain_length
             prefac = 1.0
             exponent = 1.0
-        elif self.geometry == Geometry.SPHERICAL:
+        elif self.grid.geometry == Geometry.SPHERICAL:
             prefac = 4*np.pi/3
             V = prefac*self.grid.domain_length**3
             exponent = 1.0/3.0
-        elif self.geometry == Geometry.POLAR:
+        elif self.grid.geometry == Geometry.POLAR:
             prefac = np.pi
             V = self.grid.domain_length**2
             exponent = 0.5
@@ -404,22 +410,23 @@ class Interface(object):
             self.print_perform_minimization_message()
             return
         fig, ax = plt.subplots(1, 1)
-        if unit==Lenght_unit.REDUCED:
+        if unit==LenghtUnit.REDUCED:
             ax.set_xlabel("$z/d_{11}$")
             len_fac = 1.0
         elif unit==Lenght_unit.ANGSTROM:
             ax.set_xlabel("$z$ (Å)")
             len_fac = self.cDFT.sigma*1e10
-        des_fac = np.ones(self.profiles.densities.nc)
+        des_fac = np.ones(self.profile.densities.nc)
         if plot_actual_densities:
             des_fac *= 1.0e-3
             ax.set_ylabel(r"$\rho$ (kmol/m$**3$)")
         else:
-            des_fac /= self.bulk.bulk_densities
+            des_fac /= max(self.bulk.reduced_density_left,
+                           self.bulk.reduced_density_right)
             ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
-        for i in range(self.profiles.densities.nc):
-            ax.plot(self.grid.r[:]*len_fac,
-                    self.profile.densities[i][:] * dens_fac[i],
+        for i in range(self.profile.densities.nc):
+            ax.plot(self.grid.z[:]*len_fac,
+                    self.profile.densities[i][:] * des_fac[i],
                     lw=2, color="k", label=f"cDFT comp. {i+1}")
         if data_dict is not None:
             plot_data_container(data_dict, ax)
