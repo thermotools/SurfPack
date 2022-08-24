@@ -39,6 +39,7 @@ class WeightFunction(object):
         self.convolve = convolve
         self.calc_from = calc_from
         # For transformations
+        self.prefactor_evaluated = None
         self.R = None
         self.fw = None
         self.w_conv_steady = None
@@ -48,6 +49,8 @@ class WeightFunction(object):
         self.k_sin_R = None
         self.one_div_r = None
         self.r = None
+        self.geometry = None
+        self.fn = None
 
     @staticmethod
     def Copy(Other):
@@ -67,12 +70,15 @@ class WeightFunction(object):
         """
         """
         self.R = R
+        self.geometry = grid.geometry
+        self.fn = np.zeros(grid.n_grid)
+        self.prefactor_evaluated = self.prefactor(R)
         if self.convolve:
-            if grid.geometry == Geometry.PLANAR:
+            if self.geometry == Geometry.PLANAR:
                 self.generate_planar_fourier_weights(grid, R)
-            elif grid.geometry == Geometry.SPHERICAL:
+            elif self.geometry == Geometry.SPHERICAL:
                 self.generate_spherical_fourier_weights(grid, R)
-            elif grid.geometry == Geometry.POLAR:
+            elif self.geometry == Geometry.POLAR:
                 self.generate_polar_fourier_weights(grid, R)
 
     def generate_planar_fourier_weights(self, grid, R):
@@ -159,11 +165,11 @@ class WeightFunction(object):
 
         """
         if self.convolve:
-            if grid.geometry == Geometry.PLANAR:
+            if self.geometry == Geometry.PLANAR:
                 self.planar_convolution(rho_inf, frho_delta, weighted_density)
-            elif grid.geometry == Geometry.SPHERICAL:
+            elif self.geometry == Geometry.SPHERICAL:
                 self.spherical_convolution(rho_inf, frho_delta, weighted_density)
-            elif grid.geometry == Geometry.POLAR:
+            elif self.geometry == Geometry.POLAR:
                 self.polar_convolution(rho_inf, frho_delta, weighted_density)
 
     def update_dependencies(self, weighted_densities):
@@ -175,8 +181,7 @@ class WeightFunction(object):
 
         """
         if not self.convolve:
-            prefactor = self.prefactor(self.R)
-            weighted_densities[self.alias][:] = prefactor*weighted_densities[self.calc_from][:]
+            weighted_densities[self.alias][:] = self.prefactor_evaluated*weighted_densities[self.calc_from][:]
 
     def planar_convolution(self, rho_inf: float, frho_delta: np.ndarray, weighted_density: np.ndarray):
         """
@@ -191,13 +196,13 @@ class WeightFunction(object):
             # Fourier transfor only the rho_delta (the other term is done analytically)
             #self.frho_delta[:] = dct(self.rho_delta, type=2)
             frho_delta_V = np.roll(frho_delta.copy(), -1) # Fourier transform of density profile for `k_sin`
-            self.frho_delta_V[-1] = 0                                     # this information is lost but usually not important
+            frho_delta_V[-1] = 0                          # this information is lost but usually not important
             # Vector 2d weighted density (Sine transform)
             self.fn[:] = frho_delta_V[:] * self.fw[:]
-            weighted_density[:] = idst(densities.fn2v_delta_cs, type=2)
+            weighted_density[:] = idst(self.fn, type=2)
         else:
             # Cosine transform
-            self.fn[:] = self.frho_delta[:] * self.fw[:]
+            self.fn[:] = frho_delta[:] * self.fw[:]
             weighted_density[:] = idct(self.fn, type=2) + rho_inf*self.w_conv_steady
 
     def planar_convolution_differentials(self, diff: np.ndarray, diff_conv: np.ndarray):
@@ -212,13 +217,13 @@ class WeightFunction(object):
         d_delta = np.zeros_like(diff)
         d_delta[:] = diff[:] - d_inf
         if self.wf_type == WeightFunctionType.DELTAVEC:
-            fd_delta = dst(self.d2veff_delta, type=2)       # The vector valued function is odd
+            fd_delta = dst(d_delta, type=2)       # The vector valued function is odd
             self.fn[:] = fd_delta[:] * self.fw[:]
             # We must roll the vector to conform with the cosine transform
             self.fn = np.roll(self.fn, 1)
             self.fn[0] = 0
         else:
-            fd_delta = dct(self.d_delta, type=2)
+            fd_delta = dct(d_delta, type=2)
             self.fn[:] = fd_delta[:] * self.fw[:]
 
         diff_conv[:] = idct(self.fn, type=2) + d_inf*self.w_conv_steady
@@ -291,11 +296,11 @@ class WeightFunction(object):
 
         """
         if self.convolve:
-            if grid.geometry == Geometry.PLANAR:
+            if self.geometry == Geometry.PLANAR:
                 self.planar_convolution_differentials(diff, conv_diff)
-            elif grid.geometry == Geometry.SPHERICAL:
+            elif self.geometry == Geometry.SPHERICAL:
                 self.spherical_convolution_differentials(diff, conv_diff)
-            elif grid.geometry == Geometry.POLAR:
+            elif self.geometry == Geometry.POLAR:
                 self.polar_convolution_differentials(diff, conv_diff)
 
 class WeightFunctions(object):
@@ -1064,9 +1069,9 @@ class pc_saft(Whitebear):
         self.short_name = "PC"
         # Add normalized theta weight
         self.mu_disp = np.zeros((N, pcs.nc))
-        disp_name = "w_disp"
-        self.wf.add_norm_theta_weight(disp_name, kernel_radius=phi_disp)
-        self.diff[disp_name] = self.mu_disp
+        self.disp_name = "w_disp"
+        self.wf.add_norm_theta_weight(self.disp_name, kernel_radius=phi_disp)
+        self.diff[self.disp_name] = self.mu_disp
 
     def excess_free_energy(self, dens):
         """

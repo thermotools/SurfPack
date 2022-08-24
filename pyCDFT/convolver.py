@@ -232,7 +232,7 @@ class CompWeightedDifferentials():
     """
     """
 
-    def __init__(self, n_grid: int, wfs: WeightFunctions, ms: float, R: float):
+    def __init__(self, n_grid: int, wfs: WeightFunctions, ms: float):
         """
 
         Args:
@@ -261,16 +261,14 @@ class CompWeightedDifferentials():
         # self.d_conv["w3"] = self.d3_conv
         # self.d_conv["w2eff"] = self.d2eff_conv
         # self.d_conv["wv2eff"] = self.d2veff_conv
-        self.d_conv = {}
+        self.d_conv = {} # Effective results
+        self.d_eff = np.zeros(n_grid)
 
         # Additional differentials
         self.d = {}
-        self.corr_contribution = {}
         for wf in wfs:
-            print("wf: ", wf)
             alias = wfs[wf].alias
-            self.corr_contribution[alias] = wfs.get_correlation_factor(alias, R)
-            if self.corr_contribution[alias] > 0.0:
+            if wfs[wf].convolve > 0.0:
                 self.d_conv[alias] = np.zeros(n_grid)
             else:
                 self.d_conv[alias] = None
@@ -294,6 +292,18 @@ class CompWeightedDifferentials():
         # One - body direct correlation function
         self.corr = np.zeros(n_grid)
 
+    def d_effective(self, wf):
+        """
+
+        Returns:
+        """
+        assert self.wfs[wf].convolve
+        self.d_eff[:] = self.d[wf][:]
+        for wfi in self.wfs:
+            if not self.wfs[wfi].convolve and self.wfs[wfi].calc_from == wf:
+                self.d_eff[:] += self.wfs[wfi].prefactor_evaluated*self.d[wfi][:]
+        return self.d_eff
+
     def update_after_convolution(self):
         """
 
@@ -301,9 +311,8 @@ class CompWeightedDifferentials():
         """
         self.corr.fill(0.0)
         for wf in self.wfs:
-            alias = self.wfs[wf].alias
-            if self.corr_contribution[alias] > 0.0:
-                self.corr[:] -= self.corr_contribution[alias]*self.d_conv[alias][:]
+            if self.wfs[wf].convolve:
+                self.corr[:] -= self.d_conv[wf][:]
 
     def set_functional_differentials(self, functional, ic):
         """
@@ -404,12 +413,13 @@ class Convolver(object):
         self.comp_differentials = []
         self.comp_wfs = []
         for i in range(functional.thermo.nc):
-            self.comp_weighted_densities.append(WeightedDensities(n_grid=grid.n_grid, wfs=functional.wf, ms=functional.thermo.m[i]))
-            self.comp_differentials.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=functional.wf, ms=functional.thermo.m[i], R=R[i]))
             self.comp_wfs.append(WeightFunctions.Copy(functional.wf))
             # Set up Fourier weights
             for wfun in self.comp_wfs[i]:
                 self.comp_wfs[i][wfun].generate_fourier_weights(grid, R[i])
+            self.comp_weighted_densities.append(WeightedDensities(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
+            self.comp_differentials.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
+
 
         # Overall weighted densities
         self.weighted_densities = WeightedDensitiesMaster(n_grid=grid.n_grid, wfs=functional.wf, nc=functional.thermo.nc)
@@ -464,12 +474,13 @@ class Convolver(object):
                 self.functional, i)
             # Loop all weight functions
             for wf in self.comp_wfs[i]:
-                self.comp_wfs[i][wf].convolve_differentials(self.comp_differentials[i].d[wf],
-                                                            self.comp_differentials[i].d_conv[wf])
+                if self.comp_wfs[i][wf].convolve:
+                    self.comp_wfs[i][wf].convolve_differentials(self.comp_differentials[i].d_effective(wf),
+                                                                self.comp_differentials[i].d_conv[wf])
             # Calculate one-particle correlation
             self.comp_differentials[i].update_after_convolution()
 
-        # print("d2eff",self.comp_differentials[0].d_conv["w2"]*self.comp_differentials[0].corr_contribution["w2"])
+        #print("d2eff",self.comp_differentials[0].d_conv["w2"])
         # print("d2 corr",self.comp_differentials[0].corr_contribution["w2"])
         # print("d3",self.comp_differentials[0].d_conv["w3"])
         # print("d2v",self.comp_differentials[0].d_conv["wv2"])

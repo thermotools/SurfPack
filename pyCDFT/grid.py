@@ -497,7 +497,6 @@ class Profile(object):
         """
         z_centered = np.zeros_like(grid.z)
         z_centered[:] = grid.z[:] - rel_pos_dividing_surface*grid.domain_size
-
         r_left = bulk.reduced_density_left
         r_right = bulk.reduced_density_right
         R = bulk.R
