@@ -454,7 +454,7 @@ class Grid(object):
         # Defining integration weights
         self.integration_weights = np.zeros(n_grid)
         for k in range(n_grid):
-            self.integration_weights[k] = 4.0*np.pi/3.0*dr**3*(3*k**2 + 3*k + 1)
+            self.integration_weights[k] = 4.0*np.pi/3.0*self.dr**3*(3*k**2 + 3*k + 1)
 
     @staticmethod
     def Planar(domain_size=15.0,

@@ -4,7 +4,8 @@ import sys
 from constants import NA, KB, Geometry, Specification, LenghtUnit
 from grid import Grid, Bulk, Profile
 from convolver import Convolver
-from pyctp import pcsaft
+from pyctp.pcsaft import pcsaft
+from pyctp.thermopack_state import state, equilibrium
 from pcsaft_functional import pc_saft
 import numpy as np
 import os
@@ -37,7 +38,7 @@ class Interface(object):
             None
         """
         # Create functional
-        if isinstance(thermopack, pcsaft.pcsaft):
+        if isinstance(thermopack, pcsaft):
             t_red = temperature/thermopack.eps_div_kb[0]
             self.functional = pc_saft(n_grid, thermopack, t_red)
         else:
@@ -173,6 +174,7 @@ class Interface(object):
                 self.bulk.update_bulk_densities(rho_left, rho_right)
             else:
                 print("Interface solver did not converge")
+        return self
 
 
     def tanh_profile(self, vle, t_crit, rel_pos_dividing_surface=0.5, invert_states=False):
@@ -310,17 +312,6 @@ class Interface(object):
                 np.exp(self.convolver.correlation(ic)[:]
                        - self.bulk.beta * self.v_ext[ic][:]))
         return integral
-
-
-    # def test_laplace(self, dens, sigma0):
-    #     """
-    #     Calculates the integral of exp(-beta(df+Vext)).
-
-    #     Returns:
-    #         (float): Integral (-)
-    #     """
-    #     #
-    #     return 0.0
 
     def get_equimolar_dividing_surface(self):
         """
@@ -494,7 +485,7 @@ class PlanarInterface(Interface):
                  domain_size=100.0,
                  n_grid=1024,
                  specification = Specification.NUMBER_OF_MOLES):
-        """Class holding specifications for an interface calculation
+        """Class holding specifications for an interface calculation of a planar geometry
 
         Args:
             thermopack (thermo): Thermopack instance
@@ -537,6 +528,136 @@ class PlanarInterface(Interface):
                          rel_pos_dividing_surface=rel_pos_dividing_surface,
                          invert_states=invert_states)
         return pif
+
+class SphericalInterface(Interface):
+    """
+    Utility class for simplifying specification of SPHERICAL interface
+    """
+
+    def __init__(self,
+                 thermopack,
+                 temperature,
+                 radius,
+                 domain_radius=100.0,
+                 n_grid=1024,
+                 specification = Specification.NUMBER_OF_MOLES):
+        """Class holding specifications for an interface calculation of a spherical geometry
+
+        Args:
+            thermopack (thermo): Thermopack instance
+            temperature (float): Temperature (K)
+            domain_size (float, optional): Sisze of domain. Defaults to 100.0.
+            n_grid (int, optional): Number of grid points. Defaults to 1024.
+            specification (Specification, optional): Override how system of equations are solved
+        Returns:
+            None
+        """
+        Interface.__init__(self,
+                           Geometry.SPHERICAL,
+                           thermopack=thermopack,
+                           temperature=temperature,
+                           domain_size=domain_radius,
+                           n_grid=n_grid,
+                           specification = specification)
+        self.raduis = radius
+
+    @staticmethod
+    def from_tanh_profile(vle,
+                          t_crit,
+                          radius,
+                          domain_radius=100.0,
+                          n_grid=1024,
+                          calculate_bubble=True,
+                          sigma0=None):
+        """
+        Initialize tangens hyperbolicus profile
+
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
+        Returns:
+            (float): Grand potential
+            (array): Grand potential contribution for each grid point
+        """
+        sif = SphericalInterface(thermopack=vle.eos,
+                                 temperature=vle.temperature,
+                                 radius=radius,
+                                 domain_radius=domain_radius,
+                                 n_grid=n_grid)
+        if not sigma0:
+            # Calculate planar surface tension
+            sigma0 = sif.tanh_profile(vle,
+                                      t_crit=t_crit,
+                                      rel_pos_dividing_surface=0.5).solve().surface_tension_real_units()
+        sif.sigma0 = sigma0
+        print(sigma0)
+        # Extrapolate sigma 0
+        phase = sif.functional.thermo.LIQPH if calculate_bubble else sif.functional.thermo.VAPPH
+        print(phase)
+        real_radius = radius * sif.functional.d_hs[0]
+        print(real_radius)
+        print(vle.vapor.rho,vle.liquid.rho)
+        # Extrapolate chemical potential to first order and solve for phase densiteis
+        mu, rho_l, rho_g = \
+            sif.functional.thermo.extrapolate_mu_in_inverse_radius(sigma_0=sigma0,
+                                                                    temp=vle.temperature,
+                                                                    rho_l=vle.liquid.rho,
+                                                                    rho_g=vle.vapor.rho,
+                                                                    radius=real_radius,
+                                                                    geometry="SPHERICAL",
+                                                                    phase=phase)
+        # Solve Laplace Extrapolate chemical potential to first order and solve for phase densiteis
+        mu, rho_l, rho_g = \
+            sif.functional.thermo.solve_laplace(sigma_0=sigma0,
+                                                temp=vle.temperature,
+                                                rho_l=rho_l,
+                                                rho_g=rho_g,
+                                                radius=real_radius,
+                                                geometry="SPHERICAL",
+                                                phase=phase)
+
+        rel_pos_dividing_surface = radius/domain_radius
+        vapor = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
+        liquid = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
+        vle_modified = equilibrium(vapor, liquid)
+        # Set profile based on modefied densities
+        sif.tanh_profile(vle=vle_modified,
+                         t_crit=t_crit,
+                         rel_pos_dividing_surface=rel_pos_dividing_surface,
+                         invert_states=not calculate_bubble)
+        return sif
+
+    # def test_laplace(self, dens, sigma0):
+    #     """
+    #     Calculates the integral of exp(-beta(df+Vext)).
+
+    #     Returns:
+    #         (float): Integral (-)
+    #     """
+    #     R = self.get_equimolar_dividing_surface(dens)
+
+    #     rho1 = np.zeros(self.nc)
+    #     rho2 = np.zeros(self.nc)
+    #     for i in range(self.nc):
+    #         rho1[i] = dens[i][1]
+    #         rho2[i] = dens[i][-2]
+    #     print("rho1",rho1)
+    #     print("rho2",rho2)
+
+    #     rho1 *= 1.0/(NA*self.functional.d_hs[0]**3)
+    #     rho_mix = np.sum(rho1)
+    #     V = 1.0/rho_mix
+    #     n = rho1/rho_mix
+    #     P1, = self.thermo.pressure_tv(self.functional.T, V, n)
+
+    #     rho2 *= 1.0/(NA*self.functional.d_hs[0]**3)
+    #     rho_mix = np.sum(rho2)
+    #     V = 1.0/rho_mix
+    #     n = rho2/rho_mix
+    #     P2, = self.thermo.pressure_tv(self.functional.T, V, n)
+    #     print("P1, P2", P1*1e-6, P2*1e-6)
+    #     R_m = R*self.functional.d_hs[0]
+    #     print("R_m",R_m)
+    #     print(P1-P2,2*sigma0/R_m, (P1-P2 - 2*sigma0/R_m)/(P1-P2))
+    #     return R
 
 if __name__ == "__main__":
     pass
