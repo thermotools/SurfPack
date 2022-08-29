@@ -348,9 +348,23 @@ class picard_geometry_solver():
         if self.specification == Specification.NUMBER_OF_MOLES:
             # Convolution integrals for densities
             self.cDFT.weights_system.convolutions(self.mod_densities)
+            # print("n0",self.cDFT.weights_system.comp_weighted_densities[0].n0)
+            # print("n1",self.cDFT.weights_system.comp_weighted_densities[0].n1)
+            # print("n2",self.cDFT.weights_system.comp_weighted_densities[0].n2)
+            # print("n3",self.cDFT.weights_system.comp_weighted_densities[0].n3)
+            # print("n1v",self.cDFT.weights_system.comp_weighted_densities[0].n1v)
+            # print("n2v",self.cDFT.weights_system.comp_weighted_densities[0].n2v)
+            # print("n_disp",self.cDFT.weights_system.comp_weighted_densities[0].rho_disp)
+
             # Calculate one-body direct correlation function
             self.cDFT.weights_system.correlation_convolution()
+            # print("d2eff",self.cDFT.weights_system.comp_differentials[0].d2eff_conv)
+            # print("d3",self.cDFT.weights_system.comp_differentials[0].d3_conv)
+            # print("d2veff",self.cDFT.weights_system.comp_differentials[0].d2veff_conv)
+            # print("d_disp",self.cDFT.weights_system.comp_differentials[0].mu_disp_conv)
+
             integrals = self.cDFT.integrate_df_vext()
+            # print("integrals",integrals)
             #denum = np.dot(exp_beta_mu, integrals)
             exp_mu = self.Ntot / integrals
 
@@ -366,6 +380,9 @@ class picard_geometry_solver():
             #print(np.exp(self.cDFT.mu_scaled_beta))
             #print("exp_mu", exp_mu, np.exp(self.cDFT.mu_scaled_beta))
             #xvec[n_rho:n_rho + self.cDFT.nc] = np.exp(self.cDFT.mu_scaled_beta)
+
+        # print("x0:", xvec)
+        # sys.exit()
 
 
         if use_scipy:
@@ -411,6 +428,7 @@ class picard_geometry_solver():
             # Calculate one-body direct correlation function
             self.cDFT.weights_system.correlation_convolution()
             integrals = self.cDFT.integrate_df_vext()
+            print("integrals",integrals)
             #denum = np.dot(exp_beta_mu, integrals)
             exp_mu = self.Ntot / integrals
             if self.do_exp_mu:

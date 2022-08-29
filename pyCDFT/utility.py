@@ -280,7 +280,7 @@ class weighted_densities_1D():
             ms:
             mask_conv_results:
         """
-        self.N = N
+        self.n_grid = N
         self.R = R
         self.ms = ms
         self.n0 = np.zeros(N)
@@ -394,7 +394,7 @@ class weighted_densities_1D():
             self.n1[:] = 2.0
             self.n1v[:] = 5.0
 
-        self.N = 1
+        self.n_grid = 1
         self.R = 0.5
         self.update_utility_variables()
 

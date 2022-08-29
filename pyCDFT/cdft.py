@@ -379,7 +379,6 @@ class cdft1D:
         """
 
         _, omega_a = self.grand_potential(dens, update_convolutions)
-        
         omega_a += self.red_pressure * self.integration_weights
         for i in range(self.nc):
             omega_a[self.boundary_mask[i]] = 0.0  # Don't include wall
@@ -457,6 +456,7 @@ class cdft1D:
         # plt.show()
         # self.hist[:] = self.weights_system.comp_differentials[0].d3_conv[self.domain_mask]
 
+        #print("corr", self.weights_system.comp_differentials[0].corr[self.domain_mask])
         integral = np.zeros(self.nc)
         for ic in range(self.nc):
             integral[ic] = np.sum(self.integration_weights*(
@@ -578,8 +578,7 @@ class cdft_thermopack(cdft1D):
             self.eos_gas_comp = np.zeros_like(self.eos_liq_comp)
             self.eos_gas_comp[:] = self.eos_liq_comp[:]
 
-        particle_diameters = np.zeros(self.thermo.nc)
-        particle_diameters[:] = self.thermo.hard_sphere_diameters(temperature)
+        particle_diameters, particle_diameters_dT = self.thermo.hard_sphere_diameters(temperature)
         d_hs_reducing = particle_diameters[0]
 
         # Store the bulk component densities (scaled)

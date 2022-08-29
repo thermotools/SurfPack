@@ -21,9 +21,7 @@ class pc_saft(Whitebear):
         self.thermo = pcs
         self.T_red = T_red
         self.T = self.T_red * self.thermo.eps_div_kb[0]
-        self.d_hs = np.zeros(pcs.nc)
-        for i in range(pcs.nc):
-            self.d_hs[i] = pcs.hard_sphere_diameters(self.T)
+        self.d_hs, self.d_T_hs = pcs.hard_sphere_diameters(self.T)
         R = np.zeros(pcs.nc)
         R[:] = 0.5*self.d_hs[:]/self.d_hs[0]
         Whitebear.__init__(self, N, R)
@@ -50,7 +48,7 @@ class pc_saft(Whitebear):
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(len(f)):
-            rho_thermo[:] = dens.rho_disp_array[:, i]
+            rho_thermo[:] = dens.n[self.disp_name][:, i]
             rho_mix = np.sum(rho_thermo)
             rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
             a, = self.thermo.a_dispersion(self.T, V, rho_thermo)
@@ -82,7 +80,7 @@ class pc_saft(Whitebear):
         #non_prdm = np.invert(prdm)
         rho_thermo = np.zeros(self.nc)
         V = 1.0
-        for i in range(self.N):
+        for i in range(self.n_grid):
         #   if prdm[i]:
             rho_thermo[:] = dens.n[self.disp_name][:, i]
             rho_thermo *= 1.0/(NA*self.d_hs[0]**3)

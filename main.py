@@ -14,27 +14,27 @@ from pyCDFT.fmt_functionals import bulk_weighted_densities
 from pyCDFT.geometry_solvers import picard_geometry_solver
 
 # Initialize Thermopack
-# cdft_tp = cdft_thermopack(model="PC-SAFT",
-#                           comp_names="C1",
-#                           comp=np.array([1.0]),
-#                           temperature=140.0,
-#                           pressure=0.0,
-#                           bubble_point_pressure=True,
-#                           domain_length=50,
-#                           grid=1024, no_bc=True)
-
-cdft_tp = cdft_thermopack(model="SAFT-VRQ Mie",
-                          comp_names="H2",
+cdft_tp = cdft_thermopack(model="PC-SAFT",
+                          comp_names="C1",
                           comp=np.array([1.0]),
-                          temperature=25.0,
+                          temperature=140.0,
                           pressure=0.0,
                           bubble_point_pressure=True,
-                          domain_length=100.0,
-                          grid=512,
-                          geometry=Geometry.PLANAR,
-                          no_bc=True,
-                          kwthermoargs={"feynman_hibbs_order": 1,
-                                        "parameter_reference": "AASEN2019-FH1"})
+                          domain_length=100,
+                          grid=1024, no_bc=True)
+
+# cdft_tp = cdft_thermopack(model="SAFT-VRQ Mie",
+#                           comp_names="H2",
+#                           comp=np.array([1.0]),
+#                           temperature=25.0,
+#                           pressure=0.0,
+#                           bubble_point_pressure=True,
+#                           domain_length=100.0,
+#                           grid=23,
+#                           geometry=Geometry.PLANAR,
+#                           no_bc=True,
+#                           kwthermoargs={"feynman_hibbs_order": 1,
+#                                         "parameter_reference": "AASEN2019-FH1"})
 
 # Initialize the solver
 solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5,
@@ -42,6 +42,7 @@ solver = picard_geometry_solver(cDFT=cdft_tp, alpha_min=0.1, alpha_max=0.5,
                                 ng_extrapolations=10, line_search="ERROR",
                                 density_init="VLE",
                                 specification=Specification.NUMBER_OF_MOLES)
+
 
 # Make the calculations
 # solver.minimise(print_frequency=250,

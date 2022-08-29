@@ -479,7 +479,7 @@ class Rosenfeld:
         self.short_name = "RF"
         self.R = R
         self.nc = np.shape(R)[0]
-        self.N = N
+        self.n_grid = N
         # Allocate arrays for differentials
         self.d0 = np.zeros(N)
         self.d1 = np.zeros(N)
@@ -523,7 +523,7 @@ class Rosenfeld:
             array_like: Excess HS Helmholtz free energy ()
 
         """
-        f = np.zeros(dens.N)
+        f = np.zeros(dens.n_grid)
         f[:] = -dens.n0[:] * dens.logn3neg[:] + \
             (dens.n1[:] * dens.n2[:] - dens.n1v[:] * dens.n2v[:]) / dens.n3neg[:] + \
             ((dens.n2[:] ** 3) - 3.0 * dens.n2[:] * dens.n2v[:]
@@ -784,7 +784,7 @@ class Whitebear(Rosenfeld):
         """
         # Avoid dividing with zero value of n3 in boundary grid points
         pn3m = dens.n3 > 0.0  # Positive value n3 mask
-        f = np.zeros(dens.N)
+        f = np.zeros(dens.n_grid)
         f[pn3m] = -dens.n0[pn3m] * dens.logn3neg[pn3m] + \
             (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) / dens.n3neg[pn3m] + \
             ((dens.n2[pn3m] ** 3) - 3.0 * dens.n2[pn3m] * dens.n2v[pn3m] ** 2) * \
@@ -904,7 +904,7 @@ class WhitebearMarkII(Whitebear):
         if self.dphi3dn3_div3 is None or np.shape(self.dphi3dn3_div3) != np.shape(dens.n3):
             self.dphi3dn3_div3 = np.zeros_like(dens.n3)
         if mask is None:
-            mask = np.full(dens.N, True, dtype=bool)
+            mask = np.full(dens.n_grid, True, dtype=bool)
         prefac = 1.0 / 3.0
         self.phi2_div3[mask] = prefac * (2 - dens.n3[mask] + 2 *
                                          dens.n3neg[mask] * dens.logn3neg[mask] / dens.n3[mask])
@@ -933,7 +933,7 @@ class WhitebearMarkII(Whitebear):
         # Avoid dividing with zero value of n3 in boundary grid points
         pn3m = dens.n3 > 0.0  # Positive value n3 mask
         self.update_phi2_and_phi3(dens, pn3m)
-        f = np.zeros(dens.N)
+        f = np.zeros(dens.n_grid)
         f[pn3m] = -dens.n0[pn3m] * dens.logn3neg[pn3m] + \
             (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) * \
             (1 + self.phi2_div3) / (dens.n3neg[pn3m]) + \
@@ -1059,9 +1059,7 @@ class pc_saft(Whitebear):
         self.thermo = pcs
         self.T_red = T_red
         self.T = self.T_red * self.thermo.eps_div_kb[0]
-        self.d_hs = np.zeros(pcs.nc)
-        for i in range(pcs.nc):
-            self.d_hs[i] = pcs.hard_sphere_diameters(self.T)
+        self.d_hs, self.d_T_hs = pcs.hard_sphere_diameters(self.T)
         R = np.zeros(pcs.nc)
         R[:] = 0.5*self.d_hs[:]/self.d_hs[0]
         Whitebear.__init__(self, N, R)
@@ -1115,7 +1113,7 @@ class pc_saft(Whitebear):
         non_prdm = np.invert(prdm)
         rho_thermo = np.zeros(self.nc)
         V = 1.0
-        for i in range(self.N):
+        for i in range(self.n_grid):
             if prdm[i]:
                 rho_thermo[:] = dens.rho_disp_array[:, i]
                 rho_thermo *= 1.0/(NA*self.d_hs[0]**3)

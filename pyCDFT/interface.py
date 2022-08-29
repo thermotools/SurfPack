@@ -164,6 +164,13 @@ class Interface(object):
                 x0, self.residual, log_iter)
             if self.converged:
                 self.profile = self.unpack_profile(x_sol)
+                # Update bulk properties
+                rho_left = np.zeros_like(self.bulk.real_mu)
+                rho_right = np.zeros_like(self.bulk.real_mu)
+                for i in range(self.functional.nc):
+                    rho_left[i] = self.profile.densities[i][1]
+                    rho_right[i] = self.profile.densities[i][-2]
+                self.bulk.update_bulk_densities(rho_left, rho_right)
             else:
                 print("Interface solver did not converge")
 
@@ -217,67 +224,58 @@ class Interface(object):
         """
 
         # Calculate chemical potential (excess + ideal)
-        mu = self.T * (self.mu_res_scaled_beta + np.log(self.bulk_densities))
+        mu = self.bulk.reduced_temperature * self.bulk.mu_scaled_beta
 
         # FMT hard-sphere part
-        omega_a = self.T * \
+        omega_a = self.bulk.reduced_temperature * \
             self.functional.excess_free_energy(
-                self.weights_system.weighted_densities)
+                self.convolver.weighted_densities)
 
         # Add ideal part and extrinsic part
-        for i in range(self.nc):
+        for i in range(self.functional.nc):
             # Ideal part
-            omega_a[:] += self.T * dens[i][:] * \
-                (np.log(dens[i][:]) - 1.0)
+            omega_a[:] += self.bulk.reduced_temperature * self.profile.densities[i][:] * \
+                (np.log(self.profile.densities[i][:]) - 1.0)
             # Extrinsic part
-            omega_a[:] += dens[i][:] \
+            omega_a[:] += self.profile.densities[i][:] \
                 * (self.v_ext[i][:] - mu[i])
 
-        omega_a[:] *= self.dr
-
-        for i in range(self.nc):
-            omega_a[self.boundary_mask[i]] = 0.0  # Don't include wall
+        omega_a[:] *= self.grid.integration_weights
 
         # Integrate
         omega = np.sum(omega_a[:])
 
         return omega, omega_a
 
-    def surface_tension(self, update_convolutions=True):
+    def surface_tension(self):
         """
         Calculates the surface tension of the system.
-
-        Args:
-            dens (densities): Density profile
-            update_convolutions(bool): Flag telling if convolutions should be updated
 
         Returns:
-            (float): Surface tension
+            (float): Surface tension (reduced units)
         """
 
-        _, omega_a = self.grand_potential(dens, update_convolutions)
-        omega_a += self.red_pressure * self.dr
-        for i in range(self.nc):
-            omega_a[self.boundary_mask[i]] = 0.0  # Don't include wall
+        if not self.converged:
+            self.print_perform_minimization_message()
+            return
 
+        _, omega_a = self.grand_potential()
+
+        omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
         gamma = np.sum(omega_a)
-
         return gamma
 
-    def surface_tension_real_units(self, dens, update_convolutions=True):
+    def surface_tension_real_units(self):
         """
         Calculates the surface tension of the system.
-
-        Args:
-            dens (densities): Density profile
-            update_convolutions(bool): Flag telling if convolutions should be updated
 
         Returns:
             (float): Surface tension (J/m2)
         """
-
-        gamma_star = self.surface_tension(dens, update_convolutions)
-        gamma = gamma_star * self.eps / self.sigma ** 2
+        gamma_star = self.surface_tension()
+        eps = self.functional.thermo.eps_div_kb[0] * KB
+        sigma = self.bulk.particle_diameters[0]
+        gamma = gamma_star * eps / sigma ** 2
 
         return gamma
 
@@ -328,42 +326,32 @@ class Interface(object):
         """
 
         """
-        mu = self.bulk.real_mu
+        if not self.converged:
+            self.print_perform_minimization_message()
+            return
 
-        rho_1 = np.zeros_like(mu)
-        rho_2 = np.zeros_like(mu)
-        for i in range(self.functional.nc):
-            rho_1[i] = self.profile.densities[i][1]
-            rho_2[i] = self.profile.densities[i][-2]
-
-        rho_1_real = self.bulk.get_real_density(rho_1)
-        rho_1_real = self.functional.thermo.solve_mu_t(self.bulk.temperature, mu, rho_initial=rho_1_real)
-        rho_1 = self.bulk.get_reduced_density(rho_1_real)
-        rho1 = np.sum(rho_1)
-
-        rho_2_real = self.bulk.get_real_density(rho_2)
-        rho_2_real = self.functional.thermo.solve_mu_t(self.bulk.temperature, mu, rho_initial=rho_2_real)
-        rho_2 = self.bulk.get_reduced_density(rho_2_real)
-        rho2 = np.sum(rho_2)
+        rho1 = np.sum(self.bulk.reduced_density_left)
+        rho2 = np.sum(self.bulk.reduced_density_right)
 
         N = self.calculate_total_mass()
         if self.grid.geometry == Geometry.PLANAR:
-            V = self.grid.domain_length
+            V = self.grid.domain_size
             prefac = 1.0
             exponent = 1.0
         elif self.grid.geometry == Geometry.SPHERICAL:
             prefac = 4*np.pi/3
-            V = prefac*self.grid.domain_length**3
+            V = prefac*self.grid.domain_size**3
             exponent = 1.0/3.0
         elif self.grid.geometry == Geometry.POLAR:
             prefac = np.pi
-            V = self.grid.domain_length**2
+            V = self.grid.domain_size**2
             exponent = 0.5
 
         R = ((N - V*rho2)/(rho1 - rho2)/prefac)**exponent
-        print("Re, Re/R", R, R/self.grid.domain_length)
+        #print("Re, Re/R", R, R/self.grid.domain_size)
 
         return R
+
 
     def print_perform_minimization_message(self):
         """
@@ -376,7 +364,7 @@ class Interface(object):
         """
         Generate case name from specifications
         """
-        self.case_name = f'{self.geometry.name}_{"{:.3f}".format(self.bulk.temperature)}_{self.functional.short_name}'
+        return f'{self.grid.geometry.name}_{"{:.3f}".format(self.bulk.temperature)}_{self.functional.short_name}'
 
     def save_equilibrium_density_profile(self):
         """
@@ -387,7 +375,7 @@ class Interface(object):
             return
 
         nd_densities = self.profiles.densities.get_nd_copy()
-        filename = self.case_name + '.dat'
+        filename = self.generate_case_name() + '.dat'
         np.savetxt(filename,
                    np.c_[self.grid.r[:],
                          nd_densities[:, :],
@@ -448,7 +436,7 @@ class Interface(object):
 
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
-        filename = self.case_name + ".pdf"
+        filename = self.generate_case_name() + ".pdf"
         plt.savefig(filename)
         plt.show()
 
