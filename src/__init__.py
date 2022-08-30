@@ -1,16 +1,25 @@
 # Init file for the DFT code
 from . import constants
-from . import utility
-from . import ng_extrapolation
-from . import weight_functions_sph
+from . import weight_functions
+from . import dft_numerics
 from . import fmt_functionals
-from . import cdft
-from . import geometry_solvers
+from . import pcsaft_functional
+from . import grid
+from . import external_potential
+from . import convolver
+from . import interface
+from . import pore
+from . import pair_correlation
 
 __all__ = ["constants",
-           "utility",
-           "ng_extrapolation",
            "weight_functions",
+           "dft_numerics",
            "fmt_functionals",
-           "cdft",
-           "geometry_solvers"]
+           "pcsaft_functional",
+           "grid",
+           "external_potential",
+           "convolver",
+           "interface",
+           "pore",
+           "pair_correlation"]
+

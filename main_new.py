@@ -4,8 +4,7 @@ import numpy as np
 import sys
 from pyctp.pcsaft import pcsaft
 from pyctp.thermopack_state import equilibrium
-from pyCDFT.interface import PlanarInterface
-#from pyCDFT.constants import Specification
+from src.interface import PlanarInterface
 
 # Set up thermopack and equilibrium state
 thermopack = pcsaft()

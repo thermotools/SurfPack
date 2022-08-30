@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
-from dft_numerics import dft_solver
-import sys
-from constants import NA, KB, Geometry, Specification, LenghtUnit
-from grid import Grid, Bulk, Profile
-from convolver import Convolver
-from pyctp import pcsaft
-from interface import Interface
-import fmt_functionals
-import numpy as np
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from grid import Grid
+from constants import Geometry
+from pyctp import pcsaft
+from interface import Interface
+import numpy as np
 
 
 class Pore(Interface):

@@ -1,24 +1,13 @@
 #!/usr/bin/env python3
-from enum import Enum
-from dft_numerics import dft_solver
-import sys
-from constants import NA, KB, Dft_enum
-from weight_functions_cosine_sine import planar_weights_system_mc, \
-    planar_weights_system_mc_pc_saft
-from utility import packing_fraction_from_density, \
-    boundary_condition, densities, get_thermopack_model, \
-    weighted_densities_pc_saft_1D, get_initial_densities_vle, \
-    weighted_densities_1D
-import fmt_functionals
+from constants import DftEnum
 import numpy as np
+from scipy.special import gamma
+from abc import ABC, abstractmethod
 import os
 import sys
-import scipy.special.gamma as gamma
-
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
-
-class External_potential(Dft_enum):
+class External_potential(DftEnum):
     ENUM_HARDWALL = 11
     ENUM_LJ93 = 22
     ENUM_STEELE = 33
@@ -26,14 +15,14 @@ class External_potential(Dft_enum):
     ENUM_LJ93_CUSTOM = 55
     ENUM_FF_POTENTIAL = 66
 
-class Eps_mixing(Dft_enum):
+class Eps_mixing(DftEnum):
     GEOMETRIC = 111
     MOD_GEOMETRIC = 222
 
 class PotentialParam(object):
     """
     """
-    def __init__(self, potential_type, eps_mixing=GEOMETRIC):
+    def __init__(self, potential_type, eps_mixing=Eps_mixing.GEOMETRIC):
         self.potential_type = potential_type
         self.eps_mixing = eps_mixing
 
@@ -47,7 +36,7 @@ class Hardwall(PotentialParam):
 class Steele(PotentialParam):
     """
     """
-    def __init__(self, rho_s, epsilon, sigma, alpha=0.61, delta=3.35, lambda_r=12.0, lambda_a=6.0, prefactor=1.0, eps_mixing=GEOMETRIC):
+    def __init__(self, rho_s, epsilon, sigma, alpha=0.61, delta=3.35, lambda_r=12.0, lambda_a=6.0, prefactor=1.0, eps_mixing=Eps_mixing.GEOMETRIC):
         PotentialParam.__init__(self, ENUM_STEELE, eps_mixing)
         self.sigma = sigma
         self.epsilon = epsilon
@@ -60,7 +49,7 @@ class Steele(PotentialParam):
 class LJ93(PotentialParam):
     """
     """
-    def __init__(self, rho_s, epsilon, sigma, eps_mixing=GEOMETRIC):
+    def __init__(self, rho_s, epsilon, sigma, eps_mixing=Eps_mixing.GEOMETRIC):
         PotentialParam.__init__(self, ENUM_LJ93, eps_mixing)
         self.sigma = sigma
         self.epsilon = epsilon
@@ -70,7 +59,7 @@ class LJ93Simple(PotentialParam):
     """
     """
 
-    def __init__(self, epsilon, sigma, eps_mixing=GEOMETRIC):
+    def __init__(self, epsilon, sigma, eps_mixing=Eps_mixing.GEOMETRIC):
         Potential.__init__(self, ENUM_LJ93_SIMPLE, eps_mixing)
         self.sigma = sigma
         self.epsilon = epsilon
@@ -92,7 +81,7 @@ class FluidFluid(PotentialParam):
         Potential.__init__(self, ENUM_FF_POTENTIAL)
         self.comp = comp
 
-class Potential(object):
+class Potential(ABC):
     """
     """
     def __init__(self, potential_type, geometry, prefactor=1.0):
@@ -187,25 +176,25 @@ class SteelePotential(Potential):
 
     def taylor_2f1_phi(x, n):
         if n == 3:
-            2f1 = 1.0 + 3.0 / 4.0 * x**2 + 3.0 / 64.0 * x**4 \
+            _2f1 = 1.0 + 3.0 / 4.0 * x**2 + 3.0 / 64.0 * x**4 \
                 - 1.0 / 256.0 * x**6 - 15.0 / 16384.0 * x**8
         elif n == 6:
-            2f1 = 1.0 + 63.0 / 4.0 * x**2 + 2205.0 / 64.0 * x**4 \
+            _2f1 = 1.0 + 63.0 / 4.0 * x**2 + 2205.0 / 64.0 * x**4 \
                 + 3675.0 / 256.0 * x**6 + 11025.0 / 16384.0 * x**8
         else:
             raise ValueError("taylor_2f1_phi, unsupported n")
-        return 2f1
+        return _2f1
 
     def taylor_2f1_psi(x, n):
         if n == 3:
-            2f1 = 1.0 + 9.0 / 4.0 * x**2 + 9.0 / 64.0 * x**4 \
+            _2f1 = 1.0 + 9.0 / 4.0 * x**2 + 9.0 / 64.0 * x**4 \
                 + 1.0 / 256.0 * x**6 + 9.0 / 16384.0 * x**8
         elif n == 6:
-            2f1 = 1.0 + 81.0 / 4.0 * x**2 + 3969.0 / 64.0 * x**4 \
+            _2f1 = 1.0 + 81.0 / 4.0 * x**2 + 3969.0 / 64.0 * x**4 \
                 + 11025.0 / 256.0 * x**6 + 99125.0 / 16384.0 * x**8
         else:
             raise ValueError("taylor_2f1_psi, unsupported n")
-        return 2f1
+        return _2f1
 
 class LJ93Potential(Potential):
     """
@@ -228,7 +217,7 @@ class LJ93Potential(Potential):
                           - phi(3, r / pore_size, self.sigma / pore_size))
         elif self.Geometry == SPHERICAL:
             p = prefac * 0.5 * (
-                * self.sigma**12 / 90.
+                self.sigma**12 / 90.
                 * ((r - 9.0 * pore_size) / (r - pore_size)**9
                    - (r + 9.0 * pore_size) / (r + pore_size)**9)
                 - self.sigma**6 / 3.
@@ -272,7 +261,7 @@ class FluidFluidPotential(Potential):
 
 def mix_epsilon_solid_fluid(eps_mixing, eps_ss, eps_ff, sigma_ss=1.0, sigma_ff=1.0):
     eps_sf = np.sqrt(eps_ss*eps_ff)
-    if eps_mixing == MOD_GEOMETRIC:
+    if eps_mixing == Eps_mixing.MOD_GEOMETRIC:
         eps_sf *= np.sqrt(sigma_ss**3*sigma_ff**3)/(sigma_ss + sigma_ff)**3*8
     return eps_sf
 
@@ -322,88 +311,6 @@ class ExternalPotentials(object):
             else:
                 raise ValueError("Unsupported potential")
             v_ext.append(potential)
-
-class Pore(Interface):
-    """
-
-    """
-
-    def __init__(self,
-                 geometry,
-                 functional,
-                 external_potential_param,
-                 domain_size=100.0,
-                 n_grid=1024):
-        """
-        Object holding specifications for classical DFT problem.
-        Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
-
-        Args:
-            bulk_densities (ndarray): Bulk fluid density ()
-            particle_diameters (ndarray): Particle diameter
-            wall (str): Wall type (HardWall, SlitHardWall, None)
-            domain_length (float): Length of domain
-            functional (str): Name of hard sphere functional: Rosenfeld, WhiteBear, WhiteBear Mark II, Default Rosenfeld
-            grid (int) : Grid size
-            temperature (float): Reduced temperature
-            quadrature (str): Quadrature to use during integration
-        Returns:
-            None
-        """
-
-        # Init of base class
-        Interface.__init__(self,
-                           geometry=geometry,
-                           functional=functional,
-                           domain_size=domain_size,
-                           n_grid=n_grid)
-        self.ext_potentials = ExternalPotential(geometry=geometry,
-                                                potential_param=external_potential_param,
-                                                functional=functional)
-        self.v_ext = []
-        # for i in functional.nc:
-        #     r = self.grid
-        #     T = functional
-        #     v = self.ext_potentials.pot(r, domain_size, temperature)
-        #     self.v_ext.append(v)
-
-    def residual(self, x):
-        return self.grid.convolve(x).residual
-
-
-class PairCorrelation(Pore):
-
-    def __init__(self,
-                 functional,
-                 state,
-                 comp=0,
-                 domain_size=15.0,
-                 n_grid=1024):
-        """
-        Object holding specifications for classical DFT problem.
-        Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
-
-        Args:
-            bulk_densities (ndarray): Bulk fluid density ()
-            particle_diameters (ndarray): Particle diameter
-            wall (str): Wall type (HardWall, SlitHardWall, None)
-            domain_length (float): Length of domain
-            functional (str): Name of hard sphere functional: Rosenfeld, WhiteBear, WhiteBear Mark II, Default Rosenfeld
-            grid (int) : Grid size
-            temperature (float): Reduced temperature
-            quadrature (str): Quadrature to use during integration
-        Returns:
-            None
-        """
-
-        fluid_fluid_pot_param = FluidFluid(comp)
-        # Init of base class
-        Pore.__init__(self,
-                      geometry=Geometry.SPHERICAL,
-                      functional=functional,
-                      external_potential_param=fluid_fluid_pot_param,
-                      domain_size=domain_size,
-                      n_grid=n_grid)
 
 
 if __name__ == "__main__":
