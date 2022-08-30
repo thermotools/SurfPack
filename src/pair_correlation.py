@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-from dft_numerics import dft_solver
+import os
 import sys
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from dft_numerics import dft_solver
 from constants import NA, KB, Geometry, Specification, LenghtUnit
-from grid import Grid, Bulk, Profile
 from convolver import Convolver
 from pyctp import pcsaft
 from pore import Pore
 import fmt_functionals
 import numpy as np
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from bulk import Bulk
+from profile import Profile
 from grid import Grid
 
 

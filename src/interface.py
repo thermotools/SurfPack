@@ -4,7 +4,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from dft_numerics import dft_solver
 from constants import NA, KB, Geometry, Specification, LenghtUnit
-from grid import Grid, Bulk, Profile
+from bulk import Bulk
+from density_profile import Profile
+from grid import Grid
 from convolver import Convolver
 from pyctp.pcsaft import pcsaft
 from pyctp.thermopack_state import state, equilibrium
@@ -12,7 +14,6 @@ from pcsaft_functional import pc_saft
 import numpy as np
 import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
-from grid import Grid
 
 class Interface(ABC):
     """

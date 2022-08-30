@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
+import os
 import sys
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from constants import Geometry
 from fmt_functionals import WeightFunctions
 from grid import Grid
 import numpy as np
-import os
-import sys
 from scipy.fft import dct, idct, dst, idst, fft, ifft
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 
 class WeightedDensities():
