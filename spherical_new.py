@@ -14,23 +14,28 @@ T = 140.0
 vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
 # Define interface with initial tanh density profile
-sigma0 = 0.00815622572569111 #PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(1), domain_size=100.0, n_grid=1024).solve().surface_tension_real_units()
+#sigma0 = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(1), domain_size=100.0, n_grid=1024).solve().surface_tension_real_units()
+sigma0 = 0.00815622572569111
 
 # Define interface with initial tanh density profile
-interf = SphericalInterface.from_tanh_profile(vle,
-                                              thermopack.critical_temperature(1),
-                                              radius=25.0,
-                                              domain_radius=100.0,
-                                              n_grid=1024,
-                                              calculate_bubble=False,
-                                              sigma0=sigma0)
+spi = SphericalInterface.from_tanh_profile(vle,
+                                           thermopack.critical_temperature(1),
+                                           radius=25.0,
+                                           domain_radius=50.0,
+                                           n_grid=1024,
+                                           calculate_bubble=False,
+                                           sigma0=sigma0)
 
 # Solve for equilibrium profile
-interf.solve(log_iter=True)
+spi.solve(log_iter=True)
 
 # Plot profile
-interf.plot_equilibrium_density_profiles(plot_actual_densities=False,
-                                         plot_equimolar_surface=True)
+spi.plot_equilibrium_density_profiles(plot_actual_densities=False,
+                                      plot_equimolar_surface=True)
 
 # Surface tension
-print("Surface tension: ", interf.surface_tension_real_units())
+print(f"Planar surface tension: {1.0e3*sigma0} mN/m")
+print(f"Surface tension: {1.0e3*spi.surface_tension_real_units()} mN/m")
+gamma_s, r_s, delta = spi.surface_of_tension()
+print(f"Surface of tension: {1.0e3*gamma_s} mN/m")
+print(f"Tolman length: {1.0e10*delta} Å")

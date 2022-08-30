@@ -115,6 +115,7 @@ class WeightFunction(object):
         """
         """
         self.R = R
+        R_kern = R * self.kernel_radius
         self.fw = np.zeros(grid.n_grid)
         self.k_cos_R = np.zeros(grid.n_grid)
         self.k_sin = np.zeros(grid.n_grid)
@@ -122,25 +123,25 @@ class WeightFunction(object):
         N = grid.n_grid
         L = grid.domain_size
         self.k_sin = 2 * np.pi * np.linspace(1.0, N, N) / (2 * L)
-        self.k_sin_R = self.k_sin * R
+        self.k_sin_R = self.k_sin * R_kern
         self.one_div_r = (1/grid.z)
         self.r = grid.z
         if self.wf_type == WeightFunctionType.THETA:
-            self.w_conv_steady = (4.0/3.0)*np.pi*(R**3)
-            self.fw[:] = 4.0/3.0 * np.pi * self.R**3 * \
+            self.w_conv_steady = (4.0/3.0)*np.pi*R_kern**3
+            self.fw[:] = 4.0/3.0 * np.pi * R_kern**3 * \
                 (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
         elif self.wf_type == WeightFunctionType.NORMTHETA:
             self.w_conv_steady = 1.0
             self.fw[:] = spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)
         elif self.wf_type == WeightFunctionType.DELTA:
             # The convolution of the fourier weights for steady profile
-            self.w_conv_steady = 4.0*np.pi*(R**2)
-            self.fw[:] = 4.0 * np.pi * self.R**2 * spherical_jn(0, self.k_sin_R)
+            self.w_conv_steady = 4.0*np.pi*R_kern**2
+            self.fw[:] = 4.0 * np.pi * R_kern**2 * spherical_jn(0, self.k_sin_R)
         elif self.wf_type == WeightFunctionType.DELTAVEC:
             # The convolution of the fourier weights for steady profile
             self.w_conv_steady = 0.0
             #self.k_sin *
-            self.fw[:] = 4.0/3.0 * np.pi * self.R**3 * \
+            self.fw[:] = 4.0/3.0 * np.pi * R_kern**3 * \
                 (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
 
 
@@ -246,7 +247,7 @@ class WeightFunction(object):
             self.fn[0] = 0
             weighted_density[:] -= self.one_div_r*idct(self.fn, type=2)
         else:
-            self.fn[:] = self.frho_delta[:] * self.fw[:]
+            self.fn[:] = frho_delta[:] * self.fw[:]
             weighted_density[:] = self.one_div_r*idst(self.fn, type=2) + rho_inf*self.w_conv_steady
 
     def spherical_convolution_differentials(self, diff: np.ndarray, diff_conv: np.ndarray):
@@ -268,7 +269,7 @@ class WeightFunction(object):
             fd_term2[-1] = 0.0
             self.fn[:] = -1.0*(fd_term1[:] + fd_term2[:])*self.fw[:]*self.k_sin[:]
         else:
-            fd_delta = dst(self.d_delta*self.r, type=2)
+            fd_delta = dst(d_delta*self.r, type=2)
             self.fn[:] = fd_delta[:] * self.fw[:]
 
         # Transform from Fourier space to real space

@@ -313,19 +313,6 @@ class Grid(object):
         #     self.boundary_mask[i] = np.logical_or(
         #         self.left_boundary_mask[i], self.right_boundary_mask[i])
 
-
-    def integrate_number_of_molecules(self):
-        """
-        Calculates the overall number of molecules (reduced) of the system.
-
-        Returns:
-            (float): Reduced number of molecules (Unit depending on geometry)
-        """
-        n_tot = 0.0
-        for ic in range(self.nc):
-            n_tot += np.sum(self.density[ic]*self.integration_weights)
-        return n_tot
-
     def print_grid(self):
         """
         Debug function
@@ -353,7 +340,7 @@ class Grid(object):
         """
         idx = None
         if self.geometry == Geometry.PLANAR or \
-           self.geometry == Geometry.SPERICAL:
+           self.geometry == Geometry.SPHERICAL:
             idx = int(rel_pos_dividing_surface*self.n_grid)
         else:
             pos = rel_pos_dividing_surface*self.domain_size
@@ -362,6 +349,53 @@ class Grid(object):
                     idx = i
                     break
         return idx
+
+    def get_left_weight(self, position):
+        """
+        Calculate left side weight in cell, given position
+        Args:
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface.
+        """
+        idx = self.get_index_of_rel_pos(position/self.domain_size)
+        if self.geometry == Geometry.PLANAR:
+            w_left = position - self.z_edge[idx]
+        elif self.geometry == Geometry.SPHERICAL:
+            w_left = 4.0*np.pi/3.0*(position**3 - self.z_edge[idx]**3)
+        else:
+            w_left = None
+        return w_left
+
+    def get_volume(self, position):
+        """
+        Calculate "volume", given position
+        Args:
+            position (float): Position (m)
+        Return:
+            float: Volume/Area/Length
+        """
+        if self.geometry == Geometry.PLANAR:
+            vol =  position
+        elif self.geometry == Geometry.SPHERICAL:
+            vol = 4.0*np.pi/3.0*position**3
+        else:
+            vol = np.pi*position**2
+        return vol
+
+    @property
+    def total_volume(self):
+        """
+        Calculate "volume", given position
+
+        Return:
+            float: System Volume/Area/Length
+        """
+        if self.geometry == Geometry.PLANAR:
+            vol = self.domain_size
+        elif self.geometry == Geometry.SPHERICAL:
+            vol = 4.0*np.pi/3.0*self.domain_size**3
+        else:
+            vol = np.pi*self.domain_size**2
+        return vol
 
     def polar_grid(self,
                    domain_size=15.0,

@@ -11,10 +11,11 @@ import numpy as np
 import os
 import sys
 import matplotlib.pyplot as plt
+from abc import ABC, abstractmethod
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from grid import Grid
 
-class Interface(object):
+class Interface(ABC):
     """
 
     """
@@ -55,6 +56,7 @@ class Interface(object):
         self.do_exp_mu = True
         self.convolver = None
         self.n_tot = None
+        self.r_equimolar = None
 
     def unpack_profile(self, xvec):
         # Set profile
@@ -159,8 +161,8 @@ class Interface(object):
             # Set up convolver
             self.convolver = Convolver(self.grid, self.functional, self.bulk.R)
             x0 = self.pack_x_vec()
-            #print("x0:", x0)
-            #sys.exit()
+            # print("x0:", x0)
+            # sys.exit()
             x_sol, self.converged = solver.solve(
                 x0, self.residual, log_iter)
             if self.converged:
@@ -172,6 +174,7 @@ class Interface(object):
                     rho_left[i] = self.profile.densities[i][1]
                     rho_right[i] = self.profile.densities[i][-2]
                 self.bulk.update_bulk_densities(rho_left, rho_right)
+                self.calculate_equimolar_dividing_surface()
             else:
                 print("Interface solver did not converge")
         return self
@@ -249,6 +252,8 @@ class Interface(object):
 
         return omega, omega_a
 
+
+    @abstractmethod
     def surface_tension(self):
         """
         Calculates the surface tension of the system.
@@ -263,8 +268,18 @@ class Interface(object):
 
         _, omega_a = self.grand_potential()
 
-        omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
-        gamma = np.sum(omega_a)
+        print(self.bulk.red_pressure_left, self.bulk.red_pressure_right)
+
+        v_left = self.grid.get_volume(self.r_equimolar)
+        v_right = self.grid.total_volume - v_left
+        print(v_left,v_right, sum(self.grid.integration_weights)-self.grid.total_volume)
+        #gamma = np.sum(omega_a) + v_left*self.bulk.red_pressure_left + v_right*self.bulk.red_pressure_right
+
+        delta_omega = np.sum(omega_a) + self.grid.total_volume*self.bulk.red_pressure_right
+        dp = self.bulk.red_pressure_left - self.bulk.red_pressure_right
+        gamma = (3*delta_omega*dp**2/16/np.pi)**(1/3)
+        #omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
+        #gamma = np.sum(omega_a)
         return gamma
 
     def surface_tension_real_units(self):
@@ -313,7 +328,7 @@ class Interface(object):
                        - self.bulk.beta * self.v_ext[ic][:]))
         return integral
 
-    def get_equimolar_dividing_surface(self):
+    def calculate_equimolar_dividing_surface(self):
         """
 
         """
@@ -338,10 +353,29 @@ class Interface(object):
             V = self.grid.domain_size**2
             exponent = 0.5
 
-        R = ((N - V*rho2)/(rho1 - rho2)/prefac)**exponent
+        self.r_equimolar = ((N - V*rho2)/(rho1 - rho2)/prefac)**exponent
         #print("Re, Re/R", R, R/self.grid.domain_size)
 
-        return R
+    def get_adsorption_vector(self, radius):
+        """
+        Get adsoprption vector Gamma (Gamma is zero for equimolar radius)
+        """
+        if not self.profile:
+            print("Need profile to calculate adsorption vector")
+            return
+
+        iR = self.grid.get_index_of_rel_pos(radius/self.grid.domain_size)
+        w_left = self.grid.get_left_weight(radius)
+        w_right = self.grid.integration_weights[iR] - w_left
+        gamma = np.zeros_like(self.bulk.reduced_density_left)
+        for i in range(self.functional.nc):
+            gamma[i] += w_left*(self.profile.densities[i][iR] - self.bulk.reduced_density_left[i])
+            gamma[i] += w_right*(self.profile.densities[i][iR] - self.bulk.reduced_density_right[i])
+            for j in range(iR):
+                gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_left[i])
+            for j in range(iR+1,self.grid.n_grid):
+                gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_right[i])
+        return gamma
 
 
     def print_perform_minimization_message(self):
@@ -417,9 +451,8 @@ class Interface(object):
 
         if plot_equimolar_surface:
             # Plot equimolar dividing surface
-            Re = self.get_equimolar_dividing_surface()
             yl = ax.get_ylim()
-            ax.plot([Re, Re],
+            ax.plot([self.r_equimolar, self.r_equimolar],
                     [0.0, yl[1]],
                     lw=1, color="k",
                     linestyle="--",
@@ -529,6 +562,23 @@ class PlanarInterface(Interface):
                          invert_states=invert_states)
         return pif
 
+    def surface_tension(self):
+        """
+        Calculates the surface tension of the system.
+
+        Returns:
+            (float): Surface tension (reduced units)
+        """
+
+        if not self.converged:
+            self.print_perform_minimization_message()
+            return
+
+        _, omega_a = self.grand_potential()
+        omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
+        gamma = np.sum(omega_a)
+        return gamma
+
 class SphericalInterface(Interface):
     """
     Utility class for simplifying specification of SPHERICAL interface
@@ -625,39 +675,53 @@ class SphericalInterface(Interface):
                          invert_states=not calculate_bubble)
         return sif
 
-    # def test_laplace(self, dens, sigma0):
-    #     """
-    #     Calculates the integral of exp(-beta(df+Vext)).
+    def surface_tension(self):
+        """
+        Calculates the surface tension of the system.
 
-    #     Returns:
-    #         (float): Integral (-)
-    #     """
-    #     R = self.get_equimolar_dividing_surface(dens)
+        Returns:
+            (float): Surface tension (reduced units)
+        """
 
-    #     rho1 = np.zeros(self.nc)
-    #     rho2 = np.zeros(self.nc)
-    #     for i in range(self.nc):
-    #         rho1[i] = dens[i][1]
-    #         rho2[i] = dens[i][-2]
-    #     print("rho1",rho1)
-    #     print("rho2",rho2)
+        if not self.converged:
+            self.print_perform_minimization_message()
+            return
 
-    #     rho1 *= 1.0/(NA*self.functional.d_hs[0]**3)
-    #     rho_mix = np.sum(rho1)
-    #     V = 1.0/rho_mix
-    #     n = rho1/rho_mix
-    #     P1, = self.thermo.pressure_tv(self.functional.T, V, n)
+        _, omega_a = self.grand_potential()
 
-    #     rho2 *= 1.0/(NA*self.functional.d_hs[0]**3)
-    #     rho_mix = np.sum(rho2)
-    #     V = 1.0/rho_mix
-    #     n = rho2/rho_mix
-    #     P2, = self.thermo.pressure_tv(self.functional.T, V, n)
-    #     print("P1, P2", P1*1e-6, P2*1e-6)
-    #     R_m = R*self.functional.d_hs[0]
-    #     print("R_m",R_m)
-    #     print(P1-P2,2*sigma0/R_m, (P1-P2 - 2*sigma0/R_m)/(P1-P2))
-    #     return R
+        v_left = self.grid.get_volume(self.r_equimolar)
+        v_right = self.grid.total_volume - v_left
+        omega = np.sum(omega_a) + v_left*self.bulk.red_pressure_left + v_right*self.bulk.red_pressure_right
+        gamma = omega / (4 * np.pi * self.r_equimolar**2)
+        return gamma
+
+    def surface_of_tension(self, reduced=False):
+        """
+        Calculates the surface tension of the system.
+
+        Returns:
+            (float): Surface tension (reduced or real units)
+            (float): Surface of tension (reduced or real units)
+            (float): Tolman length (reduced or real units)
+        """
+
+        if not self.converged:
+            self.print_perform_minimization_message()
+            return
+
+        _, omega_a = self.grand_potential()
+        delta_omega = np.sum(omega_a) + self.grid.total_volume*self.bulk.red_pressure_right
+        dp = self.bulk.red_pressure_left - self.bulk.red_pressure_right
+        gamma_s = (3*delta_omega*dp**2/16/np.pi)**(1/3)
+        r_s = 2*gamma_s/dp
+        delta = self.r_equimolar - r_s
+        if not reduced:
+            eps = self.functional.thermo.eps_div_kb[0] * KB
+            sigma = self.bulk.particle_diameters[0]
+            gamma_s *= eps / sigma ** 2
+            r_s *= sigma
+            delta *= sigma
+        return gamma_s, r_s, delta
 
 if __name__ == "__main__":
     pass

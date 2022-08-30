@@ -458,6 +458,7 @@ class Convolver(object):
             # print("nv1",self.comp_weighted_densities[i].n["wv1"])
             # print("nv2",self.comp_weighted_densities[i].n["wv2"])
             # print("n_disp",self.comp_weighted_densities[i].n["w_disp"])
+
             # Add component contribution to overall density
             self.weighted_densities += self.comp_weighted_densities[i]
             for wf in self.comp_wfs[i]:
@@ -484,7 +485,6 @@ class Convolver(object):
         # print("d3",self.comp_differentials[0].d_conv["w3"])
         # print("d2veff",self.comp_differentials[0].d_conv["wv2"])
         # print("d_disp",self.comp_differentials[0].d_conv["w_disp"])
-
 
     def correlation(self, i):
         """
