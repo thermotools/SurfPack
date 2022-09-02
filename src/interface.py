@@ -389,8 +389,16 @@ class Interface(ABC):
         dfdt = self.functional.temperature_differential(self.convolver.weighted_densities)
         entropy_density = np.zeros_like(dfdn_dndt)
         entropy_density[:] = -dfdn_dndt[:] - dfdt[:]
+        return entropy_density
+
+    def get_entropy_density_real_units(self):
+        """
+        Get entropy per volume (J/m3/K)
+        """
+        s = self.get_entropy_density()
         # Scale to real units
-        #rho_thermo *= 1.0/(NA*self.grid_redicing_lenght**3)
+        eps = self.functional.thermo.eps_div_kb[0] * KB
+        s *= eps/(NA*self.functional.grid_reducing_lenght**3)
         return entropy_density
 
     def print_perform_minimization_message(self):
