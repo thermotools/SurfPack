@@ -7,10 +7,10 @@ Classical density functinal theory for thermopack
   * plot binary results vs. MC
 
 # List of todos (Remove when accomplished)
+  * Implement Lanczos sigma
   * Test the chain term implementation
   * Test with a wall potential
   * Find a smarter way to grid up the domain
-  * Implement a scale for grid-size
   * Implement postprocessing routine to extract useful variables
   * The thermopack association term implementation must be revised
   * Implement association into the DFT code [[2]](#2)
