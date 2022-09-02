@@ -329,6 +329,39 @@ Finally,
   \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{T} = \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{R} \pd{R}{T}
 \end{equation}
 
+
+\subsection{Density shift contributions}
+
+When shifting the density profiles we get contributions from convolution of constant densities ($\rho^{\rm{s}}$). These contributions are given as,
+\begin{align}
+  \label{eq:n_alpha_diff_steady}
+  n_\alpha^{\rm{s}} &= \rho^{\rm{s}} \lb \mathbf{r} \rb \otimes w_\alpha \lb \mathbf{r}\rb = \rho^{\rm{s}} w_\alpha^{\rm{s}} \\
+  \pd{n_\alpha^{\rm{s}}}{T} &= \rho^{\rm{s}} \pd{w_\alpha^{\rm{s}}}{T}.
+\end{align}
+Where,
+\begin{align}
+  \label{eq:weight_functions_steady}
+  w_0^{\rm{s}} &= 1  \\
+  w_1^{\rm{s}} &= R  \\
+  w_2^{\rm{s}} &= 4 \pi R^2  \\
+  w_3^{\rm{s}} &= \frac{4}{3} \pi R^3  \\
+  w_{V1}^{\rm{s}} &= 0  \\
+  w_{V2}^{\rm{s}} &= 0  \\
+  w_{\rm{disp}}^{\rm{s}} &= 1.
+\end{align}
+
+Differentiating we get,
+\begin{align}
+  \label{eq:weight_functions_steady_diff}
+  \pd{w_0^{\rm{s}}}{R} &= 0  \\
+  \pd{w_1^{\rm{s}}}{R} &= 1  \\
+  \pd{w_2^{\rm{s}}}{R} &= 8 \pi R  \\
+  \pd{w_3^{\rm{s}}}{R} &= 4 \pi R^2  \\
+  \pd{w_{V1}^{\rm{s}}}{R} &= 0  \\
+  \pd{w_{V2}^{\rm{s}}}{R} &= 0  \\
+  \pd{w_{\rm{disp}}^{\rm{s}}}{R} &= 0
+\end{align}
+
 \section{Results}
 
 
