@@ -32,6 +32,8 @@ class WeightFunction(object):
         self.alias = alias
         self.prefactor_str = prefactor
         self.prefactor = lambdify(("R"), sympify(prefactor), "numpy")
+        self.inv_prefactor_R = lambdify(("R"), sympify("1.0/("+prefactor+")").diff("R"), "numpy")
+        self.inv_prefactor_RR = lambdify(("R"), sympify("1.0/("+prefactor+")").diff("R", 2), "numpy")
         self.convolve = convolve
         self.calc_from = calc_from
         # For transformations
@@ -40,6 +42,7 @@ class WeightFunction(object):
         self.fw = None
         self.w_conv_steady = None
         self.k_grid = None
+        self.k_cos = None
         self.k_cos_R = None
         self.k_sin = None
         self.k_sin_R = None
@@ -47,6 +50,9 @@ class WeightFunction(object):
         self.r = None
         self.geometry = None
         self.fn = None
+        # Entropy weights
+        self.fw_T = None
+        self.w_conv_steady_T = None
 
     @staticmethod
     def Copy(Other):
@@ -62,52 +68,86 @@ class WeightFunction(object):
                               convolve=Other.convolve,
                               calc_from=Other.calc_from)
 
-    def generate_fourier_weights(self, grid, R):
+    def generate_fourier_weights(self, grid, R, R_T):
         """
         """
         self.R = R
+        self.R_T = R_T
         self.geometry = grid.geometry
         self.fn = np.zeros(grid.n_grid)
         self.prefactor_evaluated = self.prefactor(R)
-        if self.convolve:
-            if self.geometry == Geometry.PLANAR:
-                self.generate_planar_fourier_weights(grid, R)
-            elif self.geometry == Geometry.SPHERICAL:
-                self.generate_spherical_fourier_weights(grid, R)
-            elif self.geometry == Geometry.POLAR:
-                self.generate_polar_fourier_weights(grid, R)
+        if self.geometry == Geometry.PLANAR:
+            self.generate_planar_fourier_weights(grid, R, R_T)
+        elif self.geometry == Geometry.SPHERICAL:
+            self.generate_spherical_fourier_weights(grid, R, R_T)
+        elif self.geometry == Geometry.POLAR:
+            self.generate_polar_fourier_weights(grid, R, R_T)
 
-    def generate_planar_fourier_weights(self, grid, R):
+    def generate_planar_fourier_weights(self, grid, R, R_T):
         """
         """
         self.fw = np.zeros(grid.n_grid)
+        self.k_cos = np.zeros(grid.n_grid)
         self.k_cos_R = np.zeros(grid.n_grid)
         self.k_sin = np.zeros(grid.n_grid)
         self.k_sin_R = np.zeros(grid.n_grid)
         N = grid.n_grid
         L = grid.domain_size
-        self.k_cos_R = 2 * np.pi * np.linspace(0.0, N - 1, N) / (2 * L) * R * self.kernel_radius
+        R_kernel = R*self.kernel_radius
+        self.k_cos = 2 * np.pi * np.linspace(0.0, N - 1, N) / (2 * L)
+        self.k_cos_R = self.k_cos * R_kernel
         self.k_sin = 2 * np.pi * np.linspace(1.0, N, N) / (2 * L)
-        self.k_sin_R = self.k_sin * R * self.kernel_radius
+        self.k_sin_R = self.k_sin * R_kernel
+        self.generate_planar_fourier_weights_T(grid, R, R_T)
+        if self.convolve:
+            if self.wf_type == WeightFunctionType.THETA:
+                self.w_conv_steady = (4.0/3.0)*np.pi*(R_kernel**3)
+                self.fw[:] = 4/3 * np.pi * R_kernel**3 * \
+                    (spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R))
+            elif self.wf_type == WeightFunctionType.NORMTHETA:
+                self.w_conv_steady = 1.0
+                self.fw[:] = spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R)
+            elif self.wf_type == WeightFunctionType.DELTA:
+                # The convolution of the fourier weights for steady profile
+                self.w_conv_steady = 4.0*np.pi*R_kernel**2
+                self.fw[:] = 4.0 * np.pi * R_kernel**2 * spherical_jn(0, self.k_cos_R)
+            elif self.wf_type == WeightFunctionType.DELTAVEC:
+                # The convolution of the fourier weights for steady profile
+                self.w_conv_steady = 0.0
+                self.fw[:] = - self.k_sin * \
+                    (4.0/3.0 * np.pi * R_kernel**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
 
+    def generate_planar_fourier_weights_T(self, grid, R, R_T):
+        """
+        """
+        self.fw_T = np.zeros(grid.n_grid)
+        R_kernel = R*self.kernel_radius
         if self.wf_type == WeightFunctionType.THETA:
-            self.w_conv_steady = (4.0/3.0)*np.pi*((R*self.kernel_radius)**3)
-            self.fw[:] = 4/3 * np.pi * (R*self.kernel_radius)**3 * \
-                (spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R))
+            self.fw_T[:] = 4 * np.pi * R_kernel**2 * spherical_jn(0, self.k_cos_R)
+            self.w_conv_steady_T = 4 * np.pi * R_kernel**2
         elif self.wf_type == WeightFunctionType.NORMTHETA:
-            self.w_conv_steady = 1.0
-            self.fw[:] = spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R)
+            self.fw_T[:] = 3*spherical_jn(2, self.k_cos_R)/R
+            self.w_conv_steady_T = 0.0
         elif self.wf_type == WeightFunctionType.DELTA:
-            # The convolution of the fourier weights for steady profile
-            self.w_conv_steady = 4.0*np.pi*(R*self.kernel_radius)**2
-            self.fw[:] = 4.0 * np.pi * (R*self.kernel_radius)**2 * spherical_jn(0, self.k_cos_R)
+            if self.inv_prefactor_R(R) == 0.0:
+                #n0 type weight
+                self.fw_T[:] = - self.k_cos * spherical_jn(1, self.k_cos_R)
+                self.w_conv_steady_T = 0.0
+            elif self.inv_prefactor_RR(R) == 0.0:
+                #n1 type weight
+                self.fw_T[:] = spherical_jn(0, self.k_cos_R) - self.k_cos_R * spherical_jn(1, self.k_cos_R)
+                self.w_conv_steady_T = self.kernel_radius
+            else:
+                #n2 type weight
+                self.fw_T[:] = 8 * np.pi * R_kernel * (spherical_jn(0, self.k_cos_R) - 0.5*self.k_cos_R*spherical_jn(1, self.k_cos_R))
+                self.w_conv_steady_T = 8 * np.pi * R_kernel
         elif self.wf_type == WeightFunctionType.DELTAVEC:
-            # The convolution of the fourier weights for steady profile
-            self.w_conv_steady = 0.0
-            self.fw[:] = self.k_sin * \
-            (4.0/3.0 * np.pi * (R*self.kernel_radius)**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
+            self.fw_T[:] = - 4 * self.k_sin_R * R_kernel * spherical_jn(0, self.k_sin_R)
+            self.w_conv_steady_T = 0.0
+        self.fw_T[:] *= R_T
+        self.w_conv_steady_T *= R_T
 
-    def generate_spherical_fourier_weights(self, grid, R):
+    def generate_spherical_fourier_weights(self, grid, R, R_T):
         """
         """
         self.R = R
@@ -122,26 +162,26 @@ class WeightFunction(object):
         self.k_sin_R = self.k_sin * R_kern
         self.one_div_r = (1/grid.z)
         self.r = grid.z
-        if self.wf_type == WeightFunctionType.THETA:
-            self.w_conv_steady = (4.0/3.0)*np.pi*R_kern**3
-            self.fw[:] = 4.0/3.0 * np.pi * R_kern**3 * \
-                (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
-        elif self.wf_type == WeightFunctionType.NORMTHETA:
-            self.w_conv_steady = 1.0
-            self.fw[:] = spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)
-        elif self.wf_type == WeightFunctionType.DELTA:
-            # The convolution of the fourier weights for steady profile
-            self.w_conv_steady = 4.0*np.pi*R_kern**2
-            self.fw[:] = 4.0 * np.pi * R_kern**2 * spherical_jn(0, self.k_sin_R)
-        elif self.wf_type == WeightFunctionType.DELTAVEC:
-            # The convolution of the fourier weights for steady profile
-            self.w_conv_steady = 0.0
-            #self.k_sin *
-            self.fw[:] = 4.0/3.0 * np.pi * R_kern**3 * \
-                (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
+        if self.convolve:
+            if self.wf_type == WeightFunctionType.THETA:
+                self.w_conv_steady = (4.0/3.0)*np.pi*R_kern**3
+                self.fw[:] = 4.0/3.0 * np.pi * R_kern**3 * \
+                    (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
+            elif self.wf_type == WeightFunctionType.NORMTHETA:
+                self.w_conv_steady = 1.0
+                self.fw[:] = spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)
+            elif self.wf_type == WeightFunctionType.DELTA:
+                # The convolution of the fourier weights for steady profile
+                self.w_conv_steady = 4.0*np.pi*R_kern**2
+                self.fw[:] = 4.0 * np.pi * R_kern**2 * spherical_jn(0, self.k_sin_R)
+            elif self.wf_type == WeightFunctionType.DELTAVEC:
+                # The convolution of the fourier weights for steady profile
+                self.w_conv_steady = 0.0
+                #self.k_sin *
+                self.fw[:] = 4.0/3.0 * np.pi * R_kern**3 * \
+                    (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R))
 
-
-    def generate_polar_fourier_weights(self, grid, R):
+    def generate_polar_fourier_weights(self, grid, R, R_T):
         """
         """
         if self.wf_type == WeightFunctionType.THETA:
@@ -168,6 +208,7 @@ class WeightFunction(object):
                 self.spherical_convolution(rho_inf, frho_delta, weighted_density)
             elif self.geometry == Geometry.POLAR:
                 self.polar_convolution(rho_inf, frho_delta, weighted_density)
+
 
     def update_dependencies(self, weighted_densities):
         """
@@ -224,6 +265,29 @@ class WeightFunction(object):
             self.fn[:] = fd_delta[:] * self.fw[:]
 
         diff_conv[:] = idct(self.fn, type=2) + d_inf*self.w_conv_steady
+
+    def planar_convolution_differentials_T(self, diff: np.ndarray, diff_conv: np.ndarray):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+        d_inf = diff[-1]
+        d_delta = np.zeros_like(diff)
+        d_delta[:] = diff[:] - d_inf
+        if self.wf_type == WeightFunctionType.DELTAVEC:
+            fd_delta = dst(d_delta, type=2)       # The vector valued function is odd
+            self.fn[:] = fd_delta[:] * self.fw_T[:]
+            # We must roll the vector to conform with the cosine transform
+            self.fn = np.roll(self.fn, 1)
+            self.fn[0] = 0
+        else:
+            fd_delta = dct(d_delta, type=2)
+            self.fn[:] = fd_delta[:] * self.fw_T[:]
+
+        diff_conv[:] = idct(self.fn, type=2) + d_inf*self.w_conv_steady_T
 
 
     def spherical_convolution(self, rho_inf: float, frho_delta: np.ndarray, weighted_density: np.ndarray):
@@ -299,6 +363,19 @@ class WeightFunction(object):
                 self.spherical_convolution_differentials(diff, conv_diff)
             elif self.geometry == Geometry.POLAR:
                 self.polar_convolution_differentials(diff, conv_diff)
+
+    def convolve_differentials_T(self, diff: np.ndarray, conv_diff: np.ndarray):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+        if self.geometry == Geometry.PLANAR:
+            self.planar_convolution_differentials_T(diff, conv_diff)
+        else:
+            pass
 
 class WeightFunctions(object):
 

@@ -66,7 +66,7 @@ class Rosenfeld:
         self.d2v = np.zeros(N)
         self.d2eff = np.zeros(N)
         self.d2veff = np.zeros(N)
-
+        self.d_T = np.zeros(N)
         # Set up FMT weights
         self.wf = WeightFunctions()
         self.wf.add_fmt_weights()
@@ -191,6 +191,19 @@ class Rosenfeld:
 
         # Combining differentials
         self.combine_differentials()
+
+    def temperature_differential(self, dens):
+        """
+        Calculates the functional differentials wrpt. temperature
+
+        Args:
+        dens (array_like): weighted densities
+        Return:
+        np.ndarray: Functional differentials
+
+        """
+        self.d_T.fill(0.0)
+        return self.d_T
 
     def combine_differentials(self):
         """

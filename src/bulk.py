@@ -32,6 +32,8 @@ class Bulk(object):
         self.particle_diameters, self.particle_diameters_dt = left_state.eos.hard_sphere_diameters(left_state.T)
         self.R = np.zeros_like(self.particle_diameters) # Particle radius (Reduced)
         self.R[:] = 0.5*self.particle_diameters/self.particle_diameters[0]
+        self.R_T = np.zeros_like(self.particle_diameters)
+        self.R_T[:] = 0.5*self.particle_diameters_dt/self.particle_diameters[0]
 
         # Temperature
         self.temperature = left_state.T

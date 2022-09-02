@@ -159,7 +159,7 @@ class Interface(ABC):
             self.n_tot = self.calculate_total_mass()
             print("n_tot", self.n_tot)
             # Set up convolver
-            self.convolver = Convolver(self.grid, self.functional, self.bulk.R)
+            self.convolver = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
             x0 = self.pack_x_vec()
             # print("x0:", x0)
             # sys.exit()
@@ -377,6 +377,21 @@ class Interface(ABC):
                 gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_right[i])
         return gamma
 
+    def get_entropy_density(self):
+        """
+        Get entropy per volume (J/m3/K)
+        """
+        if not self.profile:
+            print("Need profile to calculate entropy density")
+            return
+
+        dfdn_dndt = self.convolver.convolve_differentials_T()
+        dfdt = self.functional.temperature_differential(self.convolver.weighted_densities)
+        entropy_density = np.zeros_like(dfdn_dndt)
+        entropy_density[:] = -dfdn_dndt[:] - dfdt[:]
+        # Scale to real units
+        #rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+        return entropy_density
 
     def print_perform_minimization_message(self):
         """

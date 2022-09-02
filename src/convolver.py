@@ -267,10 +267,7 @@ class CompWeightedDifferentials():
         self.d = {}
         for wf in wfs:
             alias = wfs[wf].alias
-            if wfs[wf].convolve > 0.0:
-                self.d_conv[alias] = np.zeros(n_grid)
-            else:
-                self.d_conv[alias] = None
+            self.d_conv[alias] = np.zeros(n_grid)
             if alias not in wfs.fmt_aliases:
                 self.d[alias] = np.zeros(n_grid)
             else:
@@ -394,7 +391,8 @@ class Convolver(object):
     def __init__(self,
                  grid: Grid,
                  functional,
-                 R: np.ndarray):
+                 R: np.ndarray,
+                 R_T: np.ndarray):
         """Class handeling convolution
 
         Args:
@@ -415,7 +413,7 @@ class Convolver(object):
             self.comp_wfs.append(WeightFunctions.Copy(functional.wf))
             # Set up Fourier weights
             for wfun in self.comp_wfs[i]:
-                self.comp_wfs[i][wfun].generate_fourier_weights(grid, R[i])
+                self.comp_wfs[i][wfun].generate_fourier_weights(grid, R[i], R_T[i])
             self.comp_weighted_densities.append(WeightedDensities(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
             self.comp_differentials.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
 
@@ -484,6 +482,26 @@ class Convolver(object):
         # print("d3",self.comp_differentials[0].d_conv["w3"])
         # print("d2veff",self.comp_differentials[0].d_conv["wv2"])
         # print("d_disp",self.comp_differentials[0].d_conv["w_disp"])
+
+    def convolve_differentials_T(self):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        dfdt = np.zeros(self.grid.n_grid)
+        # Calculate differentials
+        self.functional.differentials(self.weighted_densities)
+        for i in range(self.functional.nc):
+            self.comp_differentials[i].set_functional_differentials(
+                self.functional, i)
+            # Loop all weight functions
+            for wf in self.comp_wfs[i]:
+                self.comp_wfs[i][wf].convolve_differentials_T(self.comp_differentials[i].d_effective(wf),
+                                                              self.comp_differentials[i].d_conv[wf])
+                dfdt[:] += self.comp_differentials[i].d_conv[wf]
+        return dfdt
 
     def correlation(self, i):
         """

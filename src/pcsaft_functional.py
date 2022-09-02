@@ -177,6 +177,29 @@ class pc_saft(Whitebear):
             d = self.mu_disp[i-6, :]
         return d
 
+    def temperature_differential(self, dens):
+        """
+        Calculates the functional differentials wrpt. temperature
+
+        Args:
+        dens (array_like): weighted densities
+        Return:
+        np.ndarray: Functional differentials
+
+        """
+        d_T = Whitebear.temperature_differential(self, dens)
+
+        rho_thermo = np.zeros(self.nc)
+        V = 1.0
+        for i in range(self.n_grid):
+            rho_thermo[:] = dens.n[self.disp_name][:, i]
+            rho_mix = np.sum(rho_thermo)
+            rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+            a, a_T, = self.thermo.a_dispersion(
+                self.T, V, rho_thermo, a_T=True)
+            d_T[i] += rho_mix*a_T
+
+        return d_T
 
 if __name__ == "__main__":
     # Model testing
