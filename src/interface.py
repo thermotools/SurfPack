@@ -3,7 +3,7 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from dft_numerics import dft_solver
-from constants import NA, KB, Geometry, Specification, LenghtUnit
+from constants import NA, KB, Geometry, Specification, LenghtUnit, GRID_UNIT, LCOLORS
 from bulk import Bulk
 from density_profile import Profile
 from grid import Grid
@@ -291,7 +291,7 @@ class Interface(ABC):
         """
         gamma_star = self.surface_tension()
         eps = self.functional.thermo.eps_div_kb[0] * KB
-        sigma = self.bulk.particle_diameters[0]
+        sigma = self.functional.grid_reducing_lenght
         gamma = gamma_star * eps / sigma ** 2
 
         return gamma
@@ -390,7 +390,7 @@ class Interface(ABC):
         entropy_density = np.zeros_like(dfdn_dndt)
         entropy_density[:] = -dfdn_dndt[:] - dfdt[:]
         # Scale to real units
-        #rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+        #rho_thermo *= 1.0/(NA*self.grid_redicing_lenght**3)
         return entropy_density
 
     def print_perform_minimization_message(self):
@@ -428,7 +428,7 @@ class Interface(ABC):
                                           ylim=None,
                                           plot_actual_densities=False,
                                           plot_equimolar_surface=False,
-                                          unit=LenghtUnit.REDUCED):
+                                          unit=GRID_UNIT):
         """
         Plot equilibrium density profile
         Args:
@@ -440,14 +440,16 @@ class Interface(ABC):
         fig, ax = plt.subplots(1, 1)
         if unit==LenghtUnit.REDUCED:
             ax.set_xlabel("$z/d_{11}$")
-            len_fac = 1.0
-        elif unit==Lenght_unit.ANGSTROM:
+        elif unit==LenghtUnit.ANGSTROM:
             ax.set_xlabel("$z$ (Å)")
-            len_fac = self.cDFT.sigma*1e10
+        if GRID_UNIT == LenghtUnit.ANGSTROM and unit == LenghtUnit.REDUCED:
+            len_fac = 1.0/(self.functional.d_hs[0]*1e10)
+        else:
+            len_fac = self.functional.grid_reducing_lenght*1e10
         des_fac = np.ones(self.profile.densities.nc)
         if plot_actual_densities:
-            des_fac *= 1.0e-3
-            ax.set_ylabel(r"$\rho$ (kmol/m$**3$)")
+            des_fac *= 1.0e-3/(NA*self.functional.grid_reducing_lenght**3)
+            ax.set_ylabel(r"$\rho$ (kmol/m$^3$)")
         else:
             des_fac /= max(self.bulk.reduced_density_left,
                            self.bulk.reduced_density_right)
@@ -455,7 +457,7 @@ class Interface(ABC):
         for i in range(self.profile.densities.nc):
             ax.plot(self.grid.z[:]*len_fac,
                     self.profile.densities[i][:] * des_fac[i],
-                    lw=2, color="k", label=f"cDFT comp. {i+1}")
+                    lw=2, color=LCOLORS[i], label=f"Comp. {i+1}")
         if data_dict is not None:
             plot_data_container(data_dict, ax)
 
@@ -467,7 +469,7 @@ class Interface(ABC):
         if plot_equimolar_surface:
             # Plot equimolar dividing surface
             yl = ax.get_ylim()
-            ax.plot([self.r_equimolar, self.r_equimolar],
+            ax.plot([len_fac*self.r_equimolar, len_fac*self.r_equimolar],
                     [0.0, yl[1]],
                     lw=1, color="k",
                     linestyle="--",
@@ -657,7 +659,7 @@ class SphericalInterface(Interface):
         # Extrapolate sigma 0
         phase = sif.functional.thermo.LIQPH if calculate_bubble else sif.functional.thermo.VAPPH
         print(phase)
-        real_radius = radius * sif.functional.d_hs[0]
+        real_radius = radius * sif.functional.grid_reducing_lenght
         print(real_radius)
         print(vle.vapor.rho,vle.liquid.rho)
         # Extrapolate chemical potential to first order and solve for phase densiteis
@@ -732,7 +734,7 @@ class SphericalInterface(Interface):
         delta = self.r_equimolar - r_s
         if not reduced:
             eps = self.functional.thermo.eps_div_kb[0] * KB
-            sigma = self.bulk.particle_diameters[0]
+            sigma = self.functional.grid_reducing_lenght
             gamma_s *= eps / sigma ** 2
             r_s *= sigma
             delta *= sigma

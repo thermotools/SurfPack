@@ -31,9 +31,9 @@ class Bulk(object):
         self.right_state = right_state
         self.particle_diameters, self.particle_diameters_dt = left_state.eos.hard_sphere_diameters(left_state.T)
         self.R = np.zeros_like(self.particle_diameters) # Particle radius (Reduced)
-        self.R[:] = 0.5*self.particle_diameters/self.particle_diameters[0]
+        self.R[:] = 0.5*self.particle_diameters/functional.grid_reducing_lenght
         self.R_T = np.zeros_like(self.particle_diameters)
-        self.R_T[:] = 0.5*self.particle_diameters_dt/self.particle_diameters[0]
+        self.R_T[:] = 0.5*self.particle_diameters_dt/functional.grid_reducing_lenght
 
         # Temperature
         self.temperature = left_state.T
@@ -73,7 +73,7 @@ class Bulk(object):
         """
 
         reduced_density = np.zeros_like(partial_density)
-        reduced_density[:] = partial_density*NA*self.particle_diameters[0]**3
+        reduced_density[:] = partial_density*NA*self.functional.grid_reducing_lenght**3
         return reduced_density
 
     def get_real_density(self, reduced_density):
@@ -85,7 +85,7 @@ class Bulk(object):
         """
 
         partial_density = np.zeros_like(reduced_density)
-        partial_density[:] = reduced_density/(NA*self.particle_diameters[0]**3)
+        partial_density[:] = reduced_density/(NA*self.functional.grid_reducing_lenght**3)
         return partial_density
 
 

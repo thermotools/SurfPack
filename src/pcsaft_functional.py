@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import NA, RGAS
+from constants import NA, RGAS, GRID_UNIT, LenghtUnit
 from fmt_functionals import Whitebear
 from pyctp import pcsaft
 
@@ -22,8 +22,13 @@ class pc_saft(Whitebear):
         self.T_red = T_red
         self.T = self.T_red * self.thermo.eps_div_kb[0]
         self.d_hs, self.d_T_hs = pcs.hard_sphere_diameters(self.T)
+
+        if GRID_UNIT == LenghtUnit.ANGSTROM:
+            self.grid_reducing_lenght = 1.0e-10
+        else:
+            self.grid_reducing_lenght = self.d_hs[0]
         R = np.zeros(pcs.nc)
-        R[:] = 0.5*self.d_hs[:]/self.d_hs[0]
+        R[:] = 0.5*self.d_hs[:]/self.grid_reducing_lenght
         Whitebear.__init__(self, N, R)
         self.name = "PC-SAFT"
         self.short_name = "PC"
@@ -50,7 +55,7 @@ class pc_saft(Whitebear):
         for i in range(len(f)):
             rho_thermo[:] = dens.n[self.disp_name][:, i]
             rho_mix = np.sum(rho_thermo)
-            rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+            rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, = self.thermo.a_dispersion(self.T, V, rho_thermo)
             f[i] += rho_mix*a
 
@@ -83,7 +88,7 @@ class pc_saft(Whitebear):
         for i in range(self.n_grid):
         #   if prdm[i]:
             rho_thermo[:] = dens.n[self.disp_name][:, i]
-            rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+            rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_n, = self.thermo.a_dispersion(
                 self.T, V, rho_thermo, a_n=True)
             self.mu_disp[i, :] = (a + rho_thermo[:]*a_n[:])
@@ -104,7 +109,7 @@ class pc_saft(Whitebear):
         # PC-SAFT contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
-        rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+        rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
         rho_mix = np.sum(rho_thermo)
         V = 1.0/rho_mix
         n = rho_thermo/rho_mix
@@ -130,7 +135,7 @@ class pc_saft(Whitebear):
         # PC-SAFT contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
-        rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+        rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
         rho_mix = np.sum(rho_thermo)
         V = 1.0
         n = rho_thermo
@@ -156,7 +161,7 @@ class pc_saft(Whitebear):
             rho_mix = np.sum(rho_vec)
             V = 1.0
             rho_thermo = np.zeros_like(rho_vec)
-            rho_thermo[:] = rho_vec[:]/(NA*self.d_hs[0]**3)
+            rho_thermo[:] = rho_vec[:]/(NA*self.grid_reducing_lenght**3)
             a, a_n, = self.thermo.a_dispersion(
                 self.T, V, rho_thermo, a_n=True)
             phi += rho_mix*a
@@ -194,7 +199,7 @@ class pc_saft(Whitebear):
         for i in range(self.n_grid):
             rho_thermo[:] = dens.n[self.disp_name][:, i]
             rho_mix = np.sum(rho_thermo)
-            rho_thermo *= 1.0/(NA*self.d_hs[0]**3)
+            rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_T, = self.thermo.a_dispersion(
                 self.T, V, rho_thermo, a_T=True)
             d_T[i] += rho_mix*a_T
@@ -214,7 +219,7 @@ if __name__ == "__main__":
                             1.0e6,
                             np.array([1.0]),
                             pcs.LIQPH)
-    rho = (NA * PCS_functional.d_hs[0] ** 3)/v
+    rho = (NA * PCS_functional.grid_reducing_lenght ** 3)/v
     PCS_functional.test_bulk_differentials(rho)
     dens = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
     dens.set_testing_values(rho)
