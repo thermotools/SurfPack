@@ -1,0 +1,346 @@
+\documentclass[12pt, letterpaper]{article}
+\pdfminorversion=4
+\usepackage[utf8]{inputenc}
+\usepackage{textcomp}
+\usepackage{listings}
+\usepackage{babel}
+\usepackage[square,numbers]{natbib}
+%\usepackage{amsmath}
+\usepackage{amssymb,amsmath,amsthm,amsfonts}
+\usepackage{pslatex}
+%\usepackage{bm}% better \boldsymbol
+\usepackage{array}% improves tabular environment.
+\usepackage{dcolumn}% also improves tabular environment, with decimal centring.
+%\usepackage{lastpage}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathmorphing}
+%\usepackage{pgfplots}
+%\usepackage{cleveref}
+\usepackage{pgf,pgfarrows,pgfnodes}
+
+\usepackage[final]{pdfpages}
+\usepackage{hyperref}
+\usepackage{doi}
+
+%\usepackage[altbullet,expert]{lucidabr}
+%\usepackage[charter]{mathdesign}
+\usepackage{cleveref}
+\usepackage{ifthen}
+%\usepackage{nomencl}
+\usepackage{parskip}
+\usepackage{psfrag}
+\usepackage{booktabs}
+\usepackage{pifont}
+%\usepackage{subfig,caption}
+\usepackage{microtype}% for pdflatex; medisin mot overfull \vbox
+\usepackage{xspace}% for pdflatex; medisin mot overfull \vbox
+\usepackage[font=footnotesize]{subcaption}
+\usepackage{siunitx}
+\usepackage{todonotes}
+\presetkeys%
+    {todonotes}%
+    {inline,backgroundcolor=orange}{}
+
+%% Formattering av figur- og tabelltekster
+%
+%
+% Egendefinerte
+%
+%\newcommand*{\od}[3][]{\frac{\mathrm{d}^{#1}#2}{\mathrm{d}{#3}^{#1}}}% ordinary derivative
+\newcommand*{\od}[3][]{\frac{\dif^{#1}#2}{\dif{#3}^{#1}}}% ordinary derivative
+\newcommand*{\pd}[3][]{\frac{\partial^{#1}#2}{\partial{#3}^{#1}}}% partial derivative
+\newcommand*{\pdt}[3][]{{\partial^{#1}#2}/{\partial{#3}^{#1}}}% partial
+                                % derivative for inline use.
+\newcommand{\pone}[3]{\frac{\partial #1}{\partial #2}_{#3}}% partial
+                                % derivative with information of
+                                % constant variables
+\newcommand{\ponel}[3]{\frac{\partial #1}{\partial #2}\bigg|_{#3}} % partial derivative with informatio of constant variable. A line is added.
+\newcommand{\ptwo}[3]{\frac{\partial^{2} #1}{\partial #2 \partial
+    #3}} % partial differential in two different variables
+\newcommand{\pdn}[3]{\frac{\partial^{#1}#2}{\partial{#3}^{#1}}}% partial derivative
+
+% Total derivative:
+\newcommand*{\ttd}[2]{\frac{\mathrm{D} #1}{\mathrm{D} #2}}
+\newcommand*{\td}[2]{\frac{\mathrm{d} #1}{\mathrm{d} #2}}
+\newcommand*{\ddt}{\frac{\partial}{\partial t}}
+\newcommand*{\ddx}{\frac{\partial}{\partial x}}
+% Vectors etc:
+% For Computer Modern:
+
+\DeclareMathAlphabet{\mathsfsl}{OT1}{cmss}{m}{sl}
+%\renewcommand*{\vec}[1]{\boldsymbol{#1}}%
+\newcommand*{\vc}[1]{\vec{\mathbf{#1}}}%
+\newcommand*{\tensor}[1]{\mathsfsl{#1}}% 2. order tensor
+\newcommand*{\matr}[1]{\tensor{#1}}% matrix
+\renewcommand*{\div}{\boldsymbol{\nabla\cdot}}% divergence
+\newcommand*{\grad}{\boldsymbol{\nabla}}% gradient
+% fancy differential from Claudio Beccari, TUGboat:
+% adjusts spacing automatically
+\makeatletter
+\newcommand*{\dif}{\@ifnextchar^{\DIfF}{\DIfF^{}}}
+\def\DIfF^#1{\mathop{\mathrm{\mathstrut d}}\nolimits^{#1}\gobblesp@ce}
+\def\gobblesp@ce{\futurelet\diffarg\opsp@ce}
+\def\opsp@ce{%
+  \let\DiffSpace\!%
+  \ifx\diffarg(%
+    \let\DiffSpace\relax
+  \else
+    \ifx\diffarg[%
+      \let\DiffSpace\relax
+    \else
+      \ifx\diffarg\{%
+        \let\DiffSpace\relax
+      \fi\fi\fi\DiffSpace}
+\makeatother
+%
+\newcommand*{\me}{\mathrm{e}}% e is not a variable (2.718281828...)
+%\newcommand*{\mi}{\mathrm{i}}%  nor i (\sqrt{-1})
+\newcommand*{\mpi}{\uppi}% nor pi (3.141592...) (works for for Lucida)
+%
+% lav tekst-indeks/subscript/pedex
+\newcommand*{\ped}[1]{\ensuremath{_{\text{#1}}}}
+% hy tekst-indeks/superscript/apex
+\newcommand*{\ap}[1]{\ensuremath{^{\text{#1}}}}
+\newcommand*{\apr}[1]{\ensuremath{^{\mathrm{#1}}}}
+\newcommand*{\pedr}[1]{\ensuremath{_{\mathrm{#1}}}}
+%
+\newcommand*{\volfrac}{\alpha}% volume fraction
+\newcommand*{\surften}{\sigma}% coeff. of surface tension
+\newcommand*{\curv}{\kappa}% curvature
+\newcommand*{\ls}{\phi}% level-set function
+\newcommand*{\ep}{\Phi}% electric potential
+\newcommand*{\perm}{\varepsilon}% electric permittivity
+\newcommand*{\visc}{\mu}% molecular (dymamic) viscosity
+\newcommand*{\kvisc}{\nu}% kinematic viscosity
+\newcommand*{\cfl}{C}% CFL number
+
+% Grid
+\newcommand{\jj}{j}
+\newcommand{\jph}{{j+1/2}}
+\newcommand{\jmh}{{j-1/2}}
+\newcommand{\jp}{{j+1}}
+\newcommand{\jm}{{j-1}}
+\newcommand{\nn}{n}
+\newcommand{\nph}{{n+1/2}}
+\newcommand{\nmh}{{n-1/2}}
+\newcommand{\np}{{n+1}}
+%
+\newcommand{\lf}{\text{LF}}
+\newcommand{\lw}{\text{Ri}}
+%
+\newcommand*{\cons}{\vec U}
+\newcommand*{\flux}{\vec F}
+\newcommand*{\dens}{\rho}
+\newcommand*{\svol}{\ensuremath v}
+\newcommand*{\temp}{\ensuremath T}
+\newcommand*{\vel}{\ensuremath u}
+\newcommand*{\mom}{\dens\vel}
+\newcommand*{\toten}{\ensuremath E}
+\newcommand*{\inten}{\ensuremath e}
+\newcommand*{\press}{\ensuremath p}
+\renewcommand*{\ss}{\ensuremath a}
+\newcommand*{\jac}{\matr A}
+%
+\newcommand*{\abs}[1]{\lvert#1\rvert}
+\newcommand*{\bigabs}[1]{\bigl\lvert#1\bigr\rvert}
+\newcommand*{\biggabs}[1]{\biggl\lvert#1\biggr\rvert}
+\newcommand*{\norm}[1]{\lVert#1\rVert}
+%
+\newcommand*{\e}[1]{\times 10^{#1}}
+\newcommand*{\ex}[1]{\times 10^{#1}}%shorthand -- for use e.g. in tables
+\newcommand*{\exi}[1]{10^{#1}}%shorthand -- for use e.g. in tables
+\newcommand*{\nondim}[1]{\ensuremath{\mathit{#1}}}% italic iflg. ISO. (???)
+\newcommand*{\rey}{\nondim{Re}}
+\newcommand*{\acro}[1]{\textsc{\MakeLowercase{#1}}}%acronyms etc.
+
+\newcommand{\nto}{\ensuremath{\mbox{N}_{\mbox{\scriptsize 2}}}}
+\newcommand{\chfire}{\ensuremath{\mbox{CH}_{\mbox{\scriptsize 4}}}}
+%\newcommand*{\checked}{\ding{51}}
+\newcommand{\coto}{\ensuremath{\text{CO}_{\text{\scriptsize 2}}}}
+\newcommand{\celsius}{\ensuremath{^\circ\text{C}}}
+%\newcommand{\clap}{Clapeyron~}
+\newcommand{\subl}{\ensuremath{\text{sub}}}
+\newcommand{\spec}{\text{spec}}
+\newcommand{\sat}{\text{sat}}
+\newcommand{\sol}{\text{sol}}
+\newcommand{\liq}{\text{liq}}
+\newcommand{\vap}{\text{vap}}
+\newcommand{\amb}{\text{amb}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\crit}{\text{crit}}
+\newcommand{\entr}{\ensuremath{\text{s}}}
+\newcommand{\fus}{\text{fus}}
+\newcommand{\flash}[1]{\ensuremath{#1\text{-flash}}}
+\newcommand{\spce}[2]{\ensuremath{#1\, #2\text{ space}}}
+\newcommand{\spanwagner}{\text{Span--Wagner}}
+\newcommand{\triplepoint}{\text{TP triple point}}
+\newcommand{\wrpt}{\text{with respec to~}}
+%\sisetup{input-symbols = {( )}}
+% \newcommand*{\red}{\ensuremath{\text{R}}\xspace}
+% \newcommand*{\crit}{\ensuremath{\text{c}}\xspace}
+% \newcommand*{\mix}{\ensuremath{\text{m}}\xspace}
+\newcommand*{\lb}{\ensuremath{\left(}}
+\newcommand*{\rb}{\ensuremath{\right)}}
+\newcommand*{\lbf}{\ensuremath{\left[}}
+\newcommand*{\rbf}{\ensuremath{\right]}}
+\newcommand{\LEFT}{\ensuremath{\text{L}}\xspace}
+\newcommand{\RIGTH}{\ensuremath{\text{R}}\xspace}
+\newcommand{\cdft}{\ensuremath{\text{classical DFT}}\xspace}
+\newcommand{\RF}{\ensuremath{\text{RF}}\xspace}
+\newcommand{\WB}{\ensuremath{\text{WB}}\xspace}
+\newcommand{\WBII}{\ensuremath{\text{WBII}}\xspace}
+\newcommand{\excess}{\ensuremath{\text{ex}}\xspace}
+\newcommand{\ideal}{\ensuremath{\text{id}}\xspace}
+\newcommand{\rvec}{\ensuremath{\mathbf{r}}\xspace}
+\newcommand{\pvec}{\ensuremath{\mathbf{p}}\xspace}
+\newcommand{\attractive}{\ensuremath{\text{att}}\xspace}
+\newcommand{\kB}{\ensuremath{\text{k}_{\text{B}}}\xspace}
+\newcommand{\NA}{\ensuremath{N_{\text{A}}}\xspace}
+\newcommand{\external}{\ensuremath{\text{ext}}\xspace}
+\newcommand{\bulk}{\ensuremath{\text{b}}\xspace}
+\newcommand{\pure}{\ensuremath{\text{p}}\xspace}
+\newcommand{\NC}{\ensuremath{\text{NC}}\xspace}
+\newcommand{\disp}{\ensuremath{\text{disp}}\xspace}
+\graphicspath{{gfx/}}
+
+\title{Classical Density Functional Theory for Thermopack - Entropy}
+\author{Morten Hammer}
+\date{\today}
+
+\begin{document}
+%\tableofcontents
+%\printnomenclature
+
+
+\begin{titlepage}
+\maketitle
+\end{titlepage}
+
+\section{Introduction}
+
+The entropy ($\tilde{S}$ (\si{\joule\per\kelvin})) is generally given
+from the Helmholtz energy ($\tilde{F}$ (\si{\joule})) differential
+with respect to temperature,
+
+\begin{equation}
+  \tilde{S} = - \od{\tilde{F}}{T}\bigg|_{V,n}.
+\end{equation}
+
+The Helmholtz functional in DFT is given as
+\begin{equation}
+  F\left[\rho\right] = \frac{\tilde{F}}{V}.
+\end{equation}
+
+The mol specific Helmholtz functional is then given as
+\begin{equation}
+  f\left[\rho\right] = \frac{F}{\rho}.
+\end{equation}
+
+The mol specific entropy then becomes
+\begin{equation}
+  s = - \od{f}{T}\bigg|_{\rho} = - \frac{1}{\rho}\od{F}{T}\bigg|_{\rho}.
+\end{equation}
+
+This is different from the definition of \citet{stierle2021}, where mol specific entropy is defined as
+\begin{equation}
+  s = - \frac{1}{\bar{\rho}}\od{F}{T}\bigg|_{\rho},
+\end{equation}
+where $\bar{\rho}$ is a weighted density. $\bar{\rho}$ is not constant upon differentiating with temperature.
+
+
+The functional depends on the density through the weighted densities,
+\begin{equation}
+  \label{eq:n_alpha}
+  n_\alpha = \int d \mathbf{r}^\prime \rho \lb \mathbf{r}^\prime \rb w_\alpha \lb \mathbf{r} - \mathbf{r}^\prime \rb =  \rho \lb \mathbf{r} \rb \otimes w_\alpha \lb \mathbf{r}\rb,
+\end{equation}
+where $w_\alpha$ is the a weight function. In effect the the functional becomes,
+
+\begin{equation}
+  F = F\lb \mathbf{n}\lb T\rb, T\rb
+\end{equation}
+
+The temperature differential of $F$ then becomes,
+\begin{equation}
+  \od{F}{T} = \underset{\alpha}{\sum} \pd{F}{n_\alpha}\pd{n_\alpha}{T} + \pd{F}{T}
+\end{equation}
+
+Differentiating  the equation for $n_\alpha$, \cref{eq:n_alpha}, give,
+\begin{align}
+  \label{eq:n_alpha_diff}
+  \pd{n_\alpha}{T} &= \pd{}{T} \rho \lb \mathbf{r} \rb \otimes w_\alpha \lb \mathbf{r}\rb \nonumber \\
+                   &= \pd{}{T} \mathcal{F}^{-1} \left[ \mathcal{F}\left[\rho \lb \mathbf{r} \rb\right] \mathcal{F}\left[w_\alpha \lb \mathbf{r}\rb\right]  \right] \nonumber \\
+                   &= \pd{}{T} \mathcal{F}^{-1} \left[ \hat{\rho} \lb \mathbf{k} \rb \hat{w}_\alpha \lb \mathbf{k}\rb  \right] \nonumber \\
+                   &= \mathcal{F}^{-1} \left[ \hat{\rho} \lb \mathbf{k} \rb \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{T}  \right]
+\end{align}
+
+The weight functions in Fourier space is given in the supplementary information by \citet{stierle2020a}.
+
+\begin{align}
+  \label{eq:weight_functions_fourier}
+  \hat{w}_0 \lb \mathbf{k}\rb &= j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \hat{w}_1 \lb \mathbf{k}\rb &= R j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \hat{w}_2 \lb \mathbf{k}\rb &= 4 \pi R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \hat{w}_3 \lb \mathbf{k}\rb &= \frac{4}{3} \pi R^3 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb  \\
+  \hat{w}_{V1} \lb \mathbf{k}\rb &= - \frac{i \mathbf{k}}{2 R} \hat{w}_3 \lb \mathbf{k}\rb  \\
+  \hat{w}_{V2} \lb \mathbf{k}\rb &= - 2 \pi i \mathbf{k} \hat{w}_3 \lb \mathbf{k}\rb  \\
+  \hat{w}_{\rm{disp}} \lb \mathbf{k}\rb &= j_0\lb 4 \pi \psi R |\mathbf{k}| \rb + j_2\lb 4 \pi \psi R |\mathbf{k}| \rb
+\end{align}
+Here $j$ is the spherical Bessel functions of the first kind of order
+zero and two. The Bessel functions of order 0-2 is given as
+\begin{align}
+  \label{eq:bessel_functions}
+  j_0\lb \xi \rb &= \frac{\sin \lb \xi \rb}{\xi} \\
+  j_1\lb \xi \rb &= \frac{\sin \lb \xi \rb}{\xi^2} - \frac{\cos \lb \xi \rb}{\xi}  \\
+  j_2\lb \xi \rb &= \biggl(\frac{3}{\xi^2} - 1\biggr) \frac{\sin \lb \xi \rb}{\xi} - \frac{3 \cos \lb \xi \rb}{\xi^2}.
+\end{align}
+Differentiating the Bessel functions of order 0 and three other useful relations,
+\begin{align}
+  \label{eq:bessel_function_differentials}
+  \pd{j_0\lb \xi \rb}{\xi} &= -\frac{\sin \lb \xi \rb}{\xi^2} + \frac{\cos \lb \xi \rb}{\xi} = - j_1\lb \xi \rb\\
+  \pd{\left[\xi^2\lb j_0\lb \xi \rb + j_2\lb \xi \rb\rb\right]}{\xi} &= \pd{}{\xi} \biggl(\frac{3\sin \lb \xi \rb}{\xi} - 3 \cos \lb \xi \rb\biggr) \nonumber \\
+                           &= -\frac{3\sin \lb \xi \rb}{\xi^2} + \frac{3\cos \lb \xi \rb}{\xi} + 3 \sin \lb \xi \rb \nonumber \\
+                           &= -3j_1\lb \xi \rb + 3 \xi j_0\lb \xi \rb\\
+  \pd{\left[\xi^3\lb j_0\lb \xi \rb + j_2\lb \xi \rb\rb\right]}{\xi} &= 3 \xi^2 j_0\lb \xi \rb \\
+  \pd{\lb j_0\lb \xi \rb + j_2\lb \xi \rb\rb}{\xi} &= 3\pd{}{\xi} \biggl(\frac{\sin \lb \xi \rb}{\xi^3} - \frac{\cos \lb \xi \rb}{\xi^2}\biggr) \nonumber \\
+                           &= 3 \biggl(3\frac{\cos \lb \xi \rb}{\xi^3} - 3 \frac{\sin \lb \xi \rb}{\xi^4} + \frac{\sin \lb \xi \rb}{\xi^2}\biggr) \nonumber \\
+                           &= -\frac{3}{\xi} j_2\lb \xi \rb
+\end{align}
+
+The differentials of the weight functions in Fourier space then becomes,
+\begin{align}
+  \label{eq:weight_functions_fourier_diff}
+  \pd{\hat{w}_0 \lb \mathbf{k}\rb}{R} &= - 2 \pi |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \pd{\hat{w}_1 \lb \mathbf{k}\rb}{R} &= j_0\lb 2 \pi R |\mathbf{k}| \rb - 2 \pi R |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb \\
+  \pd{\hat{w}_2 \lb \mathbf{k}\rb}{R} &= 8 \pi R j_0\lb 2 \pi R |\mathbf{k}| \rb - 8 \pi R^2 |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \pd{\hat{w}_3 \lb \mathbf{k}\rb}{R}  &=  \frac{1}{6 \pi^2 |\mathbf{k}|^3} \pd{}{R}\biggl( \lb 2 \pi R |\mathbf{k}|\rb ^3 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb \biggr)  \nonumber \\
+                                      &=  \frac{1}{6 \pi^2 |\mathbf{k}|^3} 3 \lb 2 \pi R |\mathbf{k}|\rb ^2  j_0\lb 2 \pi R |\mathbf{k}| \rb 2 \pi |\mathbf{k}| \nonumber  \\
+                                      &=  4 \pi R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \pd{\hat{w}_{V1} \lb \mathbf{k}\rb}{R} &= - \frac{2 \pi i \mathbf{k}}{3 (2 \pi |\mathbf{k}|)^2}  \pd{}{R}\biggl( (2 \pi R |\mathbf{k}|)^2 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb \biggr) \nonumber \\
+                                      &= - \frac{2 \pi i \mathbf{k}}{3 (2 \pi |\mathbf{k}|)^2} \biggl( 6 \pi R |\mathbf{k}| j_0\lb 2 \pi R |\mathbf{k}| \rb - 3 j_1\lb 2 \pi R |\mathbf{k}| \rb \biggr) 2 \pi |\mathbf{k}|  \nonumber \\
+   &= - i \biggl( 2 \pi R \mathbf{k} j_0\lb 2 \pi R |\mathbf{k}| \rb - \frac{\mathbf{k}}{|\mathbf{k}|} j_1\lb 2 \pi R |\mathbf{k}| \rb \biggr)  \\
+  \pd{\hat{w}_{V2} \lb \mathbf{k}\rb}{R} &= - 8 \pi i \mathbf{k} R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \pd{\hat{w}_{\rm{disp}} \lb \mathbf{k}\rb}{R} &= -\frac{3 j_2\lb 4 \pi \psi R |\mathbf{k}| \rb}{4 \pi \psi R |\mathbf{k}|} 4 \pi \psi |\mathbf{k}| \nonumber \\
+                                      &= -\frac{3 j_2\lb 4 \pi \psi R |\mathbf{k}| \rb}{R}
+\end{align}
+
+Finally,
+\begin{equation}
+  \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{T} = \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{R} \pd{R}{T}
+\end{equation}
+
+\section{Results}
+
+
+
+\clearpage
+\bibliographystyle{plainnat}
+\bibliography{../bib/DFT.bib,../bib/HardSphere.bib,../bib/PC-SAFT.bib}
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% ispell-local-dictionary: "british"
+%%% End: 

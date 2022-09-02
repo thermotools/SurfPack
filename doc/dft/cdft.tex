@@ -7,7 +7,6 @@
 \usepackage[square,numbers]{natbib}
 %\usepackage{amsmath}
 \usepackage{amssymb,amsmath,amsthm,amsfonts}
-\usepackage{adjustbox}
 \usepackage{pslatex}
 %\usepackage{bm}% better \boldsymbol
 \usepackage{array}% improves tabular environment.
@@ -23,7 +22,6 @@
 \usepackage[final]{pdfpages}
 \usepackage{hyperref}
 \usepackage{doi}
-\usepackage{mathrsfs}
 
 %\usepackage[altbullet,expert]{lucidabr}
 %\usepackage[charter]{mathdesign}
@@ -49,6 +47,8 @@
 %
 % Egendefinerte
 %
+\newcommand*{\unit}[1]{\ensuremath{\,\mathrm{#1}}}
+\newcommand*{\uunit}[1]{\ensuremath{\mathrm{#1}}}
 %\newcommand*{\od}[3][]{\frac{\mathrm{d}^{#1}#2}{\mathrm{d}{#3}^{#1}}}% ordinary derivative
 \newcommand*{\od}[3][]{\frac{\dif^{#1}#2}{\dif{#3}^{#1}}}% ordinary derivative
 \newcommand*{\pd}[3][]{\frac{\partial^{#1}#2}{\partial{#3}^{#1}}}% partial derivative
@@ -207,7 +207,7 @@
 \graphicspath{{gfx/}}
 
 \title{Classical Density Functional Theory (cDFT) for Thermopack}
-\author{Morten Hammer and Øivind Wilhelmsen}
+\author{Morten Hammer}
 \date{\today}
 
 \begin{document}
@@ -220,141 +220,37 @@
 \end{titlepage}
 
 \section{Introduction}
-The purpose of classical Density Functional Theory (cDFT) for fluids is to study heterogeneous systems such as planar vapor-liquid interfaces, droplets, bubbles and confined fluids. The following document describes the implementation of a cDFT code that couples to the Thermopack thermodynamics code~\cite{Wilhelmsen2017,ThermopackGithub}. This note will provide a brief introduction to the fundamentals, with special reference to how they are handled in the code.
 
-\section{The overall concept - Functional minimization}
-A common starting point for cDFT is the grand canonical functional:
+The Jupiter notebooks of Mary K. Coe
+\href{https://github.com/marykcoe/cDFT_Package}{cDFT} is a great recourse for
+understanding \cdft. Her PhD thesis also contsin's a lot of information
+\cite{coe2021}.
 
-\begin{equation}
-  \Omega\left(\left[\left\{\rho_i\right\}\right]\right)=F\left(\left[\left\{\rho_i\right\}\right]\right)+\sum_i^{N_c}\rho_i\left(\mathbf{r}\right)\left(V_i^{\text{ext}}\left(\mathbf{r}\right)-\mu_i\right)\text{d}\mathbf{r}
-  \label{eq:Omega}
-\end{equation}
-
-where $\rho_i$ is the density of component $i$, $F$ is the Helmholtz energy functional, $V_i^{\text{ext}}$ is the external potentials acting on component $i$, $\mu_i$ is the chemical potential of component $i$ and $\mathbf{r}$ is the coordinate. In the following, similar to Stierle et al.~\cite{stierle2020a}, we shall use square brackets to denote a functional dependence, and curly brackets to indicate a vector of all components in a mixture. 
-
-Equilibrium at fixed temperature, $T$ and chemical potentials is a minimum of the grand canonical functional. A stationary state is defined by setting all functional derivatives equal to zero (The Euler Lagrange equations), which gives:
-
-\begin{equation}
-  \frac{\delta F\left[\left\{\rho_i\right\}\right]}{\delta \rho_j\left(\mathbf{r}\right)}=\mu_j-V_j^{\text{ext}}\left(\mathbf{r}\right)
-  \label{eq:fd}
-\end{equation}
-
-cDFT amounts to solving the above equations, but the physics of course has to be put into the functionals.
-
-\subsection{Solving the equations}
-Before embarking on how to describe the functionals, lets have a look at how Eq.~\ref{eq:fd} is usually solved. Since at equilibrium the chemical potentials are constant, we can insert for $\mu_j$ from the bulk (superscript bulk), and we can split into ideal gas and residual contributions as follows:
-\begin{eqnarray}
-  &&F\left[\left\{\rho_i\right\}\right]=F^{\text{ig}}\left[\left\{\rho_i\right\}\right]+F^{\text{res}}\left[\left\{\rho_i\right\}\right]\\
-  &&\mu_i=\mu_i^{\text{ig}}+\mu_i^{\text{res}}=\mu_i^{\text{bulk}}
-\end{eqnarray}
-where
-\begin{eqnarray}
-&& F^{\text{ig}}\left[\left\{\rho_i\right\}\right]=\frac{1}{\beta}\sum_{i=1}^{N_c}\int\rho_i\left(\mathbf{r}\right)\left(\ln{\left(\rho_i\left(\mathbf{r}\right)\Lambda_i^3\right)}-1 \right)\text{d}\mathbf{r} \\
-&&\mu_i^{ig,bulk}=\frac{\ln{\left(\rho_i^{\text{bulk}}\Lambda_i^3\right)}}{\beta}
-\end{eqnarray}
-where $\beta=1/k_{\text{B}}T$. Using this in Eq.~\ref{eq:Omega} results in:
-\begin{equation}
-  \Omega\left[\left\{\rho_i\right\}\right]=\sum_{i=1}^{N_c}\int\frac{\rho_i\left(\mathbf{r}\right)}{\beta}\left(\ln{\left(\frac{\rho_i\left(\mathbf{r}\right)}{\rho_i^{\text{bulk}}}\right)}-1 \right)+\rho_i\left(\mathbf{r}\right)\left(V_i^{\text{ext}}\left(\mathbf{r}\right)-\mu_i^{\text{res,bulk}}\right)\text{d}\mathbf{r}+F^{\text{res}}\left[\left\{\rho_i\right\}\right]
-\end{equation}
-Setting the functional derivative equal to zero for the above expression allows us to formulate the following self-consistent equation for the density profile of component $j$ that should be satisfied for the equilibrium profiles:
-\begin{equation}
-  \rho_j\left(\mathbf{r}\right)=\rho_j^{\text{bulk}}\exp{\left(\beta\mu_j^{\text{res, bulk}}-\beta V_j^{\text{ext}}\left(\mathbf{r}\right)-\frac{\delta F^{\text{res}}\left[\left\{\rho_i\right\}\right]}{\delta\rho_j\left(\mathbf{r}\right)}\right)}
-  \label{eq:sol}
-\end{equation}
-The above equation can be used in a Picard iteration scheme, or the faster Anderson mixing approach~\cite{mairhofer2017}.
-
-The main challenge in cDFT is to define and compute the functional derivative of the Helmholtz energy, which will be the focus in the following sections.
-
-\subsection{The Weighted Density Approximation (WDA)}
-In order to formulate the Helmholtz energy functional for inhomogeneous systems (and also homogeneous systems), one uses so-called Weighted Density Approximation (WDA) functionals:
-
-\begin{equation}
-\beta F\left[\left\{\rho_i\right\}\right]=\int\Phi\left(\left\{n_\alpha\left(\mathbf{r}\right)\right\}\right)\text{d}\mathbf{r}
-\end{equation}
-
-where $\Phi$ is the reduced Helmholtz energy density. The WDA-functional depends on the \emph{weighted densities}, which are calculated via convolution of the density profiles as follows:
-\begin{equation}
-  n_\alpha = \sum_i^{N_c}\int d \mathbf{r}^\prime \rho_i\left(\mathbf{r}^\prime\right) w_{i}^\alpha \lb \mathbf{r} - \mathbf{r}^\prime \rb \equiv \sum_i^{N_c}\rho_i \lb\mathbf{r}\rb \circledast w_i^\alpha\lb\mathbf{r}\rb=\sum_i^{N_c}n_{\alpha,i}
-  \label{eq:wrho}
-\end{equation}
-
-and
-\begin{equation}
-  n_{\alpha,i} = \rho_i \lb\mathbf{r}\rb \circledast w_i^\alpha\lb\mathbf{r}\rb
-  \label{eq:wrho}
-\end{equation}
-The residual Helmholtz energy of an equation of state such as PC-SAFT, or SAFT-VR-Mie can be split into several terms, e.g:
-
-\begin{equation}
-F^{\text{res}}\left[\left\{\rho_i\right\}\right]=F^{\text{hs}}\left[\left\{\rho_i\right\}\right]+F^{\text{hc}}\left[\left\{\rho_i\right\}\right]+F^{\text{disp}}\left[\left\{\rho_i\right\}\right]+F^{\text{polar}}\left[\left\{\rho_i\right\}\right]+F^{\text{assoc}}\left[\left\{\rho_i\right\}\right]
-\end{equation}
-where the terms on the right-hand-side are from the hard-sphere reference, chain contribution, dispersion contribution, polar contribution and association contribution respectively. The different terms use different  weight functions and approximation.
-
-\subsection{The one body correlation function}
-The one body correlation functions is given from the Helmholtz free energy functional as,
-
-\begin{equation}
-  c^{(1)}\lb \mathbf{r} \rb = \beta \pd{\mathcal{F}_{\excess} \lbf \rho \rbf}{\rho \lb \mathbf{r} \rb} =  -\underset{\alpha}{\sum} \int d \mathbf{r}^\prime \pd{\Phi_\alpha}{n_\alpha} \pd{n_\alpha}{\rho}.
-\end{equation}
-
-In a planar geometry, the one body correlation function simply becomes,
-\begin{equation}
-  \label{eq:dndrho}
-  \pd{n_\alpha \lb z^\prime \rb}{\rho \lb z \rb} = \frac{\partial}{\partial \rho \lb z \rb} \int dz^{\prime\prime} \rho \lb z^{\prime\prime} \rb w_\alpha \lb z^\prime - z^{\prime\prime} \rb = w_\alpha \lb z^\prime - z\rb,
-\end{equation}
-\begin{equation}
-  \label{eq:c1_1d}
-  c^{(1)}\lb z \rb = -\underset{\alpha}{\sum} \int d z^\prime \pd{\Phi_\alpha}{n_\alpha} w_\alpha \lb z^\prime - z\rb.
-\end{equation}
-
-
-\section{The hard-sphere term - Fundamental Measure Theory}
-We shall start with the arguably most important term in cDFT, the hard-sphere term. To describe the hard-sphere term, we shall use Fundamental Measure Theory (FMT), where the weight functions are given by
-
-\begin{align}
-  w_3^i \lb \mathbf{r} \rb &=  \Theta \lb R_i - \abs{\mathbf{r}} \rb \label{eq:w1} \\
-  w_2^i \lb \mathbf{r} \rb &=  \delta \lb R_i - \abs{\mathbf{r}} \rb \\
-  w_1^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i} w_2^i \lb \mathbf{r} \rb \\
-  w_0^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i^2} w_2^i \lb \mathbf{r} \rb \\
-  \mathbf{w}_2^i \lb \mathbf{r} \rb &=  \frac{\mathbf{r}}{\abs{\mathbf{r}}}\delta \lb R_i - \abs{\mathbf{r}} \rb \\
-  \mathbf{w}_1^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i} \mathbf{w}_2^i.\label{eq:we}
-\end{align}
-Here $\Theta$ is the Heaviside function, and $\delta$ are the Dirac delta function.
-
-FMT for hard sphere mixtures was first developed by
+\section{Fundamental Measure Theory}
+Fundamental measure theory for hard sphere mixtures was developed by
 \citet{rosenfeld1989}. The name "measure" relates to the fundamental
 geometrical measures (volume, surface area, mean radius of curvature
 and the Euler characteristic) of a sphere particle. The fundamental
 geometrical measures are recovered when integrating the weight
-functions in Eqs.~\ref{eq:w1}-\ref{eq:we}. Historically, there are
-three FMT functionals used for hard-sphere mixtures, which differ only
-in terms of how the reduced Helmholtz energy density, $\Phi$ depends
-on the weighted densities.
+functions defined in Section~\ref{sec:weight}.
 
-The FMT introduced by Rosenfelt (Sec.~\ref{sec:fmt1}) reduces to the compressibility from the Percus Yevick integral equation in the bulk phases. This is a decent, but not very accurate description of the hard-sphere mixture, in particular at higher densities.
-
-For the White Bear functional \cite{roth2002}, the bulk phase
-properties are consistent with additive hard-sphere mixture
-compressibillity of \citet{boublik1970} and
-Mansoori-Carnahan-Starling-Leland (MCSL) \cite{mansoori1971}.
-This functional will be presented in Sec.~\ref{sec:fmt2}, and it is the functional that is normally used for e.g. PC-SAFT:
-
-The BMCSL equation of state leads to a excess free energy density that
-is slightly inconsistent, and a new generalization of the Carnahan-
-Starling \cite{carnahan1969} equation of state to mixtures was derived,
-the White Bear Mark II \cite{hansen-goos2006a}.
-
-
-
+For bulk phases this functional reduces to the Pick's-Yevick (PY)
+compressibility equation \cite{percus1958}, equivalent to scaled
+particle theory.
 
 \subsection{The Rosenfeld functional}
-\label{sec:fmt1}
-The Rosenfeld functional for the hard-sphere mixture term uses the following reduced Helmholtz energy functional:
+
+The functional depends on the weighted densities,
+\begin{equation}
+  n_\alpha = \int d \mathbf{r}^\prime \rho \lb \mathbf{r}^\prime \rb w_\alpha \lb \mathbf{r} - \mathbf{r}^\prime \rb.
+\end{equation}
+
 \begin{equation}
   \Phi^\RF = -n_0 \ln \lb 1 - n_3 \rb +
   \frac{n_1 n_2 - \vc{n}_1 \cdot \vc{n}_2}{1 - n_3} +
   \frac{n_2^3 - 3 n_2 \vc{n}_2 \cdot \vc{n}_2}{24\pi \lb 1 - n_3 \rb^2}
 \end{equation}
+
 The differentials needed when searching for the Grand potential and the equilibrium density profile:
 \begin{align}
   \pd{\Phi^\RF}{n_0} &= -\ln \lb 1 - n_3 \rb \\
@@ -367,7 +263,19 @@ The differentials needed when searching for the Grand potential and the equilibr
   \pd{\Phi^\RF}{\vc{n}_2} &=  -\frac{\vc{n}_1}{1 - n_3} - \frac{n_2 \vc{n}_2}{4\pi \lb 1 - n_3 \rb^2}
 \end{align}
 
+\subsection{Weight functions}
+\label{sec:weight}
+Weight functions given by
 
+\begin{align}
+  w_3^i \lb \mathbf{r} \rb &=  \Theta \lb R_i - \abs{\mathbf{r}} \rb \\
+  w_2^i \lb \mathbf{r} \rb &=  \delta \lb R_i - \abs{\mathbf{r}} \rb \\
+  w_1^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i} w_2^i \lb \mathbf{r} \rb \\
+  w_0^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i^2} w_2^i \lb \mathbf{r} \rb \\
+  \mathbf{w}_2^i \lb \mathbf{r} \rb &=  \frac{\mathbf{r}}{\abs{\mathbf{r}}}\delta \lb R_i - \abs{\mathbf{r}} \rb \\
+  \mathbf{w}_1^i \lb \mathbf{r} \rb &= \frac{1}{4 \pi R_i} \mathbf{w}_2^i.
+\end{align}
+Where $\Theta$ is the Heaviside function, and $\delta$ are the Dirac delta function.
 
 \subsubsection{Weight functions for planar geometry}
 \label{sec:planar_weights}
@@ -405,10 +313,35 @@ and the weigth functions can be integrated for the angle dimensions.
 
 \todo{TODO}
 
+\subsection{The one body correlation function}
+The one body correlation functions is given from the Helmholtz free energy functional as,
+
+\begin{equation}
+  c^{(1)}\lb \mathbf{r} \rb = \beta \pd{\mathcal{F}_{\excess} \lbf \rho \rbf}{\rho \lb \mathbf{r} \rb} =  -\underset{\alpha}{\sum} \int d \mathbf{r}^\prime \pd{\Phi_\alpha}{n_\alpha} \pd{n_\alpha}{\rho}.
+\end{equation}
+
+In a planar geometry, the one body correlation function simply becomes,
+\begin{equation}
+  \label{eq:dndrho}
+  \pd{n_\alpha \lb z^\prime \rb}{\rho \lb z \rb} = \frac{\partial}{\partial \rho \lb z \rb} \int dz^{\prime\prime} \rho \lb z^{\prime\prime} \rb w_\alpha \lb z^\prime - z^{\prime\prime} \rb = w_\alpha \lb z^\prime - z\rb,
+\end{equation}
+\begin{equation}
+  \label{eq:c1_1d}
+  c^{(1)}\lb z \rb = -\underset{\alpha}{\sum} \int d z^\prime \pd{\Phi_\alpha}{n_\alpha} w_\alpha \lb z^\prime - z\rb.
+\end{equation}
+
+\subsection{Alternative FMT functionals}
+For the White Bear functional \cite{roth2002}, the bulk phase
+properties are consistent with additive hard-sphere mixture
+compressibillity of \citet{boublik1970} and
+Mansoori-Carnahan-Starling-Leland (MCSL) \cite{mansoori1971}.
+
+The BMCSL equation of state leads to a excess free energy density that
+is slightly inconsistent, and a new generalization of the Carnahan-
+Starling \cite{carnahan1969} equation of state to mixtures was derived,
+the White Bear Mark II \cite{hansen-goos2006a}.
 
 \subsection{The White Bear functional}
-\label{sec:fmt2}
-The reduced Helmholtz energy of the White Bear functional with derivatives is:
 
 \begin{align}
   \Phi^\WB =& -n_0 \ln \lb 1 - n_3 \rb +
@@ -428,9 +361,6 @@ The reduced Helmholtz energy of the White Bear functional with derivatives is:
 \end{align}
 
 \subsection{The White Bear Mark II functional}
-\label{sec:fmt2}
-The reduced Helmholtz energy of the White Bear Mark II functional with derivatives is:
-
 \begin{align}
   \Phi^\WBII =& -n_0 \ln \lb 1 - n_3 \rb +
   \lb n_1 n_2 - \vc{n}_1 \cdot \vc{n}_2 \rb \frac{1 + \frac{1}{3} \phi_2\lb n_3 \rb}{1 - n_3} \nonumber \\
@@ -458,173 +388,6 @@ with,
   \pd{\Phi^\WBII}{\vc{n}_1} &=  - \frac{\vc{n}_2 \lb 1 + \frac{1}{3} \phi_2 \rb}{1 - n_3} \\
   \pd{\Phi^\WBII}{\vc{n}_2} &=  - \frac{\vc{n}_1 \lb 1 + \frac{1}{3} \phi_2 \rb}{1 - n_3} - \frac{n_2 \vc{n}_2\lb 1 - \frac{1}{3} \phi_3 \rb}{4\pi \lb 1 - n_3 \rb^2}
 \end{align}
-
-\subsection{The chain rule, convolutions and Fourier transforms}
-The last term in the functional derivative (Eq.~\ref{eq:sol}) must for the hard-sphere term be expanded by use of the chain rule:
-\begin{equation}
-  \beta\frac{\delta F^{\text{hs}}\left[\left\{\rho_i\right\}\right]}{\delta\rho_j\left(\mathbf{r}\right)}
-  =\sum_\alpha\frac{\partial\Phi^{\text{hs}}}{\partial n_\alpha\lb\mathbf{r}^\prime\rb}\frac{\delta n_\alpha\left(\mathbf{r}^\prime\right)}{\delta \rho_j\lb\mathbf{r}\rb}
-\end{equation}
-Furthermore, it can be shown that~\cite{stierle2020a}:
-\begin{equation}
-\frac{\delta n_\alpha\left(\mathbf{r}^\prime\right)}{\delta \rho_j\lb\mathbf{r}\rb}=w_j^\alpha\lb\mathbf{r}-\mathbf{r}^\prime\rb
-\end{equation}
-which gives:
-\begin{equation}
-  \beta\frac{\delta F^{\text{hs}}\left[\left\{\rho_i\right\}\right]}{\delta\rho_j\left(\mathbf{r}\right)}=\sum_\alpha\frac{\partial \Phi^{hs}}{\partial n_\alpha} \circledast w_j^\alpha
-  \label{eq:conv2}
-\end{equation}
-which is a convolution of the derivative of the reduced Helmholtz density. Furthermore, the first term in the product is a function of the weighted densities, which are also convolutions (see Eq.~\ref{eq:wrho}). While convolutions can, in principle, be calculated by performing the intergrals in question numerically, it is both faster and more accurate to use fourier space transforms to do this task. The idea here is that while the convolution is an integral in real space, it is a product between two fourier transformed functions in Fourier space. The weighted density, for instance, can be calculated by:
-
-\begin{equation}
-  \begin{split}
-    n_\alpha\left(\mathbf{r}\right)&=\sum_i^{N_c}\rho_i \lb\mathbf{r}\rb \circledast w_i^\alpha\lb\mathbf{r}\rb \\
-    &= \mathscr{F}^{-1}\left[\mathscr{F}\left[\rho_i\lb\mathbf{r}\rb\right]\mathscr{F}\left[w_i^\alpha\lb\mathbf{r}\rb\right]\right]\\
-    &= \mathscr{F}^{-1}\left[\hat{\rho}_i\left(\mathbf{k}\right)\hat{w}_i^\alpha\left(\mathbf{k}\right)\right]\\
-  \end{split}
-  \label{eq:Fourier}
-\end{equation}
-
-where $\hat{}$ refers to the transform of the respective quantity.
-
-\subsubsection{Analytic representation of the transformed weight functions}
-The convolutions above are all taken with respect to the weight functions, $w_i^\alpha$. The transforms of these functions can be computed analytically. The analytical expressions depend on which transform that is used. For the Fourier transform, they are:
-\begin{eqnarray}
- &&\hat{w}_i^0\lb\mathbf{k}\rb=j_0\left(2\pi R_i|\mathbf{k}|\right) \label{eq:af1}\\
- &&\hat{w}_i^1\lb\mathbf{k}\rb= R_ij_0\left(2\pi R_i|\mathbf{k}|\right)\\
- &&\hat{w}_i^2\lb\mathbf{k}\rb= 4\pi R_i^2j_0\left(2\pi R_i|\mathbf{k}|\right)\\
- &&\hat{w}_i^3\lb\mathbf{k}\rb= \frac{4}{3}\pi R_i^3\left(j_0\left(2\pi R_i|\mathbf{k}|\right)+j_2\left(2\pi R_i|\mathbf{k}|\right) \right)\\
- &&\hat{w}_i^{V1}\lb\mathbf{k}\rb= \frac{-i\mathbf{k}}{2R_i}\hat{w}_i^3\lb\mathbf{k}\rb\\
- &&\hat{w}_i^{V2}\lb\mathbf{k}\rb=-i2\pi\mathbf{k}\hat{w}_i^3\lb\mathbf{k}\rb \label{eq:afN}
-\end{eqnarray}
-Here, $j_z$ is the Bessel functions of first kind of order $z$, $\mathbf{k}$ is the coordinate in Fourier space and $R_i$ is the hard-sphere diameter of component $i$ which is just a constant.
-%For the Sine transform, the analytical expressions are:
-%\begin{eqnarray}
-% &&\hat{w}_i^0\lb\mathbf{k}\rb=\frac{\sin{\left(2\pi R_i\left|\mathbf{k}\right|\right)}}{2\pi R_i\left|\mathbf{k}\right|} \\
-% &&\hat{w}_i^1\lb\mathbf{k}\rb=\frac{\sin{\left(2\pi R_i\left|\mathbf{k}\right|\right)}}{2\pi\left|\mathbf{k}\right|}\\
-% &&\hat{w}_i^2\lb\mathbf{k}\rb= \dfrac{2R_i\sin{\left(2\pi R_i\left|\mathbf{k}\right|\right)}}{\left|\mathbf{k}\right|}\\
-% &&\hat{w}_i^3\lb\mathbf{k}\rb= \frac{1}{2\pi^2\left|\mathbf{k}\right|^3}\left(\sin{\left(2\pi R_i\left|\mathbf{k}\right|\right)}-2\pi R_i\left|\mathbf{k}\right|\sin{\left(2\pi R_i\left|\mathbf{k}\right|\right)}\right)\\
-% &&\hat{w}_i^{V1}\lb\mathbf{k}\rb=\frac{-i\mathbf{k}}{2R_i}\hat{w}_i^3\lb\mathbf{k}\rb \\
-% &&\hat{w}_i^{V2}\lb\mathbf{k}\rb=-i2\pi\mathbf{k} \hat{w}_i^3\lb\mathbf{k}\rb
-%\end{eqnarray}
-
-\subsubsection{Minimum number of convolutions for efficient computations}
-From a numerical point of view, we would like to perform as few convolutions in Fourier space as possible. Looking at Eq.~\ref{eq:af1}-\ref{eq:afN}, we see that:
-\begin{eqnarray}
-  &&\hat{w}_i^0=\frac{\hat{w}_i^2}{4\pi R_i^2} \\
-  &&\hat{w}_i^1=\frac{\hat{w}_i^2}{4\pi R_i} \\
-  &&\hat{w}_i^{V1}=\frac{\hat{w}_i^{V2}}{4\pi R_i} 
-\end{eqnarray}
-where $R_i$ is a constant. This means that we only need to perform three convolutions for each component to compute the weighted densities, for $n_{2,i}$, $n_{3,i}$ and $n_{V2,i}$ (see Eq.~\ref{eq:wrho}). then the rest follow from:
-\begin{eqnarray}
-  &&n_{0,i}=\frac{n_{2,i}}{4\pi R_i^2} \\
-  &&n_{1,i}=\frac{n_{2,i}}{4\pi R_i} \\
-  &&n_{V1,i}=\frac{n_{V2,i}}{4\pi R_i} 
-\end{eqnarray}
-Furthermore, we also need to compute convolutions in Eq.~\ref{eq:conv2}, and we can use the same procedure here, where:
-\begin{equation}
-  \sum_\alpha\frac{\partial \Phi^{hs}}{\partial n_\alpha} \circledast w_j^\alpha= \Phi_{2,j,\text{eff}}^{hs} \circledast w_j^2+
-\frac{\partial \Phi^{hs}}{\partial n_{3}} \circledast w_j^3+
-  \Phi_{V2,j,\text{eff}}^{hs} \circledast w_j^{V2}
-\end{equation}
-where
-\begin{eqnarray}
-&&\Phi_{2,i,\text{eff}}^{hs}=\frac{1}{4\pi R_i^2}\frac{\partial \Phi^{hs}}{\partial n_0}+\frac{1}{4\pi R_i}\frac{\partial \Phi^{hs}}{\partial n_1}+\frac{\partial \Phi^{hs}}{\partial n_2} \\
-&&\Phi_{2V,i,\text{eff}}^{hs}=\frac{1}{4\pi R_i}\frac{\partial \Phi^{hs}}{\partial n_{V1}}+\frac{\partial \Phi^{hs}}{\partial n_{V2}}
-\end{eqnarray}
-
-\subsection{Fourier transforms}
-The challenging aspect of solving the DFT is to compute the convolution integrals. This is done most efficiently and probably accurately in fourier space, where convolution integrals reduce to products between Fourier transforms, as shown in Eq.~\ref{eq:Fourier}. The problem of using the Fourier transform is that it assumes that your profile is a periodic signal, and will hence use information at the end of the domain when computing the convolution at the other end of the domain. To circumvent this, one must employ padding at the start and at the end of the domain, which essentially extrapolates the profiles. It is not always straightforward what this extrapolation should be. To avoid this padding, one uses instead Cosine and Sine transforms. In fact, the Fourier transform is a sum:
-
-\begin{equation}
-\mathscr{F}(f(\mathbf{r}))=\mathscr{C}(f(\mathbf{r}))-i\mathscr{S}(f(\mathbf{r}))
-\end{equation}
-where $\mathscr{C}$ and $\mathscr{S}$ are the cosine and sine transforms respectively. We shall next exploit that for even functions ($f(\mathbf{r})=f(-\mathbf{r})$), only the cosine transform is non-zero, and for odd functions ($f(\mathbf{r})=f(-\mathbf{r})$), only the sine transform is zero. The inverse transforms follow the same symmetry. We shall use the sine and cosine transforms for three geometries, planar, cylindrical and spherical. The good thing about the sine and cosine transforms is that they only go from 0 to infinity, meaning that they assume a certain symmetry for the rest of the domain at e.g. the centre (0), which means that we don't need padding, which is very convenient.
-
-Moreover, if a different transform is used for the inverse transform than the transform, the grid has to be ``rolled'' due to a use of a different indexing for the cosine and sine transforms, as explained nicely in Sec.~4 of the paper by Stierle et al.~\cite{stierle2020a}, which we refer to for further details on this. For derivation of how the full fast Fourier transform can be replaced by sine and cosine transforms, we refer to Appendix B of the supplementary information of Ref.~\cite{stierle2020a}. Due to its nice symmetry fitting for many of the problems that we investigate, we employ the Type II sine and cosine transform (see~\cite{sinecosine_webpage} for details).
-
-\subsubsection{Planar geometry}
-As shown in Fig.~\ref{fig:planar_weights}, the scalar weight functions are even, and the vector valued weight functions are odd. That means that when we are computing the scalar weighted densities, we should use the cosine transform, and the sine transform for the vector weighted densities. Let us assume that there is only one relevant dimension, $r$, which is $k$ in Fourier space, and that $f(r)$ is a scalar function, and $\mathbf{f}(r)$ is a vector function, $w$ is the scalar weights, and $\mathbf{w}$ is  For a planar geometry we have that:
-
-\begin{equation}
-  f(r)\circledast w(r) = \mathscr{C}^{-1}\left(\mathscr{C}\left(f(r)\right)\hat{w}(k)\right)
-  \label{eq:p1}
-\end{equation}
-
-\begin{equation}
-  f(r)\circledast \mathbf{w}(r) = \mathscr{S}^{-1}\left(\mathscr{C}\left(f(r)\right)\hat{\mathbf{w}}(k)\right)\mathbf{e}_r
-   \label{eq:p2}
-\end{equation}
-
-\begin{equation}
-  \mathbf{f}(r)\circledast \mathbf{w}(r) = \mathscr{C}^{-1}\left(\mathscr{S}\left(\mathbf{f}(r)\right)\hat{\mathbf{w}}(k)\right)
-   \label{eq:p3}
-\end{equation}
-
-where $\hat{}$ is the analytic Fourier transform, but it is important that the right grid is used depending on the inverse transform to be taken. Furthermore, $\mathbf{e}_r$ is the unit vector in the $r$ direction.
-
-In the above relations, we have used that the scalar function, typically $\rho(r)$ or the functional derivatives with respect to the scalar weight are even functions ass well, which is due to the symmetry of the system around $r=0$. The vector functions that we consider in our case are $d\phi/d\mathbf{n}$, which have an odd symmetry (the sine transform should be used).
-
-In Eq.~\ref{eq:p1}, we have a product between an even and an even function, which is even and the cosine transform should be used the whole way (the Fourier transform conserves the odd/even property).
-
-In Eq.~\ref{eq:p2}, we have a product between an even function $f(r)$ and an odd function (the vector weight), which is odd. Since the product between the transformed quantities is odd, the inverse sine transform should be used.
-
-In Eq.~\ref{eq:p3}, we have a product between an odd and an odd function, which is even. Hence, for both vector functions, the sine transforms should be used for the forward transform, and the cosine transform should be used for the backwards transform.
-
-\subsubsection{Polar symmetric geometry}
-For a cylindrical/polar grid, it is, per now, necessary to have a
-logarithmic grid and use the Hankel transform. We have also tried the
-Abel transform and combine that with a regular grid, but that did not
-give a satisfactory accuracy as the forward and backward transform did
-not properly recover a sharp density profile that was used as an
-example. Essentially more work is needed there.
-
-To be filled in.
-
-For polar symmetric geometries we adapt the exponential/logaritmic
-grid approach described by Xi et al.\cite{xi2020}. The method contains
-and end correction factor to improve the predictions for the initial
-cell starting at origo. The method is therefore an improvement of the
-ealrer work of Botan et al.\cite{botan2009}.
-
-\begin{equation}
-  f(r)\circledast w(r) = \frac{1}{r}\mathscr{S}^{-1}\left(\mathscr{S}\left(f(r)r\right)\hat{w}(k_r)\right)
-  \label{eq:s1}
-\end{equation}
-
-
-Adaptions by Philip Rehner in FEOS: Extensisons to include direct formulations for vector weights.
-
-\subsubsection{Spherical geometry}
-In the Fourier transform in spherical coordinates, the integration over angles can be done analytically, and the transform of an (even) scalar function is:
-\begin{equation}
-  f(r)\circledast w(r) = \frac{1}{r}\mathscr{S}^{-1}\left(\mathscr{S}\left(f(r)r\right)\hat{w}(k_r)\right)
-  \label{eq:s1}
-\end{equation}
-
-\begin{equation}
-  f(r)\circledast \mathbf{w}(r) = \mathbf{e}_r\left(\frac{1}{r^2}\mathscr{S}^{-1}\left(\mathscr{S}\left(f(r)r\right)\hat{w}^*(k_r)\right)-\frac{1}{r}\mathscr{C}^{-1}\left(\mathscr{S}\left(f(r)r\right)2\pi w_r\hat{w}^*(k_r)\right)\right)
-   \label{eq:s2}
-\end{equation}
-
-\begin{equation}
-  \mathbf{f}(r)\circledast \mathbf{w}(r) = \frac{1}{r}\mathscr{S}^{-1}\left(\mathscr{C}\left(f_r(r)r\right)2\pi k_r\hat{w}^*(k_r)-\mathscr{S}\left(f_r\right)\hat{w}^*(k_r)\right)
-   \label{eq:s3}
-\end{equation}
-where:
-\begin{equation}
-\mathbf{f}(r)=f_r\mathbf{e}_r
-\end{equation}
-and
-\begin{equation}
-\hat{\mathbf{w}}=-2\pi i k_r\hat{w}^*(k_r)\mathbf{e}_r
-\end{equation}
-and $k_r$ is the fourier space spatial variabel.
-
-Since $f(r)$ is even in Eq.~\ref{eq:s1}, $rf(r)$ becomes odd, and the sine transform has to be used instead of the cosine transform (as in the planar case). Furthermore, since $w(r)$ is even, odd multiplied by even becomes odd, which means that the inverse sine transformation has to be used. The fourier transform of the weight function is the same for all coordinate systems (allthough the grid changes between cosine and sine transforms).
-
-For Eqs.~\ref{eq:s2} and \ref{eq:s3}, we must keep in mind that while $\hat{\mathbf{w}}$ is odd, $\hat{w}^*$ is even. 
-
 
 \section{Numerics}
 
@@ -1016,7 +779,7 @@ Thermopack can then be evaluated setting $V=1.0$ and
 $\mathrm{n}=\mathrm{\rho}_n$.
 \clearpage
 \bibliographystyle{plainnat}
-\bibliography{./DFT.bib,./HardSphere.bib,./PC-SAFT.bib,./misc.bib}
+\bibliography{../bib/DFT.bib,../bib/HardSphere.bib,../bib/PC-SAFT.bib}
 
 \end{document}
 
