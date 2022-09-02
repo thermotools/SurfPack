@@ -179,6 +179,12 @@ class Interface(ABC):
                 print("Interface solver did not converge")
         return self
 
+    def single_convolution(self):
+        # Set up convolver?
+        if not self.convolver:
+            self.convolver = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
+        # Perform convolution integrals
+        self.convolver.convolve_density_profile(self.profile)
 
     def tanh_profile(self, vle, t_crit, rel_pos_dividing_surface=0.5, invert_states=False):
         """
@@ -217,6 +223,24 @@ class Interface(ABC):
         # Calculate chemical potential (excess + ideal)
         self.bulk = Bulk(self.functional, state, state)
         self.profile = Profile.constant_profile(self.grid, self.bulk, self.v_ext)
+        return self
+
+    def set_profile(self, vle, profile, invert_states=False):
+        """
+        Initialize using excisting profile
+
+        Returns:
+            state (State): Thermodynamic state
+        """
+        left_state = vle.vapor
+        right_state = vle.liquid
+        if invert_states:
+            left_state, right_state = right_state, left_state
+
+        self.bulk = Bulk(self.functional, left_state, right_state)
+        self.profile = Profile()
+        self.profile.copy_profile(profile)
+        self.converged = True
         return self
 
     def grand_potential(self):
@@ -377,7 +401,19 @@ class Interface(ABC):
                 gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_right[i])
         return gamma
 
-    def get_entropy_density(self):
+    def get_excess_helmholtz_energy_density(self):
+        """
+        Calculates the Helmholtz energy in the system.
+
+        Returns:
+            (array): Helmholtz energy for each grid point
+        """
+
+        # FMT hard-sphere part
+        F = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        return F
+
+    def get_excess_entropy_density(self):
         """
         Get entropy per volume (J/m3/K)
         """
@@ -585,6 +621,29 @@ class PlanarInterface(Interface):
                          t_crit,
                          rel_pos_dividing_surface=rel_pos_dividing_surface,
                          invert_states=invert_states)
+        return pif
+
+    @staticmethod
+    def from_profile(vle,
+                     profile,
+                     domain_size=100.0,
+                     n_grid=1024,
+                     invert_states=False):
+        """
+        Initialize tangens hyperbolicus profile
+
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
+        Returns:
+            (float): Grand potential
+            (array): Grand potential contribution for each grid point
+        """
+        pif = PlanarInterface(thermopack=vle.eos,
+                              temperature=vle.temperature,
+                              domain_size=domain_size,
+                              n_grid=n_grid)
+        pif.set_profile(vle,
+                        profile,
+                        invert_states=invert_states)
         return pif
 
     def surface_tension(self):

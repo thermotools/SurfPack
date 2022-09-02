@@ -498,7 +498,7 @@ class Convolver(object):
                 self.functional, i)
             # Loop all weight functions
             for wf in self.comp_wfs[i]:
-                self.comp_wfs[i][wf].convolve_differentials_T(self.comp_differentials[i].d_effective(wf),
+                self.comp_wfs[i][wf].convolve_differentials_T(self.comp_differentials[i].d[wf],
                                                               self.comp_differentials[i].d_conv[wf])
                 dfdt[:] += self.comp_differentials[i].d_conv[wf]
         return dfdt

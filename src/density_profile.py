@@ -139,7 +139,7 @@ class Profile(object):
     """
 
     def __init__(self,
-                 dens):
+                 dens=None):
         """Class holding density profiles
 
         Args:
@@ -233,8 +233,8 @@ class Profile(object):
         Args:
             prof (Profile): Exsisting profile
         """
-        self.dens = Densities(prof.nc, prof.N)
-        self.dens.assign_elements(prof.densities)
+        self.densities = Densities(prof.densities.nc, prof.densities.N)
+        self.densities.assign_elements(prof.densities)
 
 if __name__ == "__main__":
     pass

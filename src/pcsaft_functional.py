@@ -201,7 +201,7 @@ class pc_saft(Whitebear):
             rho_mix = np.sum(rho_thermo)
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_T, = self.thermo.a_dispersion(
-                self.T, V, rho_thermo, a_T=True)
+                self.T, V, rho_thermo, a_t=True)
             d_T[i] += rho_mix*a_T
 
         return d_T
