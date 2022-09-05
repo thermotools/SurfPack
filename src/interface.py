@@ -410,32 +410,32 @@ class Interface(ABC):
         """
 
         # FMT hard-sphere part
-        F = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        F = self.bulk.reduced_temperature * self.functional.excess_free_energy(self.convolver.weighted_densities)
         return F
 
     def get_excess_entropy_density(self):
         """
-        Get entropy per volume (J/m3/K)
+        Get reduced entropy per reduced volume (1/K)
         """
         if not self.profile:
             print("Need profile to calculate entropy density")
             return
 
-        dfdn_dndt = self.convolver.convolve_differentials_T()
-        dfdt = self.functional.temperature_differential(self.convolver.weighted_densities)
-        entropy_density = np.zeros_like(dfdn_dndt)
-        entropy_density[:] = -dfdn_dndt[:] - dfdt[:]
-        return entropy_density
+        eps = self.functional.thermo.eps_div_kb[0]
+        f = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        f_T = self.convolver.functional_temperature_differential_convolution(self.profile.densities)
+        s = - f/eps - self.bulk.reduced_temperature * f_T
+        return s
 
-    def get_entropy_density_real_units(self):
+    def get_excess_entropy_density_real_units(self):
         """
         Get entropy per volume (J/m3/K)
         """
-        s = self.get_entropy_density()
+        s = self.get_excess_entropy_density()
         # Scale to real units
-        eps = self.functional.thermo.eps_div_kb[0] * KB
-        s *= eps/(NA*self.functional.grid_reducing_lenght**3)
-        return entropy_density
+        eps = self.functional.thermo.eps_div_kb[0]
+        s *= self.functional.thermo.Rgas*eps/(NA*self.functional.grid_reducing_lenght**3)
+        return s
 
     def print_perform_minimization_message(self):
         """

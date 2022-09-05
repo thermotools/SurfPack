@@ -420,6 +420,7 @@ class Convolver(object):
 
         # Overall weighted densities
         self.weighted_densities = WeightedDensitiesMaster(n_grid=grid.n_grid, wfs=functional.wf, nc=functional.thermo.nc)
+        self.weighted_densities_T = WeightedDensitiesMaster(n_grid=grid.n_grid, wfs=functional.wf, nc=functional.thermo.nc)
 
     def convolve_density_profile(self, rho):
         """
@@ -466,10 +467,8 @@ class Convolver(object):
         self.weighted_densities.update_utility_variables()
 
         # Calculate differentials
-        self.functional.differentials(self.weighted_densities)
+        self.update_functional_differentials()
         for i in range(self.functional.nc):
-            self.comp_differentials[i].set_functional_differentials(
-                self.functional, i)
             # Loop all weight functions
             for wf in self.comp_wfs[i]:
                 if self.comp_wfs[i][wf].convolve:
@@ -483,25 +482,86 @@ class Convolver(object):
         # print("d2veff",self.comp_differentials[0].d_conv["wv2"])
         # print("d_disp",self.comp_differentials[0].d_conv["w_disp"])
 
-    def convolve_differentials_T(self):
+    def update_functional_differentials(self):
         """
         Perform convolutions for weighted densities
 
         Args:
             rho (array_like): Density profile
         """
-        dfdt = np.zeros(self.grid.n_grid)
         # Calculate differentials
         self.functional.differentials(self.weighted_densities)
         for i in range(self.functional.nc):
             self.comp_differentials[i].set_functional_differentials(
                 self.functional, i)
+
+    def convolve_density_profile_T(self, rho):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+
+        self.weighted_densities_T.set_zero()
+        rho_delta = np.zeros(self.grid.n_grid)
+        for i in range(self.functional.thermo.nc):
+            rho_inf = rho.densities[i][-1]
+            rho_delta[:] = rho.densities[i][:] - rho_inf
+            if self.grid.geometry == Geometry.PLANAR:
+                frho_delta = dct(rho_delta, type=2)
+            elif self.grid.geometry == Geometry.SPHERICAL:
+                frho_delta = dst(rho_delta*self.grid.z, type=2)
+            elif self.grid.geometry == Geometry.POLAR:
+                pass
             # Loop all weight functions
             for wf in self.comp_wfs[i]:
-                self.comp_wfs[i][wf].convolve_differentials_T(self.comp_differentials[i].d[wf],
-                                                              self.comp_differentials[i].d_conv[wf])
-                dfdt[:] += self.comp_differentials[i].d_conv[wf]
-        return dfdt
+                self.comp_wfs[i].wfs[wf].convolve_densities_T(rho_inf,
+                                                              frho_delta,
+                                                              self.comp_weighted_densities[i].n[wf])
+            # for wf in self.functional.wf.wfs:
+            #     self.comp_wfs[i].wfs[wf].update_dependencies(self.comp_weighted_densities[i])
+            # Account for segments
+            self.comp_weighted_densities[i].update_after_convolution()
+            # print("n0",self.comp_weighted_densities[i].n["w0"])
+            # print("n1",self.comp_weighted_densities[i].n["w1"])
+            # print("n2",self.comp_weighted_densities[i].n["w2"])
+            # print("n3",self.comp_weighted_densities[i].n["w3"])
+            # print("nv1",self.comp_weighted_densities[i].n["wv1"])
+            # print("nv2",self.comp_weighted_densities[i].n["wv2"])
+            # print("n_disp",self.comp_weighted_densities[i].n["w_disp"])
+
+            # Add component contribution to overall density
+            self.weighted_densities_T += self.comp_weighted_densities[i]
+            for wf in self.comp_wfs[i]:
+                alias = self.comp_wfs[i].wfs[wf].alias
+                if alias not in self.comp_wfs[i].fmt_aliases:
+                    self.weighted_densities_T.n[alias][i, :] = \
+                        self.comp_weighted_densities[i].n[alias][:]
+
+    def functional_temperature_differential_convolution(self, rho):
+        """
+        Get entropy per volume (J/m3/K)
+        """
+
+        f_T = np.zeros(self.grid.n_grid)
+        # dndT
+        self.convolve_density_profile_T(rho)
+        # dfdn
+        self.update_functional_differentials()
+        # Sum dfdn*dndT
+        for wf in self.comp_wfs[0]:
+            if len(np.shape(self.weighted_densities_T.n[wf])) == 1:
+                f_T[:] += self.comp_differentials[0].d[wf][:]*self.weighted_densities_T.n[wf][:]
+            else:
+                for i in range(self.functional.thermo.nc):
+                    # Loop components
+                    f_T[:] +=  self.comp_differentials[i].d[wf][:]*self.weighted_densities_T.n[wf][i, :]
+        # dfdT
+        dfdT = self.functional.temperature_differential(self.weighted_densities)
+        f_T[:] += dfdT
+
+        return f_T
 
     def correlation(self, i):
         """

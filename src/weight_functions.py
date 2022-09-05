@@ -95,9 +95,9 @@ class WeightFunction(object):
         L = grid.domain_size
         R_kernel = R*self.kernel_radius
         self.k_cos = 2 * np.pi * np.linspace(0.0, N - 1, N) / (2 * L)
-        self.k_cos_R = self.k_cos * R_kernel
+        self.k_cos_R[:] = self.k_cos * R_kernel
         self.k_sin = 2 * np.pi * np.linspace(1.0, N, N) / (2 * L)
-        self.k_sin_R = self.k_sin * R_kernel
+        self.k_sin_R[:] = self.k_sin * R_kernel
         self.generate_planar_fourier_weights_T(grid, R, R_T)
         if self.convolve:
             if self.wf_type == WeightFunctionType.THETA:
@@ -116,6 +116,10 @@ class WeightFunction(object):
                 self.w_conv_steady = 0.0
                 self.fw[:] = - self.k_sin * \
                     (4.0/3.0 * np.pi * R_kernel**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
+                # elif self.alias == "wv1":
+                #     print("Setting vw1")
+                #     self.fw[:] = - (1.0/(4*np.pi*R_kernel))*self.k_sin * \
+                #         (4.0/3.0 * np.pi * R_kernel**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
 
     def generate_planar_fourier_weights_T(self, grid, R, R_T):
         """
@@ -126,23 +130,26 @@ class WeightFunction(object):
             self.fw_T[:] = 4 * np.pi * R_kernel**2 * spherical_jn(0, self.k_cos_R)
             self.w_conv_steady_T = 4 * np.pi * R_kernel**2
         elif self.wf_type == WeightFunctionType.NORMTHETA:
-            self.fw_T[:] = 3*spherical_jn(2, self.k_cos_R)/R
+            self.fw_T[:] = -3*spherical_jn(2, self.k_cos_R)/R
             self.w_conv_steady_T = 0.0
         elif self.wf_type == WeightFunctionType.DELTA:
             if self.inv_prefactor_R(R) == 0.0:
-                #n0 type weight
-                self.fw_T[:] = - self.k_cos * spherical_jn(1, self.k_cos_R)
-                self.w_conv_steady_T = 0.0
+                #n2 type weight
+                self.fw_T[:] = 8 * np.pi * R_kernel * (spherical_jn(0, self.k_cos_R) - 0.5*self.k_cos_R*spherical_jn(1, self.k_cos_R))
+                self.w_conv_steady_T = 8 * np.pi * R_kernel
             elif self.inv_prefactor_RR(R) == 0.0:
                 #n1 type weight
                 self.fw_T[:] = spherical_jn(0, self.k_cos_R) - self.k_cos_R * spherical_jn(1, self.k_cos_R)
                 self.w_conv_steady_T = self.kernel_radius
             else:
-                #n2 type weight
-                self.fw_T[:] = 8 * np.pi * R_kernel * (spherical_jn(0, self.k_cos_R) - 0.5*self.k_cos_R*spherical_jn(1, self.k_cos_R))
-                self.w_conv_steady_T = 8 * np.pi * R_kernel
+                #n0 type weight
+                self.fw_T[:] = - self.k_cos * spherical_jn(1, self.k_cos_R)
+                self.w_conv_steady_T = 0.0
         elif self.wf_type == WeightFunctionType.DELTAVEC:
-            self.fw_T[:] = - 4 * self.k_sin_R * R_kernel * spherical_jn(0, self.k_sin_R)
+            if self.inv_prefactor_R(R) == 0.0:
+               self.fw_T[:] = - 4 * np.pi * self.k_sin_R * R_kernel * spherical_jn(0, self.k_sin_R)
+            else:
+                self.fw_T[:] = - self.k_sin_R * spherical_jn(0, self.k_sin_R) + spherical_jn(1, self.k_sin_R)
             self.w_conv_steady_T = 0.0
         self.fw_T[:] *= R_T
         self.w_conv_steady_T *= R_T
@@ -242,6 +249,28 @@ class WeightFunction(object):
             # Cosine transform
             self.fn[:] = frho_delta[:] * self.fw[:]
             weighted_density[:] = idct(self.fn, type=2) + rho_inf*self.w_conv_steady
+
+    def planar_convolution_T(self, rho_inf: float, frho_delta: np.ndarray, weighted_density: np.ndarray):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+        if self.wf_type == WeightFunctionType.DELTAVEC:
+            # Sine transform
+            # Fourier transfor only the rho_delta (the other term is done analytically)
+            #self.frho_delta[:] = dct(self.rho_delta, type=2)
+            frho_delta_V = np.roll(frho_delta.copy(), -1) # Fourier transform of density profile for `k_sin`
+            frho_delta_V[-1] = 0                          # this information is lost but usually not important
+            # Vector 2d weighted density (Sine transform)
+            self.fn[:] = frho_delta_V[:] * self.fw_T[:]
+            weighted_density[:] = idst(self.fn, type=2)
+        else:
+            # Cosine transform
+            self.fn[:] = frho_delta[:] * self.fw_T[:]
+            weighted_density[:] = idct(self.fn, type=2) + rho_inf*self.w_conv_steady_T
 
     def planar_convolution_differentials(self, diff: np.ndarray, diff_conv: np.ndarray):
         """
@@ -377,6 +406,19 @@ class WeightFunction(object):
         else:
             pass
 
+    def convolve_densities_T(self, rho_inf: float, frho_delta: np.ndarray, weighted_density: np.ndarray):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+        if self.geometry == Geometry.PLANAR:
+            self.planar_convolution_T(rho_inf, frho_delta, weighted_density)
+        else:
+            pass
+
 class WeightFunctions(object):
 
     def __init__(self):
@@ -440,6 +482,12 @@ class WeightFunctions(object):
                                         prefactor = "1.0",
                                         convolve=True)
         self.fmt_aliases.append("w3")
+        # self.wfs["wv1"] = WeightFunction(WeightFunctionType.DELTAVEC,
+        #                                  kernel_radius=1.0,
+        #                                  alias = "wv1",
+        #                                  prefactor = "1.0",
+        #                                  convolve=True,
+        #                                  calc_from=None)
         self.wfs["wv1"] = WeightFunction(WeightFunctionType.DELTAVEC,
                                          kernel_radius=1.0,
                                          alias = "wv1",
@@ -469,7 +517,6 @@ class WeightFunctions(object):
             if self.wfs[wf].convolve and wf == label:
                 corr_fac += 1.0
             elif self.wfs[wf].calc_from == label:
-                print("R",R)
                 corr_fac += self.wfs[wf].prefactor(R)
         return corr_fac
 

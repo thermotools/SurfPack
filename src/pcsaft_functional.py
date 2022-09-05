@@ -185,7 +185,7 @@ class pc_saft(Whitebear):
     def temperature_differential(self, dens):
         """
         Calculates the functional differentials wrpt. temperature
-
+        Temperature dependence through weigthed densities calculated elewhere
         Args:
         dens (array_like): weighted densities
         Return:

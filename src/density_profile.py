@@ -236,5 +236,17 @@ class Profile(object):
         self.densities = Densities(prof.densities.nc, prof.densities.N)
         self.densities.assign_elements(prof.densities)
 
+    @property
+    def rho_mix(self):
+        """
+        Get mixture density
+        Args:
+            (np.ndarray): Mixture density
+        """
+        rho_mix = np.zeros(self.densities.N)
+        for i in range(self.densities.nc):
+            rho_mix[:] += self.densities[i][:]
+        return rho_mix
+
 if __name__ == "__main__":
     pass

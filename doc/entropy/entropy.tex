@@ -1,3 +1,4 @@
+
 \documentclass[12pt, letterpaper]{article}
 \pdfminorversion=4
 \usepackage[utf8]{inputenc}
@@ -284,7 +285,7 @@ The weight functions in Fourier space is given in the supplementary information 
   \hat{w}_3 \lb \mathbf{k}\rb &= \frac{4}{3} \pi R^3 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb  \\
   \hat{w}_{V1} \lb \mathbf{k}\rb &= - \frac{i \mathbf{k}}{2 R} \hat{w}_3 \lb \mathbf{k}\rb  \\
   \hat{w}_{V2} \lb \mathbf{k}\rb &= - 2 \pi i \mathbf{k} \hat{w}_3 \lb \mathbf{k}\rb  \\
-  \hat{w}_{\rm{disp}} \lb \mathbf{k}\rb &= j_0\lb 4 \pi \psi R |\mathbf{k}| \rb + j_2\lb 4 \pi \psi R |\mathbf{k}| \rb
+  \hat{w}_{\disp} \lb \mathbf{k}\rb &= j_0\lb 4 \pi \psi R |\mathbf{k}| \rb + j_2\lb 4 \pi \psi R |\mathbf{k}| \rb
 \end{align}
 Here $j$ is the spherical Bessel functions of the first kind of order
 zero and two. The Bessel functions of order 0-2 is given as
@@ -319,8 +320,8 @@ The differentials of the weight functions in Fourier space then becomes,
   \pd{\hat{w}_{V1} \lb \mathbf{k}\rb}{R} &= - \frac{2 \pi i \mathbf{k}}{3 (2 \pi |\mathbf{k}|)^2}  \pd{}{R}\biggl( (2 \pi R |\mathbf{k}|)^2 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb \biggr) \nonumber \\
                                       &= - \frac{2 \pi i \mathbf{k}}{3 (2 \pi |\mathbf{k}|)^2} \biggl( 6 \pi R |\mathbf{k}| j_0\lb 2 \pi R |\mathbf{k}| \rb - 3 j_1\lb 2 \pi R |\mathbf{k}| \rb \biggr) 2 \pi |\mathbf{k}|  \nonumber \\
    &= - i \biggl( 2 \pi R \mathbf{k} j_0\lb 2 \pi R |\mathbf{k}| \rb - \frac{\mathbf{k}}{|\mathbf{k}|} j_1\lb 2 \pi R |\mathbf{k}| \rb \biggr)  \\
-  \pd{\hat{w}_{V2} \lb \mathbf{k}\rb}{R} &= - 8 \pi i \mathbf{k} R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
-  \pd{\hat{w}_{\rm{disp}} \lb \mathbf{k}\rb}{R} &= -\frac{3 j_2\lb 4 \pi \psi R |\mathbf{k}| \rb}{4 \pi \psi R |\mathbf{k}|} 4 \pi \psi |\mathbf{k}| \nonumber \\
+  \pd{\hat{w}_{V2} \lb \mathbf{k}\rb}{R} &= - 8 \pi^2 i \mathbf{k} R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \pd{\hat{w}_{\disp} \lb \mathbf{k}\rb}{R} &= -\frac{3 j_2\lb 4 \pi \psi R |\mathbf{k}| \rb}{4 \pi \psi R |\mathbf{k}|} 4 \pi \psi |\mathbf{k}| \nonumber \\
                                       &= -\frac{3 j_2\lb 4 \pi \psi R |\mathbf{k}| \rb}{R}
 \end{align}
 
@@ -347,7 +348,7 @@ Where,
   w_3^{\rm{s}} &= \frac{4}{3} \pi R^3  \\
   w_{V1}^{\rm{s}} &= 0  \\
   w_{V2}^{\rm{s}} &= 0  \\
-  w_{\rm{disp}}^{\rm{s}} &= 1.
+  w_{\disp}^{\rm{s}} &= 1.
 \end{align}
 
 Differentiating we get,
@@ -359,7 +360,7 @@ Differentiating we get,
   \pd{w_3^{\rm{s}}}{R} &= 4 \pi R^2  \\
   \pd{w_{V1}^{\rm{s}}}{R} &= 0  \\
   \pd{w_{V2}^{\rm{s}}}{R} &= 0  \\
-  \pd{w_{\rm{disp}}^{\rm{s}}}{R} &= 0
+  \pd{w_{disp}^{\rm{s}}}{R} &= 0
 \end{align}
 
 \section{Results}
