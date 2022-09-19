@@ -117,6 +117,7 @@ plt.plot([interf.grid.z[-1]], s_scaling*np.array([vle.vapor.specific_excess_entr
 plt.ylabel(r"$s^{\rm{E}}$ (MJ/m$^3$/K)")
 plt.xlabel("$z$ (Å)")
 leg = plt.legend(loc="best", numpoints=1, frameon=False)
+plt.savefig("methane_140K.pdf")
 plt.show()
 
 s_scaling = 1.0
