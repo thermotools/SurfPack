@@ -36,9 +36,6 @@ class LenghtUnit(DftEnum):
     ANGSTROM = 100
     REDUCED = 200
 
-# Define units for simulation grid
-GRID_UNIT = LenghtUnit.ANGSTROM
-
 # Plot utility
 LINE_STYLES = OrderedDict(
     [('0',               (0, ())),

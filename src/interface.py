@@ -3,14 +3,20 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from dft_numerics import dft_solver
-from constants import NA, KB, Geometry, Specification, LenghtUnit, GRID_UNIT, LCOLORS
+from constants import NA, KB, Geometry, Specification, LenghtUnit, LCOLORS
 from bulk import Bulk
 from density_profile import Profile
 from grid import Grid
 from convolver import Convolver
 from pyctp.pcsaft import pcsaft
+from pyctp.saftvrmie import saftvrmie
+from pyctp.saftvrqmie import saftvrqmie
+from pyctp.ljs_bh import ljs_bh
+from pyctp.ljs_wca import ljs_wca, ljs_uv
 from pyctp.thermopack_state import state, equilibrium
 from pcsaft_functional import pc_saft
+from ljs_functional import ljs_bh_functional, ljs_wca_functional, ljs_uv_functional
+from saftvrmie_functional import saftvrmie_functional, saftvrqmie_functional
 import numpy as np
 import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
@@ -26,22 +32,35 @@ class Interface(ABC):
                  temperature,
                  domain_size=100.0,
                  n_grid=1024,
-                 specification = Specification.NUMBER_OF_MOLES):
+                 specification=Specification.NUMBER_OF_MOLES,
+                 functional_kwargs={}):
         """Class holding specifications for an interface calculation
 
         Args:
             geometry (int): PLANAR/POLAR/SPHERICAL
             thermopack (thermo): Thermopack instance
+            temperature (float): Temperature (K)
             domain_size (float, optional): Sisze of domain. Defaults to 100.0.
             n_grid (int, optional): Number of grid points. Defaults to 1024.
             specification (Specification, optional): Override how system of equations are solved
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
         Returns:
             None
         """
+        t_red = temperature/thermopack.eps_div_kb[0]
         # Create functional
         if isinstance(thermopack, pcsaft):
-            t_red = temperature/thermopack.eps_div_kb[0]
-            self.functional = pc_saft(n_grid, thermopack, t_red)
+            self.functional = pc_saft(n_grid, thermopack, t_red, **functional_kwargs)
+        elif isinstance(thermopack, ljs_bh):
+            self.functional = ljs_bh_functional(n_grid, thermopack, t_red, **functional_kwargs)
+        elif isinstance(thermopack, ljs_wca):
+            self.functional = ljs_wca_functional(n_grid, thermopack, t_red, **functional_kwargs)
+        elif isinstance(thermopack, ljs_uv):
+            self.functional = ljs_uv_functional(n_grid, thermopack, t_red, **functional_kwargs)
+        elif isinstance(thermopack, saftvrqmie):
+            self.functional = saftvrqmie_functional(n_grid, thermopack, t_red, **functional_kwargs)
+        elif isinstance(thermopack, saftvrmie):
+            self.functional = saftvrmie_functional(n_grid, thermopack, t_red, **functional_kwargs)
         else:
             raise TypeError("No DFT functional for thermopack model: " + type(thermopack))
         # Set up grid
@@ -470,9 +489,9 @@ class Interface(ABC):
                                           data_dict=None,
                                           xlim=None,
                                           ylim=None,
-                                          plot_actual_densities=False,
+                                          plot_reduced_densities=False,
                                           plot_equimolar_surface=False,
-                                          unit=GRID_UNIT):
+                                          grid_unit=None):
         """
         Plot equilibrium density profile
         Args:
@@ -481,26 +500,27 @@ class Interface(ABC):
         if not self.converged:
             self.print_perform_minimization_message()
             return
+        if not grid_unit:
+            grid_unit = self.functional.grid_unit
         fig, ax = plt.subplots(1, 1)
-        if unit==LenghtUnit.REDUCED:
-            ax.set_xlabel("$z/d_{11}$")
-        elif unit==LenghtUnit.ANGSTROM:
+        if grid_unit==LenghtUnit.REDUCED:
+            ax.set_xlabel("$z/\sigma_{11}$")
+        elif grid_unit==LenghtUnit.ANGSTROM:
             ax.set_xlabel("$z$ (Å)")
-        if GRID_UNIT == LenghtUnit.ANGSTROM and unit == LenghtUnit.REDUCED:
-            len_fac = 1.0/(self.functional.d_hs[0]*1e10)
+        if self.functional.grid_unit == LenghtUnit.ANGSTROM and grid_unit == LenghtUnit.REDUCED:
+            len_fac = 1.0/(self.functional.thermo.sigma[0]*1e10)
         else:
             len_fac = self.functional.grid_reducing_lenght*1e10
-        des_fac = np.ones(self.profile.densities.nc)
-        if plot_actual_densities:
-            des_fac *= 1.0e-3/(NA*self.functional.grid_reducing_lenght**3)
-            ax.set_ylabel(r"$\rho$ (kmol/m$^3$)")
+        dens_fac = np.ones(self.profile.densities.nc)
+        if plot_reduced_densities:
+            dens_fac *= (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+            ax.set_ylabel(r"$\rho^*$")
         else:
-            des_fac /= max(self.bulk.reduced_density_left,
-                           self.bulk.reduced_density_right)
-            ax.set_ylabel(r"$\rho^*/\rho_{\rm{b}}^*$")
+            dens_fac *= 1.0e-3/(NA*self.functional.grid_reducing_lenght**3)
+            ax.set_ylabel(r"$\rho$ (kmol/m$^3$)")
         for i in range(self.profile.densities.nc):
             ax.plot(self.grid.z[:]*len_fac,
-                    self.profile.densities[i][:] * des_fac[i],
+                    self.profile.densities[i][:] * dens_fac[i],
                     lw=2, color=LCOLORS[i], label=f"Comp. {i+1}")
         if data_dict is not None:
             plot_data_container(data_dict, ax)
@@ -578,7 +598,8 @@ class PlanarInterface(Interface):
                  temperature,
                  domain_size=100.0,
                  n_grid=1024,
-                 specification = Specification.NUMBER_OF_MOLES):
+                 specification = Specification.NUMBER_OF_MOLES,
+                 functional_kwargs={}):
         """Class holding specifications for an interface calculation of a planar geometry
 
         Args:
@@ -587,6 +608,7 @@ class PlanarInterface(Interface):
             domain_size (float, optional): Sisze of domain. Defaults to 100.0.
             n_grid (int, optional): Number of grid points. Defaults to 1024.
             specification (Specification, optional): Override how system of equations are solved
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
         Returns:
             None
         """
@@ -596,7 +618,8 @@ class PlanarInterface(Interface):
                            temperature=temperature,
                            domain_size=domain_size,
                            n_grid=n_grid,
-                           specification = specification)
+                           specification=specification,
+                           functional_kwargs=functional_kwargs)
 
     @staticmethod
     def from_tanh_profile(vle,
@@ -604,7 +627,8 @@ class PlanarInterface(Interface):
                           domain_size=100.0,
                           n_grid=1024,
                           rel_pos_dividing_surface=0.5,
-                          invert_states=False):
+                          invert_states=False,
+                          functional_kwargs={}):
         """
         Initialize tangens hyperbolicus profile
 
@@ -612,11 +636,14 @@ class PlanarInterface(Interface):
         Returns:
             (float): Grand potential
             (array): Grand potential contribution for each grid point
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
+
         """
         pif = PlanarInterface(thermopack=vle.eos,
                               temperature=vle.temperature,
                               domain_size=domain_size,
-                              n_grid=n_grid)
+                              n_grid=n_grid,
+                              functional_kwargs=functional_kwargs)
         pif.tanh_profile(vle,
                          t_crit,
                          rel_pos_dividing_surface=rel_pos_dividing_surface,
@@ -628,11 +655,14 @@ class PlanarInterface(Interface):
                      profile,
                      domain_size=100.0,
                      n_grid=1024,
-                     invert_states=False):
+                     invert_states=False,
+                     functional_kwargs={}):
         """
         Initialize tangens hyperbolicus profile
 
             rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
+
         Returns:
             (float): Grand potential
             (array): Grand potential contribution for each grid point
@@ -640,7 +670,8 @@ class PlanarInterface(Interface):
         pif = PlanarInterface(thermopack=vle.eos,
                               temperature=vle.temperature,
                               domain_size=domain_size,
-                              n_grid=n_grid)
+                              n_grid=n_grid,
+                              functional_kwargs=functional_kwargs)
         pif.set_profile(vle,
                         profile,
                         invert_states=invert_states)
@@ -674,7 +705,8 @@ class SphericalInterface(Interface):
                  radius,
                  domain_radius=100.0,
                  n_grid=1024,
-                 specification = Specification.NUMBER_OF_MOLES):
+                 specification = Specification.NUMBER_OF_MOLES,
+                 functional_kwargs={}):
         """Class holding specifications for an interface calculation of a spherical geometry
 
         Args:
@@ -683,6 +715,7 @@ class SphericalInterface(Interface):
             domain_size (float, optional): Sisze of domain. Defaults to 100.0.
             n_grid (int, optional): Number of grid points. Defaults to 1024.
             specification (Specification, optional): Override how system of equations are solved
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
         Returns:
             None
         """
@@ -692,7 +725,8 @@ class SphericalInterface(Interface):
                            temperature=temperature,
                            domain_size=domain_radius,
                            n_grid=n_grid,
-                           specification = specification)
+                           specification=specification,
+                           functional_kwargs=functional_kwargs)
         self.raduis = radius
 
     @staticmethod

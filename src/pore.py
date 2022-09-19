@@ -19,7 +19,8 @@ class Pore(Interface):
                  temperature,
                  external_potential,
                  domain_size=100.0,
-                 n_grid=1024):
+                 n_grid=1024,
+                 functional_kwargs={}):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
@@ -33,6 +34,7 @@ class Pore(Interface):
             grid (int) : Grid size
             temperature (float): Reduced temperature
             quadrature (str): Quadrature to use during integration
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
         Returns:
             None
         """
@@ -43,7 +45,8 @@ class Pore(Interface):
                            thermopack=thermopack,
                            temperature=temperature,
                            domain_size=domain_size,
-                           n_grid=n_grid)
+                           n_grid=n_grid,
+                           functional_kwargs=functional_kwargs)
         self.v_ext = external_potential
 
 class SlitPore(Pore):
@@ -55,7 +58,8 @@ class SlitPore(Pore):
                  temperature,
                  external_potential,
                  domain_size=100.0,
-                 n_grid=1024):
+                 n_grid=1024,
+                 functional_kwargs={}):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
@@ -69,6 +73,7 @@ class SlitPore(Pore):
             grid (int) : Grid size
             temperature (float): Reduced temperature
             quadrature (str): Quadrature to use during integration
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
         Returns:
             None
         """
@@ -80,18 +85,21 @@ class SlitPore(Pore):
                       temperature=temperature,
                       external_potential=external_potential,
                       domain_size=domain_size,
-                      n_grid=n_grid)
+                      n_grid=n_grid,
+                      functional_kwargs=functional_kwargs)
 
 
     @staticmethod
     def from_state(state,
                    external_potential,
                    domain_size=100.0,
-                   n_grid=1024):
+                   n_grid=1024,
+                   functional_kwargs={}):
         """
         Initialize tangens hyperbolicus profile
 
             rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface. Default value 0.5.
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
         Returns:
             (float): Grand potential
             (array): Grand potential contribution for each grid point
@@ -100,7 +108,8 @@ class SlitPore(Pore):
                        temperature=state.T,
                        external_potential=external_potential,
                        domain_size=domain_size,
-                       n_grid=n_grid)
+                       n_grid=n_grid,
+                       functional_kwargs=functional_kwargs)
         pif.constant_profile(state)
         return pif
 
@@ -112,7 +121,8 @@ class Surface(Pore):
                  external_potential,
                  surface_position,
                  domain_size=100.0,
-                 n_grid=1024):
+                 n_grid=1024,
+                 functional_kwargs={}):
         """
         Object holding specifications for classical DFT problem.
         Reduced particle size assumed to be d=1.0, and all other sizes are relative to this scale.
@@ -126,6 +136,7 @@ class Surface(Pore):
             grid (int) : Grid size
             temperature (float): Reduced temperature
             quadrature (str): Quadrature to use during integration
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
         Returns:
             None
         """
@@ -136,7 +147,8 @@ class Surface(Pore):
                       functional=functional,
                       external_potential=external_potential,
                       domain_size=domain_size,
-                      n_grid=n_grid)
+                      n_grid=n_grid,
+                      functional_kwargs=functional_kwargs)
 
 
 if __name__ == "__main__":

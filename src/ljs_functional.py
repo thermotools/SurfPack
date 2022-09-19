@@ -2,43 +2,63 @@
 import numpy as np
 import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from constants import NA, RGAS, LenghtUnit
-from fmt_functionals import Whitebear
-from pyctp.pcsaft import pcsaft
-from pyctp.saft import saft
+from pcsaft_functional import saft_dispersion
+from pyctp.ljs_bh import ljs_bh
+from pyctp.ljs_wca import ljs_wca_base, ljs_wca, ljs_uv
 
-class saft_dispersion(Whitebear):
+class ljs_bh_functional(saft_dispersion):
     """
 
     """
 
-    def __init__(self, N, thermo: saft, T_red, phi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, ljs: ljs_bh, T_red, phi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
-            thermopack (thermo): Thermopack object
+            N (int): Size of grid
+            ljs (ljs_bh): Thermopack object
             T_red (float): Reduced temperature
-            R (ndarray): Particle radius for all components
             phi_disp (float): Width for weighted dispersion density
+            grid_unit (LenghtUnit): Unit used for grid
         """
-        self.thermo = thermo
-        self.T_red = T_red
-        self.T = self.T_red * self.thermo.eps_div_kb[0]
-        self.d_hs, self.d_T_hs = thermo.hard_sphere_diameters(self.T)
+        saft_dispersion.__init__(self,
+                                 N,
+                                 ljs,
+                                 T_red,
+                                 phi_disp=phi_disp,
+                                 grid_unit=grid_unit)
+        self.name += "Lennard-Jones-Spline-BH"
+        self.short_name = "LJS-BH"
 
-        if grid_unit == LenghtUnit.ANGSTROM:
-            self.grid_reducing_lenght = 1.0e-10
-        else:
-            self.grid_reducing_lenght = thermo.sigma[0]
-        R = np.zeros(thermo.nc)
-        R[:] = 0.5*self.d_hs[:]/self.grid_reducing_lenght
-        Whitebear.__init__(self, N, R, grid_unit)
-        self.name = "Generic-SAFT"
-        self.short_name = "GS"
+class ljs_wca_base_functional(saft_dispersion):
+    """
+
+    """
+
+    def __init__(self, N, ljs: ljs_wca_base, T_red, phi_disp=1.3862, phi_soft_rep=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+        """
+
+        Args:
+            N (int): Size of grid
+            ljs (ljs_wca_base): Thermopack object
+            T_red (float): Reduced temperature
+            phi_disp (float): Width for weighted dispersion density
+            phi_soft_rep (float): Width for weighted soft-repulsion density
+            grid_unit (LenghtUnit): Unit used for grid
+        """
+        saft_dispersion.__init__(self, N,
+                                 ljs,
+                                 T_red,
+                                 phi_disp=phi_disp,
+                                 grid_unit=grid_unit)
+        self.name += "Lennard-Jones-Spline-WCA"
+        self.short_name = "LJS-WCA"
         # Add normalized theta weight
-        self.mu_disp = np.zeros((N, thermo.nc))
-        self.disp_name = "w_disp"
-        self.wf.add_norm_theta_weight(self.disp_name, kernel_radius=2*phi_disp)
-        self.diff[self.disp_name] = self.mu_disp
+        self.mu_soft_ref = np.zeros((N, ljs.nc))
+        self.soft_ref_name = "w_soft_rep"
+        self.wf.add_norm_theta_weight(self.soft_ref_name, kernel_radius=2*phi_soft_rep)
+        self.diff[self.soft_ref_name] = self.mu_soft_ref
+
 
     def excess_free_energy(self, dens):
         """
@@ -51,14 +71,14 @@ class saft_dispersion(Whitebear):
         array_like: Excess HS Helmholtz free energy ()
 
         """
-        f = Whitebear.excess_free_energy(self, dens)
+        f = saft_dispersion.excess_free_energy(self, dens)
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(len(f)):
             rho_thermo[:] = dens.n[self.disp_name][:, i]
             rho_mix = np.sum(rho_thermo)
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
-            a, = self.thermo.a_dispersion(self.T, V, rho_thermo)
+            a, = self.thermo.a_soft_repulsion(self.T, V, rho_thermo)
             f[i] += rho_mix*a
 
         return f
@@ -72,7 +92,7 @@ class saft_dispersion(Whitebear):
         diff (array_like): Functional differentials
 
         """
-        Whitebear.differentials(self, dens)
+        saft_dispersion.differentials(self, dens)
 
         # All densities must be positive
         #prdm = dens.n[self.disp_name] > 0.0  # Positive rho_disp value mask
@@ -91,7 +111,7 @@ class saft_dispersion(Whitebear):
         #   if prdm[i]:
             rho_thermo[:] = dens.n[self.disp_name][:, i]
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
-            a, a_n, = self.thermo.a_dispersion(
+            a, a_n, = self.thermo.a_soft_repulsion(
                 self.T, V, rho_thermo, a_n=True)
             self.mu_disp[i, :] = (a + rho_thermo[:]*a_n[:])
         #self.mu_disp[non_prdm, :] = 0.0
@@ -107,7 +127,7 @@ class saft_dispersion(Whitebear):
         Returns:
             float: compressibility
         """
-        z = Whitebear.bulk_compressibility(self, rho_b)
+        z = saft_dispersion.bulk_compressibility(self, rho_b)
         # PC-SAFT contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
@@ -115,7 +135,7 @@ class saft_dispersion(Whitebear):
         rho_mix = np.sum(rho_thermo)
         V = 1.0/rho_mix
         n = rho_thermo/rho_mix
-        a, a_V, = self.thermo.a_dispersion(
+        a, a_V, = self.thermo.a_soft_repulsion(
             self.T, V, n, a_v=True)
         z_r = -a_V*V
         z += z_r
@@ -133,7 +153,7 @@ class saft_dispersion(Whitebear):
         float: Excess reduced HS chemical potential ()
 
         """
-        mu_ex = Whitebear.bulk_excess_chemical_potential(self, rho_b)
+        mu_ex = saft_dispersion.bulk_excess_chemical_potential(self, rho_b)
         # PC-SAFT contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
@@ -141,7 +161,7 @@ class saft_dispersion(Whitebear):
         rho_mix = np.sum(rho_thermo)
         V = 1.0
         n = rho_thermo
-        a, a_n, = self.thermo.a_dispersion(
+        a, a_n, = self.thermo.a_soft_repulsion(
             self.T, V, n, a_n=True)
         a_n *= n
         a_n += a
@@ -157,32 +177,22 @@ class saft_dispersion(Whitebear):
         bd (bulk_weighted_densities): bulk_weighted_densities
         only_hs_system (bool): Only calculate for hs-system
         """
-        phi, dphidn = Whitebear.bulk_functional_with_differentials(self, bd)
+        phi, dphidn = saft_dispersion.bulk_functional_with_differentials(self, bd, only_hs_system=only_hs_system)
         if not only_hs_system:
             rho_vec = bd.rho_i
             rho_mix = np.sum(rho_vec)
             V = 1.0
             rho_thermo = np.zeros_like(rho_vec)
             rho_thermo[:] = rho_vec[:]/(NA*self.grid_reducing_lenght**3)
-            a, a_n, = self.thermo.a_dispersion(
+            a, a_n, = self.thermo.a_soft_repulsion(
                 self.T, V, rho_thermo, a_n=True)
             phi += rho_mix*a
-            dphidn_comb = np.zeros(4 + self.nc)
-            dphidn_comb[:4] = dphidn
-            dphidn_comb[4:] = a + rho_thermo[:]*a_n[:]
+            dphidn_comb = np.zeros(np.shape(dphidn)[0] + self.nc)
+            dphidn_comb[:np.shape(dphidn)[0]] = dphidn
+            dphidn_comb[np.shape(dphidn)[0]:] = a + rho_thermo[:]*a_n[:]
         else:
             dphidn_comb = dphidn
         return phi, dphidn_comb
-
-    def get_differential(self, i):
-        """
-        Get differential number i
-        """
-        if i <= 5:
-            d = Whitebear.get_differential(self, i)
-        else:
-            d = self.mu_disp[i-6, :]
-        return d
 
     def temperature_differential(self, dens):
         """
@@ -194,7 +204,7 @@ class saft_dispersion(Whitebear):
         np.ndarray: Functional differentials
 
         """
-        d_T = Whitebear.temperature_differential(self, dens)
+        d_T = saft_dispersion.temperature_differential(self, dens)
 
         rho_thermo = np.zeros(self.nc)
         V = 1.0
@@ -202,12 +212,11 @@ class saft_dispersion(Whitebear):
             rho_thermo[:] = dens.n[self.disp_name][:, i]
             rho_mix = np.sum(rho_thermo)
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
-            a, a_T, = self.thermo.a_dispersion(
+            a, a_T, = self.thermo.a_soft_repulsion(
                 self.T, V, rho_thermo, a_t=True)
             d_T[i] += rho_mix*a_T
 
         return d_T
-
 
     def test_eos_differentials(self, V, n):
         """
@@ -216,22 +225,23 @@ class saft_dispersion(Whitebear):
             V (float): Volume (m3)
             n (np.ndarray): Molar numbers (mol)
         """
-        print("Dispersion functional:")
-        a, a_t, a_v, a_n, a_tt, a_vv, a_tv, a_tn, a_vn, a_nn = self.thermo.a_dispersion(
+        saft_dispersion.test_eos_differentials(self, V, n)
+        print("Soft repulsion functional:")
+        a, a_t, a_v, a_n, a_tt, a_vv, a_tv, a_tn, a_vn, a_nn = self.thermo.a_soft_repulsion(
             self.T, V, n, a_t=True, a_v=True, a_n=True, a_tt=True, a_vv=True,
             a_tv=True, a_tn=True, a_vn=True, a_nn=True)
 
         eps = 1.0e-5
         dT = self.T*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(self.T + dT, V, n, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_dispersion(self.T - dT, V, n, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(self.T + dT, V, n, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(self.T - dT, V, n, a_t=True, a_v=True, a_n=True)
         print(f"a_T: {a_t}, {(ap-am)/2/dT}")
         print(f"a_TT: {a_tt}, {(ap_t-am_t)/2/dT}")
         print(f"a_TV: {a_tv}, {(ap_v-am_v)/2/dT}")
         print(f"a_Tn: {a_tn}, {(ap_n-am_n)/2/dT}")
         dV = V*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(self.T, V + dV, n, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_dispersion(self.T, V - dV, n, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(self.T, V + dV, n, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(self.T, V - dV, n, a_t=True, a_v=True, a_n=True)
         print(f"a_V: {a_v}, {(ap-am)/2/dV}")
         print(f"a_VV: {a_vv}, {(ap_v-am_v)/2/dV}")
         print(f"a_TV: {a_tv}, {(ap_t-am_t)/2/dV}")
@@ -239,55 +249,65 @@ class saft_dispersion(Whitebear):
         eps = 1.0e-5
         dn = np.zeros_like(n)
         dn[0] = n[0]*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(self.T, V, n + dn, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_dispersion(self.T, V, n - dn, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(self.T, V, n + dn, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(self.T, V, n - dn, a_t=True, a_v=True, a_n=True)
         print(f"a_n: {a_n}, {(ap-am)/2/dn[0]}")
         print(f"a_Vn: {a_vn}, {(ap_v-am_v)/2/dn[0]}")
         print(f"a_Tn: {a_tn}, {(ap_t-am_t)/2/dn[0]}")
         print(f"a_nn: {a_nn}, {(ap_n-am_n)/2/dn[0]}")
 
-class pc_saft(saft_dispersion):
+
+class ljs_uv_functional(ljs_wca_base_functional):
     """
 
     """
 
-    def __init__(self, N, pcs: pcsaft, T_red, phi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, ljs: ljs_uv, T_red, phi_disp=1.3862, phi_soft_rep=1.3862, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
-            pcs (pcsaft): Thermopack object
+            N (int): Size of grid
+            ljs (ljs_uv): Thermopack object
             T_red (float): Reduced temperature
-            R (ndarray): Particle radius for all components
             phi_disp (float): Width for weighted dispersion density
+            phi_soft_rep (float): Width for weighted soft-repulsion density
+            grid_unit (LenghtUnit): Unit used for grid
         """
-        saft_dispersion.__init__(self,
-                                 N,
-                                 pcs,
-                                 T_red,
-                                 phi_disp=phi_disp,
-                                 grid_unit=grid_unit)
-        self.name = "PC-SAFT"
-        self.short_name = "PC"
+        ljs_wca_base_functional.__init__(self,
+                                         N,
+                                         ljs,
+                                         T_red,
+                                         phi_disp=phi_disp,
+                                         grid_unit=grid_unit)
+        self.name += "Lennard-Jones-Spline-UV"
+        self.short_name = "LJS-UV"
+
+class ljs_wca_functional(ljs_wca_base_functional):
+    """
+
+    """
+
+    def __init__(self, N, ljs: ljs_wca, T_red, phi_disp=1.3862, phi_soft_rep=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+        """
+
+        Args:
+            N (int): Size of grid
+            ljs (ljs_wca): Thermopack object
+            T_red (float): Reduced temperature
+            phi_disp (float): Width for weighted dispersion density
+            phi_soft_rep (float): Width for weighted soft-repulsion density
+            grid_unit (LenghtUnit): Unit used for grid
+        """
+        ljs_wca_base_functional.__init__(self,
+                                         N,
+                                         ljs,
+                                         T_red,
+                                         phi_disp=phi_disp,
+                                         grid_unit=grid_unit)
+        self.name += "Lennard-Jones-Spline-WCA"
+        self.short_name = "LJS-WCA"
+
 
 if __name__ == "__main__":
     # Model testing
-
-    pcs = get_thermopack_model("PC-SAFT")
-    pcs.init("C1")
-    PCS_functional = pc_saft(1, pcs, T_red=110.0/165.0)
-    print(PCS_functional.d_hs[0], PCS_functional.T)
-    dens_pcs = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
-
-    v = pcs.specific_volume(PCS_functional.T,
-                            1.0e6,
-                            np.array([1.0]),
-                            pcs.LIQPH)
-    rho = (NA * PCS_functional.grid_reducing_lenght ** 3)/v
-    PCS_functional.test_bulk_differentials(rho)
-    dens = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
-    dens.set_testing_values(rho)
-    # dens.print(print_utilities=True)
-    PCS_functional.test_differentials(dens)
-    corr = PCS_functional.get_bulk_correlation(rho)
-    mu = PCS_functional.bulk_excess_chemical_potential(rho)
-    print("corr, mu", corr, mu)
+    pass

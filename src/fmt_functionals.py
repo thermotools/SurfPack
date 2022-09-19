@@ -2,6 +2,7 @@
 import numpy as np
 import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from weight_functions import WeightFunctions
+from constants import LenghtUnit
 
 class bulk_weighted_densities:
     """
@@ -45,7 +46,7 @@ class Rosenfeld:
     doi:10.1103/PhysRevLett.63.980
     """
 
-    def __init__(self, N, R=np.array([0.5])):
+    def __init__(self, N, R=np.array([0.5]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
@@ -57,6 +58,9 @@ class Rosenfeld:
         self.R = R
         self.nc = np.shape(R)[0]
         self.n_grid = N
+        # Define units for simulation grid
+        self.grid_unit = grid_unit
+
         # Allocate arrays for differentials
         self.d0 = np.zeros(N)
         self.d1 = np.zeros(N)
@@ -329,8 +333,18 @@ class Rosenfeld:
             dphidrho_num_no_hs = (phi2 - phi2_hs - phi1 + phi1_hs) / (2 * eps)
             dphidrho_num = (phi2 - phi1) / (2 * eps)
             if np.shape(dphidn)[0] > 4:
-                print("Differential: ", 4+i, dphidrho_num_no_hs, dphidn[4+i], (dphidrho_num_no_hs - dphidn[4+i])/dphidn[4+i])
+                print("Differential: ", "[4:]", dphidrho_num_no_hs, np.sum(dphidn[4:]), (dphidrho_num_no_hs - np.sum(dphidn[4:]))/np.sum(dphidn[4:]))
             print("Chemical potential comp.: ", i, dphidrho_num, mu_ex[i])
+
+
+    def test_eos_differentials(self, V, n):
+        """
+        Test the functional differentials
+        Args:
+            V (float): Volume (m3)
+            n (np.ndarray): Molar numbers (mol)
+        """
+        print("No EOS.")
 
 
 class Whitebear(Rosenfeld):
@@ -348,14 +362,15 @@ class Whitebear(Rosenfeld):
 
     """
 
-    def __init__(self, N, R=np.array([0.5])):
+    def __init__(self, N, R=np.array([0.5]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (integer): Grid size
             R (ndarray): Particle radius for all components
+            grid_unit (LenghtUnit): Unit used for grid
         """
-        Rosenfeld.__init__(self, N, R)
+        Rosenfeld.__init__(self, N, R, grid_unit=grid_unit)
         self.name = "White Bear"
         self.short_name = "WB"
         self.numerator = None
@@ -463,13 +478,13 @@ class WhitebearMarkII(Whitebear):
     doi: 10.1088/0953-8984/18/37/002
     """
 
-    def __init__(self, N, R=np.array([0.5])):
+    def __init__(self, N, R=np.array([0.5]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             R (ndarray): Radius of particles
         """
-        Whitebear.__init__(self, N, R)
+        Whitebear.__init__(self, N, R, grid_unit)
         self.name = "White Bear Mark II"
         self.short_name = "WBII"
         self.phi2_div3 = None
