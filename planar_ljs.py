@@ -2,7 +2,7 @@
 
 import numpy as np
 import sys
-from pyctp.ljs_wca import ljs_uv
+from pyctp.ljs_wca import ljs_uv, ljs_wca
 from pyctp.ljs_bh import ljs_bh
 from pyctp.thermopack_state import equilibrium
 from src.interface import PlanarInterface
@@ -120,6 +120,11 @@ print("Surface tension: ", interf.surface_tension())
 # leg = plt.legend(loc="best", numpoints=1, frameon=False)
 # plt.show()
 
+
+
+
+
+
 len_fac = interf.functional.grid_reducing_lenght/interf.functional.thermo.sigma[0]
 s_scaling = NA*interf.functional.thermo.sigma[0]**3/interf.functional.thermo.Rgas
 s_E = interf.get_excess_entropy_density()
@@ -132,4 +137,59 @@ plt.ylabel(r"$s_{\rm{E}}^*$")
 plt.xlabel("$z/\sigma$")
 leg = plt.legend(loc="best", numpoints=1, frameon=False)
 plt.savefig("ljs_T_is_0.75.pdf")
+plt.show()
+
+
+
+# Set up Barker-Henderson model
+thermopack_bh = ljs_bh()
+thermopack_bh.init("Ar")
+thermopack.set_tmin(0.5*thermopack.eps_div_kb)
+vle_bh = equilibrium.bubble_pressure(thermopack_bh, T, z=np.ones(1))
+
+# Define interface with initial tanh density profile
+interf_bh = PlanarInterface.from_tanh_profile(vle_bh,
+                                              thermopack_bh.critical_temperature(1),
+                                              domain_size=100.0,
+                                              n_grid=1024,
+                                              invert_states=True)
+
+# Solve for equilibrium profile
+interf_bh.solve(log_iter=True)
+
+# Plot profile
+interf_bh.plot_equilibrium_density_profiles(plot_reduced_densities=True,
+                                            plot_equimolar_surface=True,
+                                            grid_unit=LenghtUnit.REDUCED)
+
+# Set up WCA model
+thermopack_wca = ljs_wca()
+thermopack_wca.init("Ar")
+thermopack.set_tmin(0.5*thermopack.eps_div_kb)
+vle_wca = equilibrium.bubble_pressure(thermopack_wca, T, z=np.ones(1))
+
+# Define interface with initial tanh density profile
+interf_wca = PlanarInterface.from_tanh_profile(vle_wca,
+                                              thermopack_wca.critical_temperature(1),
+                                              domain_size=100.0,
+                                              n_grid=1024,
+                                              invert_states=True)
+
+# Solve for equilibrium profile
+interf_wca.solve(log_iter=True)
+
+# Plot profile
+interf_wca.plot_equilibrium_density_profiles(plot_reduced_densities=True,
+                                            plot_equimolar_surface=True,
+                                            grid_unit=LenghtUnit.REDUCED)
+
+s_E_bh = interf_bh.get_excess_entropy_density()
+s_E_wca = interf_wca.get_excess_entropy_density()
+plt.plot(interf.grid.z*len_fac, s_E,label=r"UV")
+plt.plot(interf.grid.z*len_fac, s_E_bh,label=r"BH")
+plt.plot(interf.grid.z*len_fac, s_E_wca,label=r"WCA")
+plt.ylabel(r"$s_{\rm{E}}^*$")
+plt.xlabel("$z/\sigma$")
+leg = plt.legend(loc="best", numpoints=1, frameon=False)
+plt.savefig("ljs_entropy.pdf")
 plt.show()
