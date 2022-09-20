@@ -54,10 +54,10 @@ class ljs_wca_base_functional(saft_dispersion):
         self.name += "Lennard-Jones-Spline-WCA"
         self.short_name = "LJS-WCA"
         # Add normalized theta weight
-        self.mu_soft_ref = np.zeros((N, ljs.nc))
-        self.soft_ref_name = "w_soft_rep"
-        self.wf.add_norm_theta_weight(self.soft_ref_name, kernel_radius=2*phi_soft_rep)
-        self.diff[self.soft_ref_name] = self.mu_soft_ref
+        self.mu_soft_rep = np.zeros((N, ljs.nc))
+        self.soft_rep_name = "w_soft_rep"
+        self.wf.add_norm_theta_weight(self.soft_rep_name, kernel_radius=2*phi_soft_rep)
+        self.diff[self.soft_rep_name] = self.mu_soft_rep
 
 
     def excess_free_energy(self, dens):
@@ -113,7 +113,7 @@ class ljs_wca_base_functional(saft_dispersion):
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_n, = self.thermo.a_soft_repulsion(
                 self.T, V, rho_thermo, a_n=True)
-            self.mu_disp[i, :] = (a + rho_thermo[:]*a_n[:])
+            self.mu_soft_rep[i, :] = (a + rho_thermo[:]*a_n[:])
         #self.mu_disp[non_prdm, :] = 0.0
 
     def bulk_compressibility(self, rho_b):
