@@ -434,7 +434,7 @@ class Interface(ABC):
 
     def get_excess_entropy_density(self):
         """
-        Get reduced entropy per reduced volume (1/K)
+        Get reduced entropy per reduced volume (-)
         """
         if not self.profile:
             print("Need profile to calculate entropy density")
@@ -443,7 +443,8 @@ class Interface(ABC):
         eps = self.functional.thermo.eps_div_kb[0]
         f = self.functional.excess_free_energy(self.convolver.weighted_densities)
         f_T = self.convolver.functional_temperature_differential_convolution(self.profile.densities)
-        s = - f/eps - self.bulk.reduced_temperature * f_T
+        vol_fac = (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+        s = (- f - self.bulk.reduced_temperature * f_T * eps)*vol_fac
         return s
 
     def get_excess_entropy_density_real_units(self):
@@ -452,8 +453,7 @@ class Interface(ABC):
         """
         s = self.get_excess_entropy_density()
         # Scale to real units
-        eps = self.functional.thermo.eps_div_kb[0]
-        s *= self.functional.thermo.Rgas*eps/(NA*self.functional.grid_reducing_lenght**3)
+        s *= self.functional.thermo.Rgas/(NA*self.functional.thermo.sigma[0]**3)
         return s
 
     def print_perform_minimization_message(self):

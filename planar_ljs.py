@@ -10,25 +10,18 @@ from src.constants import LenghtUnit, NA
 import matplotlib.pyplot as plt
 
 # Set up thermopack and equilibrium state
-thermopack = ljs_bh()
+thermopack = ljs_uv()
 thermopack.init("Ar")
 T = 0.75*thermopack.eps_div_kb[0]
-print(thermopack.sigma[0])
-print(f"Temperature: {T}K")
-print(f"Critical temperature: {thermopack.critical_temperature(1)}K")
 thermopack.set_tmin(0.5*thermopack.eps_div_kb)
 vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+
 # Define interface with initial tanh density profile
 interf = PlanarInterface.from_tanh_profile(vle,
                                            thermopack.critical_temperature(1),
                                            domain_size=100.0,
                                            n_grid=1024,
                                            invert_states=True)
-
-#interf.functional.test_bulk_differentials(interf.bulk.reduced_density_left)
-
-#interf.functional.test_eos_differentials(V=1.0e-4, n=np.ones(1))
-#sys.exit()
 
 # Solve for equilibrium profile
 interf.solve(log_iter=True)
@@ -39,46 +32,47 @@ interf.plot_equilibrium_density_profiles(plot_reduced_densities=True,
                                          grid_unit=LenghtUnit.REDUCED)
 
 # Surface tension
-print("Surface tension: ", interf.surface_tension_real_units())
-
-sys.exit()
+print("Surface tension: ", interf.surface_tension())
 
 # Perturbate in temperature using density profile from solution
-eps_T = 1.0e-5
-T_p = T + eps_T
-vle_p = equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
-interf_p = PlanarInterface.from_profile(vle_p, interf.profile, domain_size=100.0, n_grid=1024, invert_states=True)
+# eps_T = 1.0e-5
+# T_p = T + eps_T
+# vle_p = equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
+# interf_p = PlanarInterface.from_profile(vle_p, interf.profile, domain_size=100.0, n_grid=1024, invert_states=True)
 
-interf_p.single_convolution()
-F_p = interf_p.get_excess_helmholtz_energy_density()
-n_0_p = interf_p.convolver.weighted_densities.n0
-n_1_p = interf_p.convolver.weighted_densities.n1
-n_2_p = interf_p.convolver.weighted_densities.n2
-n_3_p = interf_p.convolver.weighted_densities.n3
-n_1v_p = interf_p.convolver.weighted_densities.n1v
-n_2v_p = interf_p.convolver.weighted_densities.n2v
-n_disp_p = interf_p.convolver.weighted_densities.n["w_disp"]
+# interf_p.single_convolution()
+# F_p = interf_p.get_excess_helmholtz_energy_density()
+# n_0_p = interf_p.convolver.weighted_densities.n0
+# n_1_p = interf_p.convolver.weighted_densities.n1
+# n_2_p = interf_p.convolver.weighted_densities.n2
+# n_3_p = interf_p.convolver.weighted_densities.n3
+# n_1v_p = interf_p.convolver.weighted_densities.n1v
+# n_2v_p = interf_p.convolver.weighted_densities.n2v
+# n_disp_p = interf_p.convolver.weighted_densities.n["w_disp"]
+# n_soft_rep_p = interf_p.convolver.weighted_densities.n["w_soft_rep"]
 
-T_m = T - eps_T
-vle_m = equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
-interf_m = PlanarInterface.from_profile(vle_m, interf.profile, domain_size=100.0, n_grid=1024, invert_states=True)
-interf_m.single_convolution()
-F_m = interf_m.get_excess_helmholtz_energy_density()
-n_0_m = interf_m.convolver.weighted_densities.n0
-n_1_m = interf_m.convolver.weighted_densities.n1
-n_2_m = interf_m.convolver.weighted_densities.n2
-n_3_m = interf_m.convolver.weighted_densities.n3
-n_1v_m = interf_m.convolver.weighted_densities.n1v
-n_2v_m = interf_m.convolver.weighted_densities.n2v
-n_disp_m = interf_m.convolver.weighted_densities.n["w_disp"]
+# T_m = T - eps_T
+# vle_m = equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
+# interf_m = PlanarInterface.from_profile(vle_m, interf.profile, domain_size=100.0, n_grid=1024, invert_states=True)
+# interf_m.single_convolution()
+# F_m = interf_m.get_excess_helmholtz_energy_density()
+# n_0_m = interf_m.convolver.weighted_densities.n0
+# n_1_m = interf_m.convolver.weighted_densities.n1
+# n_2_m = interf_m.convolver.weighted_densities.n2
+# n_3_m = interf_m.convolver.weighted_densities.n3
+# n_1v_m = interf_m.convolver.weighted_densities.n1v
+# n_2v_m = interf_m.convolver.weighted_densities.n2v
+# n_disp_m = interf_m.convolver.weighted_densities.n["w_disp"]
+# n_soft_rep_m = interf_m.convolver.weighted_densities.n["w_soft_rep"]
 
-s_num = -(F_p-F_m)/(2*eps_T)
-s = interf.get_excess_entropy_density()
-plt.plot(interf.grid.z, s_num,label="Numerical")
-plt.plot(interf.grid.z, s,label="Analytical")
-leg = plt.legend(loc="best", numpoints=1, frameon=False)
-plt.show()
-plt.clf()
+# vol_fac = (interf.functional.thermo.sigma[0]/interf.functional.grid_reducing_lenght)**3
+# s_num = -interf.functional.thermo.eps_div_kb[0]*vol_fac*(F_p-F_m)/(2*eps_T)
+# s = interf.get_excess_entropy_density()
+# plt.plot(interf.grid.z, s_num,label="Numerical")
+# plt.plot(interf.grid.z, s,label="Analytical")
+# leg = plt.legend(loc="best", numpoints=1, frameon=False)
+# plt.show()
+# plt.clf()
 
 # interf.convolver.convolve_density_profile_T(interf.profile.densities)
 
@@ -118,30 +112,24 @@ plt.clf()
 # plt.plot(interf.grid.z, dndT_num,label="Num. n_disp")
 # plt.plot(interf.grid.z, dndT[comp,:],label="Anal. n_disp")
 
+# dndT = interf.convolver.weighted_densities_T.n["w_soft_rep"]
+# dndT_num = (n_soft_rep_p[comp,:]-n_soft_rep_m[comp,:])/(2*eps_T)
+# plt.plot(interf.grid.z, dndT_num,label="Num. n_soft_rep")
+# plt.plot(interf.grid.z, dndT[comp,:],label="Anal. n_soft_rep")
+
 # leg = plt.legend(loc="best", numpoints=1, frameon=False)
 # plt.show()
 
-s_scaling = 1.0e-6
-s_E = interf.get_excess_entropy_density_real_units()
-plt.plot(interf.grid.z, s_E*s_scaling,label=r"$s^{\rm{E}}$ functional")
-plt.plot([interf.grid.z[0]], s_scaling*np.array([vle.liquid.specific_excess_entropy()/vle.liquid.specific_volume()]),
-         label=r"$s^{\rm{E}}$ bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]], s_scaling*np.array([vle.vapor.specific_excess_entropy()/vle.vapor.specific_volume()]),
-         label=r"$s^{\rm{E}}$ bulk vapour", linestyle="None", marker="o")
-plt.ylabel(r"$s^{\rm{E}}$ (MJ/m$^3$/K)")
-plt.xlabel("$z$ (Å)")
+len_fac = interf.functional.grid_reducing_lenght/interf.functional.thermo.sigma[0]
+s_scaling = NA*interf.functional.thermo.sigma[0]**3/interf.functional.thermo.Rgas
+s_E = interf.get_excess_entropy_density()
+plt.plot(interf.grid.z*len_fac, s_E,label=r"$s_{\rm{E}}^*$ functional")
+plt.plot([interf.grid.z[0]*len_fac], s_scaling*np.array([vle.liquid.specific_excess_entropy()/vle.liquid.specific_volume()]),
+         label=r"$s_{\rm{E}}^*$ bulk liquid", linestyle="None", marker="o")
+plt.plot([interf.grid.z[-1]*len_fac], s_scaling*np.array([vle.vapor.specific_excess_entropy()/vle.vapor.specific_volume()]),
+         label=r"$s_{\rm{E}}^*$ bulk vapour", linestyle="None", marker="o")
+plt.ylabel(r"$s_{\rm{E}}^*$")
+plt.xlabel("$z/\sigma$")
 leg = plt.legend(loc="best", numpoints=1, frameon=False)
-plt.savefig("methane_140K.pdf")
-plt.show()
-
-s_scaling = 1.0
-rho = interf.profile.rho_mix/(NA*interf.functional.grid_reducing_lenght**3)
-plt.plot(interf.grid.z, s_E/rho,label=r"$s^{\rm{E}}$ functional")
-plt.plot([interf.grid.z[0]], s_scaling*np.array([vle.liquid.specific_excess_entropy()]),
-         label=r"$s^{\rm{E}}$ bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]], s_scaling*np.array([vle.vapor.specific_excess_entropy()]),
-         label=r"$s^{\rm{E}}$ bulk vapour", linestyle="None", marker="o")
-plt.ylabel(r"$s^{\rm{E}}$ (J/mol/K)")
-plt.xlabel("$z$ (Å)")
-leg = plt.legend(loc="best", numpoints=1, frameon=False)
+plt.savefig("ljs_T_is_0.75.pdf")
 plt.show()
