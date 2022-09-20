@@ -36,6 +36,10 @@ class LenghtUnit(DftEnum):
     ANGSTROM = 100
     REDUCED = 200
 
+class ProfileInit(DftEnum):
+    TANH = 1000
+    PREVIOUS_SCALED = 2000
+
 # Plot utility
 LINE_STYLES = OrderedDict(
     [('0',               (0, ())),

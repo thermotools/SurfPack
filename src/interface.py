@@ -176,7 +176,7 @@ class Interface(ABC):
             print("Interface need to be initialized before calling solve")
         else:
             self.n_tot = self.calculate_total_mass()
-            print("n_tot", self.n_tot)
+            #print("n_tot", self.n_tot)
             # Set up convolver
             self.convolver = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
             x0 = self.pack_x_vec()
@@ -323,7 +323,8 @@ class Interface(ABC):
         gamma = (3*delta_omega*dp**2/16/np.pi)**(1/3)
         #omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
         #gamma = np.sum(omega_a)
-        return gamma
+        print("ratio: ",self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)
+        return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
 
     def surface_tension_real_units(self):
         """
@@ -334,9 +335,8 @@ class Interface(ABC):
         """
         gamma_star = self.surface_tension()
         eps = self.functional.thermo.eps_div_kb[0] * KB
-        sigma = self.functional.grid_reducing_lenght
+        sigma = self.functional.thermo.sigma[0]
         gamma = gamma_star * eps / sigma ** 2
-
         return gamma
 
 
@@ -692,7 +692,7 @@ class PlanarInterface(Interface):
         _, omega_a = self.grand_potential()
         omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
         gamma = np.sum(omega_a)
-        return gamma
+        return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
 
 class SphericalInterface(Interface):
     """
@@ -811,7 +811,7 @@ class SphericalInterface(Interface):
         v_right = self.grid.total_volume - v_left
         omega = np.sum(omega_a) + v_left*self.bulk.red_pressure_left + v_right*self.bulk.red_pressure_right
         gamma = omega / (4 * np.pi * self.r_equimolar**2)
-        return gamma
+        return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
 
     def surface_of_tension(self, reduced=False):
         """
