@@ -1,4 +1,4 @@
-# Run script for the cDFT code that interfaces with Thermopack
+# Run script for the classical DFT code that interfaces with Thermopack
 
 import numpy as np
 import sys
@@ -7,7 +7,13 @@ from pyctp.ljs_bh import ljs_bh
 from pyctp.thermopack_state import equilibrium
 from src.interface import PlanarInterface
 from src.constants import LenghtUnit, NA
+from src.dft_numerics import dft_solver
 import matplotlib.pyplot as plt
+
+psi_disp = 1.0
+psi_soft_rep = psi_disp
+functional_kwargs={"psi_disp": psi_disp,
+                   "psi_soft_rep": psi_soft_rep}
 
 # Set up thermopack and equilibrium state
 thermopack = ljs_uv()
@@ -19,12 +25,17 @@ vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 # Define interface with initial tanh density profile
 interf = PlanarInterface.from_tanh_profile(vle,
                                            thermopack.critical_temperature(1),
-                                           domain_size=100.0,
+                                           domain_size=200.0,
                                            n_grid=1024,
-                                           invert_states=True)
+                                           invert_states=True,
+                                           functional_kwargs=functional_kwargs)
+
+solver=dft_solver()
+#.picard(tolerance=1.0e-10,max_iter=600,beta=0.05,ng_frequency=None).\
+#    anderson(tolerance=1.0e-10,max_iter=200,beta=0.05)
 
 # Solve for equilibrium profile
-interf.solve(log_iter=True)
+interf.solve(solver=solver, log_iter=True)
 
 # Plot profile
 interf.plot_equilibrium_density_profiles(plot_reduced_densities=True,
@@ -142,6 +153,7 @@ plt.show()
 
 
 # Set up Barker-Henderson model
+bh_functional_kwargs={"psi_disp": psi_disp}
 thermopack_bh = ljs_bh()
 thermopack_bh.init("Ar")
 thermopack.set_tmin(0.5*thermopack.eps_div_kb)
@@ -152,7 +164,8 @@ interf_bh = PlanarInterface.from_tanh_profile(vle_bh,
                                               thermopack_bh.critical_temperature(1),
                                               domain_size=100.0,
                                               n_grid=1024,
-                                              invert_states=True)
+                                              invert_states=True,
+                                              functional_kwargs=bh_functional_kwargs)
 
 # Solve for equilibrium profile
 interf_bh.solve(log_iter=True)
@@ -173,7 +186,8 @@ interf_wca = PlanarInterface.from_tanh_profile(vle_wca,
                                               thermopack_wca.critical_temperature(1),
                                               domain_size=100.0,
                                               n_grid=1024,
-                                              invert_states=True)
+                                               invert_states=True,
+                                               functional_kwargs=functional_kwargs)
 
 # Solve for equilibrium profile
 interf_wca.solve(log_iter=True)

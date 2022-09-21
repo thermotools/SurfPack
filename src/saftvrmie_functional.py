@@ -11,21 +11,21 @@ class saftvrqmie_functional(saft_dispersion):
 
     """
 
-    def __init__(self, N, svrqm: saftvrqmie, T_red, phi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, svrqm: saftvrqmie, T_red, psi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (int): Size of grid
             svrqm (saftvrqmie): Thermopack object
             T_red (float): Reduced temperature
-            phi_disp (float): Width for weighted dispersion density
+            psi_disp (float): Width for weighted dispersion density
             grid_unit (LenghtUnit): Unit used for grid
         """
         saft_dispersion.__init__(self,
                                  N,
                                  svrqm,
                                  T_red,
-                                 phi_disp=phi_disp,
+                                 psi_disp=psi_disp,
                                  grid_unit=grid_unit)
         self.name = "SAFTVRQ-MIE"
         self.short_name = "SVRQM"
@@ -35,21 +35,21 @@ class saftvrmie_functional(saft_dispersion):
 
     """
 
-    def __init__(self, N, svrm: saftvrmie, T_red, phi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, svrm: saftvrmie, T_red, psi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (int): Size of grid
             svrm (saftvrmie): Thermopack object
             T_red (float): Reduced temperature
-            phi_disp (float): Width for weighted dispersion density
+            psi_disp (float): Width for weighted dispersion density
             grid_unit (LenghtUnit): Unit used for grid
         """
         saft_dispersion.__init__(self,
                                  N,
                                  svrm,
                                  T_red,
-                                 phi_disp=phi_disp,
+                                 psi_disp=psi_disp,
                                  grid_unit=grid_unit)
         self.name = "SAFTVR-MIE"
         self.short_name = "SVRM"

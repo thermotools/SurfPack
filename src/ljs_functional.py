@@ -11,21 +11,21 @@ class ljs_bh_functional(saft_dispersion):
 
     """
 
-    def __init__(self, N, ljs: ljs_bh, T_red, phi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, ljs: ljs_bh, T_red, psi_disp=1.0002, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (int): Size of grid
             ljs (ljs_bh): Thermopack object
             T_red (float): Reduced temperature
-            phi_disp (float): Width for weighted dispersion density
+            psi_disp (float): Width for weighted dispersion density
             grid_unit (LenghtUnit): Unit used for grid
         """
         saft_dispersion.__init__(self,
                                  N,
                                  ljs,
                                  T_red,
-                                 phi_disp=phi_disp,
+                                 psi_disp=psi_disp,
                                  grid_unit=grid_unit)
         self.name += "Lennard-Jones-Spline-BH"
         self.short_name = "LJS-BH"
@@ -35,28 +35,28 @@ class ljs_wca_base_functional(saft_dispersion):
 
     """
 
-    def __init__(self, N, ljs: ljs_wca_base, T_red, phi_disp=1.3862, phi_soft_rep=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, ljs: ljs_wca_base, T_red, psi_disp=1.0002, psi_soft_rep=1.0002, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (int): Size of grid
             ljs (ljs_wca_base): Thermopack object
             T_red (float): Reduced temperature
-            phi_disp (float): Width for weighted dispersion density
-            phi_soft_rep (float): Width for weighted soft-repulsion density
+            psi_disp (float): Width for weighted dispersion density
+            psi_soft_rep (float): Width for weighted soft-repulsion density
             grid_unit (LenghtUnit): Unit used for grid
         """
         saft_dispersion.__init__(self, N,
                                  ljs,
                                  T_red,
-                                 phi_disp=phi_disp,
+                                 psi_disp=psi_disp,
                                  grid_unit=grid_unit)
         self.name += "Lennard-Jones-Spline-WCA"
         self.short_name = "LJS-WCA"
         # Add normalized theta weight
         self.mu_soft_rep = np.zeros((N, ljs.nc))
         self.soft_rep_name = "w_soft_rep"
-        self.wf.add_norm_theta_weight(self.soft_rep_name, kernel_radius=2*phi_soft_rep)
+        self.wf.add_norm_theta_weight(self.soft_rep_name, kernel_radius=2*psi_soft_rep)
         self.diff[self.soft_rep_name] = self.mu_soft_rep
 
 
@@ -75,7 +75,7 @@ class ljs_wca_base_functional(saft_dispersion):
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(len(f)):
-            rho_thermo[:] = dens.n[self.disp_name][:, i]
+            rho_thermo[:] = dens.n[self.soft_rep_name][:, i]
             rho_mix = np.sum(rho_thermo)
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, = self.thermo.a_soft_repulsion(self.T, V, rho_thermo)
@@ -95,10 +95,10 @@ class ljs_wca_base_functional(saft_dispersion):
         saft_dispersion.differentials(self, dens)
 
         # All densities must be positive
-        #prdm = dens.n[self.disp_name] > 0.0  # Positive rho_disp value mask
-        #print(np.shape(dens.n[self.disp_name]))
+        #prdm = dens.n[self.soft_rep_name] > 0.0  # Positive rho_disp value mask
+        #print(np.shape(dens.n[self.soft_rep_name]))
         #for i in range(self.nc):
-        #    np.logical_and(prdm, dens.n[self.disp_name][i, :] > 0.0, out=prdm)
+        #    np.logical_and(prdm, dens.n[self.soft_rep_name][i, :] > 0.0, out=prdm)
         #print(np.shape(prdm))
         # prdm = dens.rho_disp > 0.0  # Positive rho_disp value mask
         # for i in range(self.nc):
@@ -109,7 +109,7 @@ class ljs_wca_base_functional(saft_dispersion):
         V = 1.0
         for i in range(self.n_grid):
         #   if prdm[i]:
-            rho_thermo[:] = dens.n[self.disp_name][:, i]
+            rho_thermo[:] = dens.n[self.soft_rep_name][:, i]
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_n, = self.thermo.a_soft_repulsion(
                 self.T, V, rho_thermo, a_n=True)
@@ -209,7 +209,7 @@ class ljs_wca_base_functional(saft_dispersion):
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(self.n_grid):
-            rho_thermo[:] = dens.n[self.disp_name][:, i]
+            rho_thermo[:] = dens.n[self.soft_rep_name][:, i]
             rho_mix = np.sum(rho_thermo)
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_T, = self.thermo.a_soft_repulsion(
@@ -262,22 +262,23 @@ class ljs_uv_functional(ljs_wca_base_functional):
 
     """
 
-    def __init__(self, N, ljs: ljs_uv, T_red, phi_disp=1.3862, phi_soft_rep=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, ljs: ljs_uv, T_red, psi_disp=1.0002, psi_soft_rep=1.0002, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (int): Size of grid
             ljs (ljs_uv): Thermopack object
             T_red (float): Reduced temperature
-            phi_disp (float): Width for weighted dispersion density
-            phi_soft_rep (float): Width for weighted soft-repulsion density
+            psi_disp (float): Width for weighted dispersion density
+            psi_soft_rep (float): Width for weighted soft-repulsion density
             grid_unit (LenghtUnit): Unit used for grid
         """
         ljs_wca_base_functional.__init__(self,
                                          N,
                                          ljs,
                                          T_red,
-                                         phi_disp=phi_disp,
+                                         psi_disp=psi_disp,
+                                         psi_soft_rep=psi_soft_rep,
                                          grid_unit=grid_unit)
         self.name += "Lennard-Jones-Spline-UV"
         self.short_name = "LJS-UV"
@@ -287,22 +288,23 @@ class ljs_wca_functional(ljs_wca_base_functional):
 
     """
 
-    def __init__(self, N, ljs: ljs_wca, T_red, phi_disp=1.3862, phi_soft_rep=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, ljs: ljs_wca, T_red, psi_disp=1.0002, psi_soft_rep=1.0002, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (int): Size of grid
             ljs (ljs_wca): Thermopack object
             T_red (float): Reduced temperature
-            phi_disp (float): Width for weighted dispersion density
-            phi_soft_rep (float): Width for weighted soft-repulsion density
+            psi_disp (float): Width for weighted dispersion density
+            psi_soft_rep (float): Width for weighted soft-repulsion density
             grid_unit (LenghtUnit): Unit used for grid
         """
         ljs_wca_base_functional.__init__(self,
                                          N,
                                          ljs,
                                          T_red,
-                                         phi_disp=phi_disp,
+                                         psi_disp=psi_disp,
+                                         psi_soft_rep=psi_soft_rep,
                                          grid_unit=grid_unit)
         self.name += "Lennard-Jones-Spline-WCA"
         self.short_name = "LJS-WCA"

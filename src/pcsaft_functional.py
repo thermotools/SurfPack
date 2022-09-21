@@ -11,14 +11,14 @@ class saft_dispersion(Whitebear):
 
     """
 
-    def __init__(self, N, thermo: saft, T_red, phi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, thermo: saft, T_red, psi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             thermopack (thermo): Thermopack object
             T_red (float): Reduced temperature
             R (ndarray): Particle radius for all components
-            phi_disp (float): Width for weighted dispersion density
+            psi_disp (float): Width for weighted dispersion density
         """
         self.thermo = thermo
         self.T_red = T_red
@@ -37,7 +37,7 @@ class saft_dispersion(Whitebear):
         # Add normalized theta weight
         self.mu_disp = np.zeros((N, thermo.nc))
         self.disp_name = "w_disp"
-        self.wf.add_norm_theta_weight(self.disp_name, kernel_radius=2*phi_disp)
+        self.wf.add_norm_theta_weight(self.disp_name, kernel_radius=2*psi_disp)
         self.diff[self.disp_name] = self.mu_disp
 
     def excess_free_energy(self, dens):
@@ -251,20 +251,20 @@ class pc_saft(saft_dispersion):
 
     """
 
-    def __init__(self, N, pcs: pcsaft, T_red, phi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, pcs: pcsaft, T_red, psi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             pcs (pcsaft): Thermopack object
             T_red (float): Reduced temperature
             R (ndarray): Particle radius for all components
-            phi_disp (float): Width for weighted dispersion density
+            psi_disp (float): Width for weighted dispersion density
         """
         saft_dispersion.__init__(self,
                                  N,
                                  pcs,
                                  T_red,
-                                 phi_disp=phi_disp,
+                                 psi_disp=psi_disp,
                                  grid_unit=grid_unit)
         self.name = "PC-SAFT"
         self.short_name = "PC"
