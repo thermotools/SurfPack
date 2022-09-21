@@ -322,7 +322,7 @@ def picard_iteration(residual, x0, max_rel_change=1.0,
     if ng_frequency is not None:
         # Extrapolations according to Ng 1974?
         ng = ng_extrapolation(len(x0), ng_frequency)
-        x_new = np.zeros_like(x_sol)
+        x_new = np.zeros_like(x0)
 
     converged = False
     x_sol = np.zeros_like(x0)
