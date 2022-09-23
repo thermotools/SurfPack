@@ -40,6 +40,15 @@ class ProfileInit(DftEnum):
     TANH = 1000
     PREVIOUS_SCALED = 2000
 
+class Properties(DftEnum):
+    RHO = 11
+    FREE_ENERGY = 12
+    ENERGY = 13
+    ENTROPY = 14
+    ENTHALPY = 15
+    CHEMPOT_SUM = 16
+    PARALLEL_PRESSURE = 17
+
 # Plot utility
 LINE_STYLES = OrderedDict(
     [('0',               (0, ())),

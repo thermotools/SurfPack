@@ -2,7 +2,7 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import NA, KB
+from constants import NA, KB, Properties
 import numpy as np
 
 class Bulk(object):
@@ -102,6 +102,41 @@ class Bulk(object):
         self.reduced_density_right[:] = self.get_reduced_density(rho_right_real)
 
         self.bulk_fractions = self.reduced_density_left/np.sum(self.reduced_density_left)
+
+    def get_property(self, prop, reduced_property=True):
+        if not reduced_property:
+            prop_scaling = 1.0
+        else:
+            eps = self.functional.thermo.eps_div_kb[0]*KB
+            sigma = self.functional.thermo.sigma[0]
+            prop_scaling = sigma**3/eps
+
+        if prop == Properties.RHO:
+            if reduced_property:
+                prop_scaling = sigma**3*NA
+            prop_b = prop_scaling*np.column_stack((self.left_state.x/self.left_state.specific_volume(),
+                                                   self.right_state.x/self.right_state.specific_volume()))
+        elif prop == Properties.FREE_ENERGY:
+            prop_b = prop_scaling*np.array([self.left_state.specific_excess_free_energy()/self.left_state.specific_volume(),
+                                            self.right_state.specific_excess_free_energy()/self.right_state.specific_volume()])
+        elif prop == Properties.ENERGY:
+            prop_b = prop_scaling*np.array([self.left_state.specific_excess_energy()/self.left_state.specific_volume(),
+                                            self.right_state.specific_excess_energy()/self.right_state.specific_volume()])
+        elif prop == Properties.ENTROPY:
+            if reduced_property:
+                prop_scaling = sigma**3/KB
+            prop_b = prop_scaling*np.array([self.left_state.specific_excess_entropy()/self.left_state.specific_volume(),
+                                            self.right_state.specific_excess_entropy()/self.right_state.specific_volume()])
+        elif prop == Properties.ENTHALPY:
+            prop_b = prop_scaling*np.array([self.left_state.specific_excess_enthalpy()/self.left_state.specific_volume(),
+                                            self.right_state.specific_excess_enthalpy()/self.right_state.specific_volume()])
+        elif prop == Properties.CHEMPOT_SUM:
+            prop_b = prop_scaling*np.array([np.sum(self.left_state.excess_chemical_potential()*self.left_state.x)/self.left_state.specific_volume(),
+                                            np.sum(self.right_state.excess_chemical_potential()*self.right_state.x)/self.right_state.specific_volume()])
+        elif prop == Properties.PARALLEL_PRESSURE:
+            prop_b = prop_scaling*np.array([self.left_state.pressure(), self.right_state.pressure()])
+
+        return prop_b
 
 if __name__ == "__main__":
     pass
