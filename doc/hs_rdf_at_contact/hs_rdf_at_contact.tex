@@ -203,9 +203,10 @@
 \newcommand{\pure}{\ensuremath{\text{p}}\xspace}
 \newcommand{\NC}{\ensuremath{\text{NC}}\xspace}
 \newcommand{\disp}{\ensuremath{\text{disp}}\xspace}
+\newcommand{\contact}{\ensuremath{\text{c}}\xspace}
 \graphicspath{{gfx/}}
 
-\title{Classical Density Functional Theory for Thermopack - Entropy}
+\title{Classical Density Functional Theory for Thermopack - Radial distribution function at contact from fundamental measure theory.}
 \author{Morten Hammer}
 \date{\today}
 
@@ -220,188 +221,79 @@
 
 \section{Introduction}
 
-The entropy ($\tilde{S}$ (\si{\joule\per\kelvin})) is generally given
-from the Helmholtz energy ($\tilde{F}$ (\si{\joule})) differential
-with respect to temperature,
-
+From statistical mechanics the compressibility in a hard sphere
+system is known from the virial theorem,
 \begin{equation}
-  \tilde{S} = - \od{\tilde{F}}{T}\bigg|_{V,n}.
+  \label{eq:compressibillity}
+  \frac{\beta P}{\rho} = 1 + \frac{2 \pi}{3} \rho \sigma^3 g^{\contact}\lb\sigma\rb,
+\end{equation}
+where $g^{\contact}(\sigma)$ is the radial distribution function (RDF)
+at contact. For additive mixtures, the virial theorem extends to a
+double sum over the contributions form all pairs, $ij$,
+\begin{equation}
+  \label{eq:compressibillity_mix}
+  \frac{\beta P}{\rho} = 1 + \frac{2 \pi}{3} \rho \underset{i}{\sum} \underset{j}{\sum} x_i x_j \sigma_{ij}^3 g^{\contact}\lb \sigma_{ij} \rb,
+\end{equation}
+where $x_i$ is the mole fraction of component $i$
+\cite[Eq. 5.14]{mulero2008}. The excess pressure is then related to the RDF
+at contact through the algebraic relation,
+\begin{equation}
+  \label{eq:excess_pressure_mix}
+  \beta P_\excess = \frac{2 \pi}{3} \underset{i}{\sum} \underset{j}{\sum} \rho_i \rho_j \sigma_{ij}^3 g^{\contact}\lb \sigma_{ij} \rb.
 \end{equation}
 
-The Helmholtz functional in DFT is given as
+In a classical density functional theory (DFT) formulation, the
+Helmholtz free energy density can be calculated from fundamental
+measure theory (FMT). In FMT, the Helmholtz energy is a function of
+weighted densities, $\mathbf{n}$, ie.
 \begin{equation}
-  F\left[\rho\right] = \frac{\tilde{F}}{V}.
+  \label{eq:fmt_helmholtz}
+  \Phi = \Phi \lb \mathbf{n} \rb.
 \end{equation}
 
-The mol specific Helmholtz functional is then given as
-\begin{equation}
-  f\left[\rho\right] = \frac{F}{\rho}.
-\end{equation}
-
-The mol specific entropy then becomes
-\begin{equation}
-  s = - \od{f}{T}\bigg|_{\rho} = - \frac{1}{\rho}\od{F}{T}\bigg|_{\rho}.
-\end{equation}
-
-This is different from the definition of \citet{stierle2021}, where mol specific entropy is defined as
-\begin{equation}
-  s = - \frac{1}{\bar{\rho}}\od{F}{T}\bigg|_{\rho},
-\end{equation}
-where $\bar{\rho}$ is a weighted density. $\bar{\rho}$ is not constant upon differentiating with temperature.
-
-
-The functional depends on the density through the weighted densities,
+The weighted densities are given as convolution integrals,
 \begin{equation}
   \label{eq:n_alpha}
   n_\alpha = \int d \mathbf{r}^\prime \rho \lb \mathbf{r}^\prime \rb w_\alpha \lb \mathbf{r} - \mathbf{r}^\prime \rb =  \rho \lb \mathbf{r} \rb \otimes w_\alpha \lb \mathbf{r}\rb,
 \end{equation}
-where $w_\alpha$ is the a weight function. In effect the the functional becomes,
+where $w_\alpha$ is the a weight function.
 
+The excess pressure is given from,
 \begin{equation}
-  F = F\lb \mathbf{n}\lb T\rb, T\rb
+  \label{eq:fmt_pressure}
+  \beta P_\excess = -\Phi + \underset{i}{\sum} \rho_i \pd{\Phi}{\rho_i}.
+\end{equation}
+Here,
+\begin{equation}
+  \label{eq:phi_rho_i}
+  \pd{\Phi}{\rho_i}  = \underset{\alpha}{\sum} \pd{\Phi}{n_\alpha} \pd{n_\alpha}{\rho_i}.
 \end{equation}
 
-The temperature differential of $F$ then becomes,
+For mixtures, the RDF at contact are related to the Helmholtz energy
+\cite[Eq. 5.29]{mulero2008}, \cite{hamad1994} through the
+differentials,
 \begin{equation}
-  \od{F}{T} = \underset{\alpha}{\sum} \pd{F}{n_\alpha}\pd{n_\alpha}{T} + \pd{F}{T}
+  \label{eq:gc_of_r_mix}
+  g^{\contact}\lb \sigma_{ij} \rb = \frac{1}{2 \pi \lb 2 - \delta_{ij} \rb \rho_i \rho_j \sigma_{ij}^2} \pd{\Phi}{\sigma_{ij}}
 \end{equation}
-
-Differentiating  the equation for $n_\alpha$, \cref{eq:n_alpha}, give,
-\begin{align}
-  \label{eq:n_alpha_diff}
-  \pd{n_\alpha}{T} &= \pd{}{T} \rho \lb \mathbf{r} \rb \otimes w_\alpha \lb \mathbf{r}\rb \nonumber \\
-                   &= \pd{}{T} \mathcal{F}^{-1} \left[ \mathcal{F}\left[\rho \lb \mathbf{r} \rb\right] \mathcal{F}\left[w_\alpha \lb \mathbf{r}\rb\right]  \right] \nonumber \\
-                   &= \pd{}{T} \mathcal{F}^{-1} \left[ \hat{\rho} \lb \mathbf{k} \rb \hat{w}_\alpha \lb \mathbf{k}\rb  \right] \nonumber \\
-                   &= \mathcal{F}^{-1} \left[ \hat{\rho} \lb \mathbf{k} \rb \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{T}  \right]
-\end{align}
-
-The weight functions in Fourier space is given in the supplementary information by \citet{stierle2020a}.
-
-\begin{align}
-  \label{eq:weight_functions_fourier}
-  \hat{w}_0 \lb \mathbf{k}\rb &= j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
-  \hat{w}_1 \lb \mathbf{k}\rb &= R j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
-  \hat{w}_2 \lb \mathbf{k}\rb &= 4 \pi R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
-  \hat{w}_3 \lb \mathbf{k}\rb &= \frac{4}{3} \pi R^3 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb  \\
-  \hat{w}_{V1} \lb \mathbf{k}\rb &= - \frac{i \mathbf{k}}{2 R} \hat{w}_3 \lb \mathbf{k}\rb  \\
-  \hat{w}_{V2} \lb \mathbf{k}\rb &= - 2 \pi i \mathbf{k} \hat{w}_3 \lb \mathbf{k}\rb  \\
-  \hat{w}_{\disp} \lb \mathbf{k}\rb &= j_0\lb 4 \pi \psi R |\mathbf{k}| \rb + j_2\lb 4 \pi \psi R |\mathbf{k}| \rb
-\end{align}
-Here $j$ is the spherical Bessel functions of the first kind of order
-zero and two. The Bessel functions of order 0-2 is given as
-\begin{align}
-  \label{eq:bessel_functions}
-  j_0\lb \xi \rb &= \frac{\sin \lb \xi \rb}{\xi} \\
-  j_1\lb \xi \rb &= \frac{\sin \lb \xi \rb}{\xi^2} - \frac{\cos \lb \xi \rb}{\xi}  \\
-  j_2\lb \xi \rb &= \biggl(\frac{3}{\xi^2} - 1\biggr) \frac{\sin \lb \xi \rb}{\xi} - \frac{3 \cos \lb \xi \rb}{\xi^2}.
-\end{align}
-Differentiating the Bessel functions of order 0 and three other useful relations,
-\begin{align}
-  \label{eq:bessel_function_differentials}
-  \pd{j_0\lb \xi \rb}{\xi} &= -\frac{\sin \lb \xi \rb}{\xi^2} + \frac{\cos \lb \xi \rb}{\xi} = - j_1\lb \xi \rb\\
-  \pd{\left[\xi^2\lb j_0\lb \xi \rb + j_2\lb \xi \rb\rb\right]}{\xi} &= \pd{}{\xi} \biggl(\frac{3\sin \lb \xi \rb}{\xi} - 3 \cos \lb \xi \rb\biggr) \nonumber \\
-                           &= -\frac{3\sin \lb \xi \rb}{\xi^2} + \frac{3\cos \lb \xi \rb}{\xi} + 3 \sin \lb \xi \rb \nonumber \\
-                           &= -3j_1\lb \xi \rb + 3 \xi j_0\lb \xi \rb\\
-  \pd{\left[\xi^3\lb j_0\lb \xi \rb + j_2\lb \xi \rb\rb\right]}{\xi} &= 3 \xi^2 j_0\lb \xi \rb \\
-  \pd{\lb j_0\lb \xi \rb + j_2\lb \xi \rb\rb}{\xi} &= 3\pd{}{\xi} \biggl(\frac{\sin \lb \xi \rb}{\xi^3} - \frac{\cos \lb \xi \rb}{\xi^2}\biggr) \nonumber \\
-                           &= 3 \biggl(3\frac{\cos \lb \xi \rb}{\xi^3} - 3 \frac{\sin \lb \xi \rb}{\xi^4} + \frac{\sin \lb \xi \rb}{\xi^2}\biggr) \nonumber \\
-                           &= -\frac{3}{\xi} j_2\lb \xi \rb
-\end{align}
-
-The differentials of the weight functions in Fourier space then becomes,
-\begin{align}
-  \label{eq:weight_functions_fourier_diff}
-  \pd{\hat{w}_0 \lb \mathbf{k}\rb}{R} &= - 2 \pi |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb  \\
-  \pd{\hat{w}_1 \lb \mathbf{k}\rb}{R} &= j_0\lb 2 \pi R |\mathbf{k}| \rb - 2 \pi R |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb \\
-  \pd{\hat{w}_2 \lb \mathbf{k}\rb}{R} &= 8 \pi R j_0\lb 2 \pi R |\mathbf{k}| \rb - 8 \pi R^2 |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb  \\
-  \pd{\hat{w}_3 \lb \mathbf{k}\rb}{R}  &=  \frac{1}{6 \pi^2 |\mathbf{k}|^3} \pd{}{R}\biggl( \lb 2 \pi R |\mathbf{k}|\rb ^3 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb \biggr)  \nonumber \\
-                                      &=  \frac{1}{6 \pi^2 |\mathbf{k}|^3} 3 \lb 2 \pi R |\mathbf{k}|\rb ^2  j_0\lb 2 \pi R |\mathbf{k}| \rb 2 \pi |\mathbf{k}| \nonumber  \\
-                                      &=  4 \pi R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
-  \pd{\hat{w}_{V1} \lb \mathbf{k}\rb}{R} &= - \frac{2 \pi i \mathbf{k}}{3 (2 \pi |\mathbf{k}|)^2}  \pd{}{R}\biggl( (2 \pi R |\mathbf{k}|)^2 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb \biggr) \nonumber \\
-                                      &= - \frac{2 \pi i \mathbf{k}}{3 (2 \pi |\mathbf{k}|)^2} \biggl( 6 \pi R |\mathbf{k}| j_0\lb 2 \pi R |\mathbf{k}| \rb - 3 j_1\lb 2 \pi R |\mathbf{k}| \rb \biggr) 2 \pi |\mathbf{k}|  \nonumber \\
-   &= - i \biggl( 2 \pi R \mathbf{k} j_0\lb 2 \pi R |\mathbf{k}| \rb - \frac{\mathbf{k}}{|\mathbf{k}|} j_1\lb 2 \pi R |\mathbf{k}| \rb \biggr)  \\
-  \pd{\hat{w}_{V2} \lb \mathbf{k}\rb}{R} &= - 8 \pi^2 i \mathbf{k} R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
-  \pd{\hat{w}_{\disp} \lb \mathbf{k}\rb}{R} &= -\frac{3 j_2\lb 4 \pi \psi R |\mathbf{k}| \rb}{4 \pi \psi R |\mathbf{k}|} 4 \pi \psi |\mathbf{k}| \nonumber \\
-                                      &= -\frac{3 j_2\lb 4 \pi \psi R |\mathbf{k}| \rb}{R}
-\end{align}
-
-Finally,
+The equation required the differential
 \begin{equation}
-  \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{T} = \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{R} \pd{R}{T}
+  \label{eq:phi_sigma_ij}
+  \pd{\Phi}{\sigma_{ij}} = \underset{\alpha}{\sum} \pd{\Phi}{n_\alpha} \pd{n_\alpha}{\sigma_{ij}}.
 \end{equation}
+The differential $\pd{n_\alpha}{\sigma_{ij}}$ requires integrals of
+the weight function differentials with respect to $\sigma_{ij}$ and it
+is therefore not possible to derive a analytical relation for the RDF
+at contact.
 
-
-\subsection{Density shift contributions}
-
-When shifting the density profiles we get contributions from convolution of constant densities ($\rho^{\rm{s}}$). These contributions are given as,
-\begin{align}
-  \label{eq:n_alpha_diff_steady}
-  n_\alpha^{\rm{s}} &= \rho^{\rm{s}} \lb \mathbf{r} \rb \otimes w_\alpha \lb \mathbf{r}\rb = \rho^{\rm{s}} w_\alpha^{\rm{s}} \\
-  \pd{n_\alpha^{\rm{s}}}{T} &= \rho^{\rm{s}} \pd{w_\alpha^{\rm{s}}}{T}.
-\end{align}
-Where,
-\begin{align}
-  \label{eq:weight_functions_steady}
-  w_0^{\rm{s}} &= 1  \\
-  w_1^{\rm{s}} &= R  \\
-  w_2^{\rm{s}} &= 4 \pi R^2  \\
-  w_3^{\rm{s}} &= \frac{4}{3} \pi R^3  \\
-  w_{V1}^{\rm{s}} &= 0  \\
-  w_{V2}^{\rm{s}} &= 0  \\
-  w_{\disp}^{\rm{s}} &= 1.
-\end{align}
-
-Differentiating we get,
-\begin{align}
-  \label{eq:weight_functions_steady_diff}
-  \pd{w_0^{\rm{s}}}{R} &= 0  \\
-  \pd{w_1^{\rm{s}}}{R} &= 1  \\
-  \pd{w_2^{\rm{s}}}{R} &= 8 \pi R  \\
-  \pd{w_3^{\rm{s}}}{R} &= 4 \pi R^2  \\
-  \pd{w_{V1}^{\rm{s}}}{R} &= 0  \\
-  \pd{w_{V2}^{\rm{s}}}{R} &= 0  \\
-  \pd{w_{disp}^{\rm{s}}}{R} &= 0
-\end{align}
-
-
-\section{Other excess quantities}
-Knowing the entropy all the other excess energy densities can be
-calculated. The internal energy density is known from
-\begin{equation}
-  \ref{eq:energy}
-  u^\excess = f^\excess + T s^\excess.
-\end{equation}
-Further, the enthalpy is known from,
-\begin{equation}
-  \ref{eq:enthalpy}
-  h^\excess = T s^\excess + \underset{i}{\sum} \rho_i \mu_i^\excess,
-\end{equation}
-where the excess chemical potential can be calculated from
-\begin{equation}
-  \ref{eq:chem_pot}
-  \mu_i^\excess = \mu_i - \kB T \ln \lb \rho_i \rb - \rm{Const.}
-\end{equation}
-as the chemical potential, $\mu_i$, is always specified for the
-simulations. \todo{Effect of external potential?}
-% The chemical potential is also known from
-% \begin{equation}
-%   \ref{eq:chem_pot_diff}
-%   \mu_i^\excess = \underset{\alpha}{\sum} \pd{F}{n_\alpha} \pd{n_\alpha}{\rho_i}.
-% \end{equation}
-
-\section{Pressures}
-For the planar geometry the parallel component of the pressure tensor
-is given from the grand potential density,
-\begin{equation}
-  \ref{eq:parallel_pressure}
-  p_\parallel = - f + \underset{i}{\sum} \rho_i \mu_i.
-\end{equation}
-
-
-\section{Results}
-
-
-
+\section{Test}
+Use equation Eq.~\ref{eq:gc_of_r_mix} to test:
+\begin{itemize}
+\item Is $g_{ij} = g_{ji}$?
+\item Resulting $g_{ij}$ compared to the model version of both
+  PCP-SAFT \cite{sauer2017} and Yu and Wu \cite{yu2002}.
+\item Effect on entropy
+\end{itemize}
 \clearpage
 \bibliographystyle{plainnat}
 \bibliography{../bib/DFT.bib,../bib/HardSphere.bib,../bib/PC-SAFT.bib}

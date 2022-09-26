@@ -13,17 +13,20 @@ Classical density functinal theory for thermopack
   * Implement postprocessing routine to extract useful variables
   * The thermopack association term implementation must be revised
   * Implement association into the DFT code [[2]](#2)
-  * Learn "tricks of the trade" from Rolf
-  * Implement one-dimensional spherical and cylindrical geometries
+  * Implement one-dimensional cylindrical geometries
   * Extract radial distribution function and compare to simulations
   * Implement a consistent WCA-reference, test for the LJs fluid
   * Mixture implementation for saft-vrq Mie
   * Entropy for spherical
   * Set prefactors using sympy getting a more generic framework.
+  * Implement PETS functional [[3]](#3)
 
 # References
 <a id="1">[1]</a>
-J. Mairhofer, J. Gross, Fluid Phase Equilibria, 444, 1-12, 2017.
+J. Mairhofer, J. Gross, Fluid Phase Equilib., 444, 1-12, 2017.
 
 <a id="2">[2]</a>
 E. Sauer, J. Gross, Ind. Eng. Chem. Res., 56, 4119, 2017.
+
+<a id="3">[3]</a>
+Heier et al., Mol. Phys., 116, 2018. (10.1080/00268976.2018.1447153)
