@@ -13,8 +13,10 @@ from pyctp.saftvrmie import saftvrmie
 from pyctp.saftvrqmie import saftvrqmie
 from pyctp.ljs_bh import ljs_bh
 from pyctp.ljs_wca import ljs_wca, ljs_uv
+from pyctp.pets import pets
 from pyctp.thermopack_state import state, equilibrium
 from pcsaft_functional import pc_saft
+from pets_functional import PeTS_functional
 from ljs_functional import ljs_bh_functional, ljs_wca_functional, ljs_uv_functional
 from saftvrmie_functional import saftvrmie_functional, saftvrqmie_functional
 import numpy as np
@@ -61,6 +63,8 @@ class Interface(ABC):
             self.functional = saftvrqmie_functional(n_grid, thermopack, t_red, **functional_kwargs)
         elif isinstance(thermopack, saftvrmie):
             self.functional = saftvrmie_functional(n_grid, thermopack, t_red, **functional_kwargs)
+        elif isinstance(thermopack, pets):
+            self.functional = PeTS_functional(n_grid, thermopack, t_red, **functional_kwargs)
         else:
             raise TypeError("No DFT functional for thermopack model: " + type(thermopack))
         # Set up grid
