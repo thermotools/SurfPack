@@ -204,6 +204,7 @@
 \newcommand{\NC}{\ensuremath{\text{NC}}\xspace}
 \newcommand{\disp}{\ensuremath{\text{disp}}\xspace}
 \newcommand{\contact}{\ensuremath{\text{c}}\xspace}
+\newcommand{\hc}{\ensuremath{\text{hc}}\xspace}
 \graphicspath{{gfx/}}
 
 \title{Classical Density Functional Theory for Thermopack - Radial distribution function at contact from fundamental measure theory.}
@@ -276,7 +277,7 @@ differentials,
   \label{eq:gc_of_r_mix}
   g^{\contact}\lb \sigma_{ij} \rb = \frac{1}{2 \pi \lb 2 - \delta_{ij} \rb \rho_i \rho_j \sigma_{ij}^2} \pd{\Phi}{\sigma_{ij}}
 \end{equation}
-The equation required the differential
+The equation require the differential
 \begin{equation}
   \label{eq:phi_sigma_ij}
   \pd{\Phi}{\sigma_{ij}} = \underset{\alpha}{\sum} \pd{\Phi}{n_\alpha} \pd{n_\alpha}{\sigma_{ij}}.
@@ -284,7 +285,46 @@ The equation required the differential
 The differential $\pd{n_\alpha}{\sigma_{ij}}$ requires integrals of
 the weight function differentials with respect to $\sigma_{ij}$ and it
 is therefore not possible to derive a analytical relation for the RDF
-at contact.
+at contact. New weighted functions, similar to the weight functions
+used for the calculation of entropy are required to model the
+$g^{\contact}\lb \sigma_{ij} \rb$.
+
+The component densities, $\rho_i$, in Eq.~\ref{eq:gc_of_r_mix} is in
+the FMT context can be either $n_{0,i}$ or simply the local density,
+$\rho_i(\mathbf{r})$. This must be investigated.
+
+\section{The PCP-SAFT hard-chain functional}
+The hard-chain functional used in PCP-SAFT \cite{sauer2017} is,
+\begin{equation}
+  \label{eq:hc_functional}
+  \begin{split}
+    \beta F^\hc\lbf \rho_{k} \rbf =& \underset{i}{\sum} \lb m_i - 1 \rb \int \rho_{i}\lb \mathbf{r}\rb \lb \ln \rho_{i}\lb \mathbf{r}\rb -1 \rb d\mathbf{r}\\
+    & -\underset{i}{\sum} \lb m_i - 1 \rb \int \rho_{i}\lb \mathbf{r}\rb \lb \ln \lbf y_{ii}^{\text{dd}}\lb \bar{\rho}^\hc_{k}\lb\mathbf{r}\rb\rb\lambda_i\lb \mathbf{r} \rb\rbf -1 \rb d\mathbf{r},
+    \end{split}
+\end{equation}
+where $\lambda_i$ is a weighted density based on a normalized weight
+function and $\bar{\rho}^\hc_{k}$ are a dirac weighted density, both
+of width $2 d_i$,
+\begin{align}
+  \label{eq:hc_densities}
+  \bar{\rho}^\hc_{k}\lb\mathbf{r}\rb =& \frac{3}{4\pi d_i^3} \int \rho_{i}\lb \mathbf{r}_2\rb \Theta \lb d_i - \abs{\mathbf{r}_2 - \mathbf{r}_1}\rb d\mathbf{r}_2 \\
+  \lambda_i\lb \mathbf{r} \rb  =& \frac{1}{4 \pi d_i^2} \int \rho_{i}\lb \mathbf{r}_2\rb \delta \lb d_i - \abs{\mathbf{r}_2 - \mathbf{r}_1}\rb d\mathbf{r}_2
+\end{align}
+
+\todo{Show entropy profile using the above functional.....}
+
+\section{The association hard chain term used for PCP-SAFT}
+The associative attraction functional require a description of the
+$ij$ RDF at contact. To describe RDF at contact for heterogeneous
+systems, Sauer and Gross used the term proposed by Yu and
+Wu~\cite{yu2002}:
+\begin{equation}
+  \begin{split}
+    g^{\contact}_{ij}\left(\left\{n_\alpha\left(\mathbf{r}\right)\right\}\right) =& \frac{1}{1- n_3} + \frac{d_{ii}d_{jj}}{d_{ii} + d_{jj}} \frac{\xi n_2}{2\lb 1- n_3 \rb^2} \\
+                                                                                &+ \biggl(\frac{d_{ii}d_{jj}}{d_{ii} + d_{jj}} \biggr)^2\frac{\xi^2n_2^2}{18\lb 1- n_3 \rb^3},
+  \end{split}
+\end{equation}
+where $\xi = 1 - \vc{n}_2 \cdot \vc{n}_2 / n_2^2$.
 
 \section{Test}
 Use equation Eq.~\ref{eq:gc_of_r_mix} to test:
