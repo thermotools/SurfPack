@@ -16,11 +16,21 @@ psi_disp = 1.4
 psi_soft_rep = psi_disp
 functional_kwargs={"psi_disp": psi_disp,
                    "psi_soft_rep": psi_soft_rep}
+#functional_kwargs={"psi_disp": psi_disp}
+
+# Dict of all temperatures:
+temperatures = {}
+temperatures["0.56"] = {"T_star": 0.5612, "filename": "T056.csv"}
+temperatures["0.6"] = {"T_star": 0.6, "filename": "T06.csv"}
+temperatures["0.65"] = {"T_star": 0.6415, "filename": "T065.csv"}
+temperatures["0.7"] = {"T_star": 0.69, "filename": "T07.csv"}
+# Select temperature:
+temperature = temperatures["0.56"]
 
 # Set up thermopack and equilibrium state
 thermopack = ljs_uv()
 thermopack.init("Ar")
-T_star = 0.7
+T_star = temperature["T_star"]
 T = T_star*thermopack.eps_div_kb[0]
 thermopack.set_tmin(0.5*thermopack.eps_div_kb)
 vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
@@ -52,7 +62,7 @@ eps = interf.functional.thermo.eps_div_kb[0]*KB
 len_fac = interf.functional.grid_reducing_lenght/interf.functional.thermo.sigma[0]
 
 # Load experimental data
-data = np.loadtxt("T07.csv", skiprows=1, delimiter=";")
+data = np.loadtxt(temperature["filename"], skiprows=1, delimiter=";")
 DATA_X = 0
 DATA_T = 1
 DATA_RHO = 2
@@ -132,4 +142,11 @@ plt.ylabel(r"$h_{\rm{E}}^*$")
 plt.xlabel("$z^*$")
 leg = plt.legend(loc="best", numpoints=1, frameon=False)
 plt.savefig("ljs_enthalpy_T_is_0.7 .pdf")
+plt.show()
+
+plt.plot(z - dz, s_E,label=r"DFT-1.4")
+plt.ylabel(r"$s_{\rm{E}}^*$")
+plt.xlabel("$z^*$")
+leg = plt.legend(loc="best", numpoints=1, frameon=False)
+plt.savefig("ljs_entropt_T_is_0.7 .pdf")
 plt.show()
