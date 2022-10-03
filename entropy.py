@@ -67,19 +67,12 @@ leg = plt.legend(loc="best", numpoints=1, frameon=False)
 plt.show()
 plt.clf()
 
-n_0= interf.convolver.weighted_densities.n["w0"]
-plt.plot(interf.grid.z, n_0,label="n0")
-print(n_0[512])
-leg = plt.legend(loc="best", numpoints=1, frameon=False)
-plt.show()
+# interf.convolver.convolve_density_profile_T(interf.profile.densities)
 
-
-interf.convolver.convolve_density_profile_T(interf.profile.densities)
-
-dndT = interf.convolver.weighted_densities_T.n["w0"]
-dndT_num = (n_0_p-n_0_m)/(2*eps_T)
-plt.plot(interf.grid.z, dndT_num,label="Num. n0")
-plt.plot(interf.grid.z, dndT,label="Anal. n0")
+# dndT = interf.convolver.weighted_densities_T.n["w0"]
+# dndT_num = (n_0_p-n_0_m)/(2*eps_T)
+# plt.plot(interf.grid.z, dndT_num,label="Num. n0")
+# plt.plot(interf.grid.z, dndT,label="Anal. n0")
 
 # dndT = interf.convolver.weighted_densities_T.n["w1"]
 # dndT_num = (n_1_p-n_1_m)/(2*eps_T)
@@ -112,9 +105,9 @@ plt.plot(interf.grid.z, dndT,label="Anal. n0")
 # plt.plot(interf.grid.z, dndT_num,label="Num. n_disp")
 # plt.plot(interf.grid.z, dndT[comp,:],label="Anal. n_disp")
 
-leg = plt.legend(loc="best", numpoints=1, frameon=False)
-plt.show()
-sys.exit()
+# leg = plt.legend(loc="best", numpoints=1, frameon=False)
+# plt.show()
+
 s_scaling = 1.0e-6
 s_E = interf.get_excess_entropy_density_real_units()
 plt.plot(interf.grid.z, s_E*s_scaling,label=r"$s^{\rm{E}}$ functional")
