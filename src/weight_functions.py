@@ -24,9 +24,9 @@ class WeightFunction(object):
 
         Args:
         wf_type (WeightFunctionType): Type of weight
-        kernel_radius (float): Width of weight
+        kernel_radius (float): Relative width of weight
         alias (string): Alias for acessing weight
-        prefactor (string): Weight prefactor as function of R (R=kernel_radius and not particle radius)
+        prefactor (string): Weight prefactor as function of R and Psi (Psi=kernel_radius)
         convolve (bool): Perform convolution= Default: True
         calc_from (string): Calculate from another weight? Default: None
         """

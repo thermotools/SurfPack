@@ -5,6 +5,8 @@ from constants import NA, RGAS, LenghtUnit
 from fmt_functionals import Whitebear
 from pyctp.pcsaft import pcsaft
 from pyctp.saft import saft
+from weight_functions import WeightFunctionType
+
 
 class saft_dispersion(Whitebear):
     """
@@ -319,7 +321,7 @@ class pc_saft(saft_dispersion):
                 rho_hc_thermo[:] = dens.n[self.rho_hc_name][:, i]
                 lambda_hc[:] = dens.n[self.lambda_hc_name][:, i]
                 rho_hc_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
-                for j in self.nc:
+                for j in range(self.nc):
                     if self.chain_functional_active[j]:
                         rho_j = dens.rho.densities[j][i]
                         lng_jj, = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1)
@@ -347,7 +349,7 @@ class pc_saft(saft_dispersion):
                 rho_hc_thermo[:] = dens.n[self.rho_hc_name][:, i]
                 lambda_hc[:] = dens.n[self.lambda_hc_name][:, i]
                 rho_hc_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
-                for j in self.nc:
+                for j in range(self.nc):
                     if self.chain_functional_active[j]:
                         rho_j = dens.rho.densities[j][i]
                         lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_n=True)
@@ -378,7 +380,7 @@ class pc_saft(saft_dispersion):
             rho_mix = np.sum(rho_thermo)
             V = 1.0/rho_mix
             n = rho_thermo/rho_mix
-            for j in self.nc:
+            for j in range(self.nc):
                 if self.chain_functional_active[j]:
                     lng_jj, lng_jj_V = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_V=True)
                     a_V = -(self.thermo.m[j]-1.0)*rho_b[j]*(lng_jj_V - lng_jj/V)
@@ -407,7 +409,7 @@ class pc_saft(saft_dispersion):
             rho_mix = np.sum(rho_thermo)
             V = 1.0
             n = rho_thermo
-            for j in self.nc:
+            for j in range(self.nc):
                 if self.chain_functional_active[j]:
                     lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_n=True)
                     lng_jj_n *= (NA*self.grid_reducing_lenght**3) # Reducing unit
@@ -434,7 +436,7 @@ class pc_saft(saft_dispersion):
             n = np.shape(dphidn)[0]
             dphidn_comb = np.zeros(n + self.nc)
             dphidn_comb[:n] = dphidn
-            for j in self.nc:
+            for j in range(self.nc):
                 if self.chain_functional_active[j]:
                     lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=rho_thermo, i=j+1, lng_n=True)
                     phi -= (self.thermo.m[j]-1.0)*rho_b[j]*lng_jj
@@ -463,7 +465,7 @@ class pc_saft(saft_dispersion):
             for i in range(self.n_grid):
                 rho_hc_thermo[:] = dens.n[self.rho_hc_name][:, i]
                 rho_hc_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
-                for j in self.nc:
+                for j in range(self.nc):
                     if self.chain_functional_active[j]:
                         rho_j = dens.rho.densities[j][i]
                         lng_jj, lng_jj_t = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_t=True)
