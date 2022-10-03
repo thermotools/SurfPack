@@ -58,6 +58,9 @@ class WeightedDensities():
                 elif "3" in alias:
                     self.n[alias] = self.n3
 
+        # Pointer to local densities
+        self.rho = None
+
     # def update_utility_variables(self):
     #     """
     #     """
@@ -87,7 +90,7 @@ class WeightedDensities():
     def __getitem__(self, wd):
         return self.n[wd]
 
-    def set_zero(self):
+    def reset(self, rho):
         """
         Set weights to zero
         """
@@ -99,6 +102,8 @@ class WeightedDensities():
         # self.n1v[:] = 0.0
         for wd in self.n:
             self.n[wd].fill(0.0)
+        # Need access to local density in some functionals:
+        self.rho = rho
 
     def __iadd__(self, other):
         """
@@ -429,7 +434,7 @@ class Convolver(object):
         Args:
             rho (array_like): Density profile
         """
-        self.weighted_densities.set_zero()
+        self.weighted_densities.reset(rho)
         rho_delta = np.zeros(self.grid.n_grid)
         for i in range(self.functional.thermo.nc):
             rho_inf = rho.densities[i][-1]
@@ -503,7 +508,7 @@ class Convolver(object):
             rho (array_like): Density profile
         """
 
-        self.weighted_densities_T.set_zero()
+        self.weighted_densities_T.reset(rho)
         rho_delta = np.zeros(self.grid.n_grid)
         for i in range(self.functional.thermo.nc):
             rho_inf = rho.densities[i][-1]

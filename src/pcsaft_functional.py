@@ -39,6 +39,9 @@ class saft_dispersion(Whitebear):
         self.disp_name = "w_disp"
         self.wf.add_norm_theta_weight(self.disp_name, kernel_radius=2*psi_disp)
         self.diff[self.disp_name] = self.mu_disp
+        # Add storage container for differentials only depending on local density
+        # No convolution required
+        self.mu_of_rho = np.zeros((N, self.nc))
 
     def excess_free_energy(self, dens):
         """
@@ -73,7 +76,7 @@ class saft_dispersion(Whitebear):
 
         """
         Whitebear.differentials(self, dens)
-
+        self.mu_of_rho.fill(0.0)
         # All densities must be positive
         #prdm = dens.n[self.disp_name] > 0.0  # Positive rho_disp value mask
         #print(np.shape(dens.n[self.disp_name]))
@@ -251,14 +254,23 @@ class pc_saft(saft_dispersion):
 
     """
 
-    def __init__(self, N, pcs: pcsaft, T_red, psi_disp=1.3862, grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self,
+                 N,
+                 pcs: pcsaft,
+                 T_red,
+                 psi_disp=1.3862,
+                 psi_rho_hc=1.0,
+                 psi_lambda_hc=1.0,
+                 grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
+            N (int): Number of grid points
             pcs (pcsaft): Thermopack object
             T_red (float): Reduced temperature
-            R (ndarray): Particle radius for all components
             psi_disp (float): Width for weighted dispersion density
+            psi_rho_hc (float): Width for weighted hard-chain density rho_hc
+            psi_lambda_hc (float): Width for weighted hard-chain density lambda_hc
         """
         saft_dispersion.__init__(self,
                                  N,
@@ -268,6 +280,236 @@ class pc_saft(saft_dispersion):
                                  grid_unit=grid_unit)
         self.name = "PC-SAFT"
         self.short_name = "PC"
+        self.chain_functional_active = np.full((pcs.nc), False, dtype=bool)
+        for i in range(pcs.nc):
+            if abs(pcs.m[i] - 1.0) > 1.0e-8:
+                self.chain_functional_active[i] = True
+        if np.any(self.chain_functional_active):
+            # Add normalized theta weight
+            self.mu_rho_hc = np.zeros((N, pcs.nc))
+            self.rho_hc_name = "w_rho_hc"
+            self.wf.add_norm_theta_weight(self.rho_hc_name, kernel_radius=2*psi_rho_hc)
+            self.diff[self.rho_hc_name] = self.mu_rho_hc
+            # Add dirac delta weight reducing to rho in bulk
+            self.mu_lambda_hc = np.zeros((N, pcs.nc))
+            self.lambda_hc_name = "w_lambda_hc"
+            self.wf.add_weight(alias=self.lambda_hc_name,
+                               kernel_radius=2*psi_lambda_hc,
+                               wf_type=WeightFunctionType.DELTA,
+                               prefactor="1.0/(4.0*pi*(R*Psi)**2)")
+            self.diff[self.lambda_hc_name] = self.mu_lambda_hc
+
+    def excess_free_energy(self, dens):
+        """
+        Calculates the excess HS Helmholtz free energy from the weighted densities
+
+        Args:
+        dens (array_like): Weighted densities
+
+        Returns:
+        array_like: Excess HS Helmholtz free energy ()
+
+        """
+        f = saft_dispersion.excess_free_energy(self, dens)
+        if np.any(self.chain_functional_active):
+            rho_hc_thermo = np.zeros(self.nc)
+            lambda_hc = np.zeros(self.nc)
+            V = 1.0
+            for i in range(self.n_grid):
+                rho_hc_thermo[:] = dens.n[self.rho_hc_name][:, i]
+                lambda_hc[:] = dens.n[self.lambda_hc_name][:, i]
+                rho_hc_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+                for j in self.nc:
+                    if self.chain_functional_active[j]:
+                        rho_j = dens.rho.densities[j][i]
+                        lng_jj, = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1)
+                        f_chain = rho_j*(np.log(rho_j) - 1.0)
+                        f_chain -= rho_j*(lng_jj + np.log(lambda_hc[j]) - 1.0)
+                        f[i] += (self.thermo.m[j]-1.0)*f_chain
+
+        return f
+
+    def differentials(self, dens):
+        """
+        Calculates the functional differentials wrpt. the weighted densities
+
+        Args:
+        dens (array_like): weighted densities
+        diff (array_like): Functional differentials
+
+        """
+        saft_dispersion.differentials(self, dens)
+        if np.any(self.chain_functional_active):
+            rho_hc_thermo = np.zeros(self.nc)
+            lambda_hc = np.zeros(self.nc)
+            V = 1.0
+            for i in range(self.n_grid):
+                rho_hc_thermo[:] = dens.n[self.rho_hc_name][:, i]
+                lambda_hc[:] = dens.n[self.lambda_hc_name][:, i]
+                rho_hc_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+                for j in self.nc:
+                    if self.chain_functional_active[j]:
+                        rho_j = dens.rho.densities[j][i]
+                        lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_n=True)
+                        lng_jj_n *= (NA*self.grid_reducing_lenght**3) # Reducing unit
+                        # Contribution not to be convolved:
+                        self.mu_of_rho[i, j] = (self.thermo.m[j]-1.0)*(np.log(rho_j) - lng_jj - np.log(lambda_hc[j]) + 1.0)
+                        # Convolved contributions:
+                        self.mu_rho_hc[i, :] = -(self.thermo.m[j]-1.0)*rho_j*lng_jj_n
+                        self.mu_lambda_hc[i, :] = -(self.thermo.m[j]-1.0)*rho_j/lambda_hc[j]
+
+    def bulk_compressibility(self, rho_b):
+        """
+        Calculates the PC-SAFT compressibility.
+        Multiply by rho*kB*T to get pressure.
+
+        Args:
+            rho_b (ndarray): Bulk densities
+
+        Returns:
+            float: compressibility
+        """
+        z = saft_dispersion.bulk_compressibility(self, rho_b)
+        if np.any(self.chain_functional_active):
+            # PC-SAFT contributions
+            rho_thermo = np.zeros_like(rho_b)
+            rho_thermo[:] = rho_b[:]
+            rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+            rho_mix = np.sum(rho_thermo)
+            V = 1.0/rho_mix
+            n = rho_thermo/rho_mix
+            for j in self.nc:
+                if self.chain_functional_active[j]:
+                    lng_jj, lng_jj_V = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_V=True)
+                    a_V = -(self.thermo.m[j]-1.0)*rho_b[j]*(lng_jj_V - lng_jj/V)
+                    z_r = -a_V*V
+            z += z_r
+        return z
+
+    def bulk_excess_chemical_potential(self, rho_b):
+        """
+        Calculates the reduced HS excess chemical potential from the bulk
+        packing fraction.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess reduced HS chemical potential ()
+
+        """
+        mu_ex = saft_dispersion.bulk_excess_chemical_potential(self, rho_b)
+        if np.any(self.chain_functional_active):
+            # PC-SAFT contributions
+            rho_thermo = np.zeros_like(rho_b)
+            rho_thermo[:] = rho_b[:]
+            rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+            rho_mix = np.sum(rho_thermo)
+            V = 1.0
+            n = rho_thermo
+            for j in self.nc:
+                if self.chain_functional_active[j]:
+                    lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_n=True)
+                    lng_jj_n *= (NA*self.grid_reducing_lenght**3) # Reducing unit
+                    a_n = -(self.thermo.m[j]-1.0)*(rho_b[j]*lng_jj_n + lng_jj/V)
+                    mu_ex += a_n
+        return mu_ex
+
+    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
+        """
+        Calculates the functional differentials wrpt. the weighted densities
+        in the bulk phase.
+
+        Args:
+        bd (bulk_weighted_densities): bulk_weighted_densities
+        only_hs_system (bool): Only calculate for hs-system
+        """
+        phi, dphidn = saft_dispersion.bulk_functional_with_differentials(self, bd)
+        if not only_hs_system and np.any(self.chain_functional_active):
+            rho_vec = bd.rho_i
+            rho_mix = np.sum(rho_vec)
+            V = 1.0
+            rho_thermo = np.zeros_like(rho_vec)
+            rho_thermo[:] = rho_vec[:]/(NA*self.grid_reducing_lenght**3)
+            n = np.shape(dphidn)[0]
+            dphidn_comb = np.zeros(n + self.nc)
+            dphidn_comb[:n] = dphidn
+            for j in self.nc:
+                if self.chain_functional_active[j]:
+                    lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=rho_thermo, i=j+1, lng_n=True)
+                    phi -= (self.thermo.m[j]-1.0)*rho_b[j]*lng_jj
+                    lng_jj_n *= (NA*self.grid_reducing_lenght**3) # Reducing unit
+                    a_n = -(self.thermo.m[j]-1.0)*(rho_b[j]*lng_jj_n + lng_jj/V)
+                    dphidn_comb[n:] += a_n
+
+        else:
+            dphidn_comb = dphidn
+        return phi, dphidn_comb
+
+    def temperature_differential(self, dens):
+        """
+        Calculates the functional differentials wrpt. temperature
+        Temperature dependence through weigthed densities calculated elewhere
+        Args:
+        dens (array_like): weighted densities
+        Return:
+        np.ndarray: Functional differentials
+
+        """
+        d_T = saft_dispersion.temperature_differential(self, dens)
+        if np.any(self.chain_functional_active):
+            rho_hc_thermo = np.zeros(self.nc)
+            V = 1.0
+            for i in range(self.n_grid):
+                rho_hc_thermo[:] = dens.n[self.rho_hc_name][:, i]
+                rho_hc_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+                for j in self.nc:
+                    if self.chain_functional_active[j]:
+                        rho_j = dens.rho.densities[j][i]
+                        lng_jj, lng_jj_t = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_t=True)
+                        d_T[i] += -(self.thermo.m[j]-1.0)*rho_j*lng_jj_t
+        return d_T
+
+
+    def test_eos_differentials(self, V, n):
+        """
+        Test the functional differentials
+        Args:
+            V (float): Volume (m3)
+            n (np.ndarray): Molar numbers (mol)
+        """
+        saft_dispersion.test_eos_differentials(self, V, n)
+        if np.any(self.chain_functional_active):
+            print("Chain functional:")
+            lng, lng_t, lng_v, lng_n, lng_tt, lng_vv, lng_tv, lng_tn, lng_vn, lng_nn = self.thermo.lng_ii(
+                self.T, V, n, lng_t=True, lng_v=True, lng_n=True, lng_tt=True, lng_vv=True,
+                lng_tv=True, lng_tn=True, lng_vn=True, lng_nn=True)
+
+            eps = 1.0e-5
+            dT = self.T*eps
+            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T + dT, V, n, lng_t=True, lng_v=True, lng_n=True)
+            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T - dT, V, n, lng_t=True, lng_v=True, lng_n=True)
+            print(f"lng_T: {lng_t}, {(lngp-lngm)/2/dT}")
+            print(f"lng_TT: {lng_tt}, {(lngp_t-lngm_t)/2/dT}")
+            print(f"lng_TV: {lng_tv}, {(lngp_v-lngm_v)/2/dT}")
+            print(f"lng_Tn: {lng_tn}, {(lngp_n-lngm_n)/2/dT}")
+            dV = V*eps
+            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T, V + dV, n, lng_t=True, lng_v=True, lng_n=True)
+            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T, V - dV, n, lng_t=True, lng_v=True, lng_n=True)
+            print(f"lng_V: {lng_v}, {(lngp-lngm)/2/dV}")
+            print(f"lng_VV: {lng_vv}, {(lngp_v-lngm_v)/2/dV}")
+            print(f"lng_TV: {lng_tv}, {(lngp_t-lngm_t)/2/dV}")
+            print(f"lng_Vn: {lng_vn}, {(lngp_n-lngm_n)/2/dV}")
+            eps = 1.0e-5
+            dn = np.zeros_like(n)
+            dn[0] = n[0]*eps
+            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T, V, n + dn, lng_t=True, lng_v=True, lng_n=True)
+            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T, V, n - dn, lng_t=True, lng_v=True, lng_n=True)
+            print(f"lng_n: {lng_n}, {(lngp-lngm)/2/dn[0]}")
+            print(f"lng_Vn: {lng_vn}, {(lngp_v-lngm_v)/2/dn[0]}")
+            print(f"lng_Tn: {lng_tn}, {(lngp_t-lngm_t)/2/dn[0]}")
+            print(f"lng_nn: {lng_nn}, {(lngp_n-lngm_n)/2/dn[0]}")
+
 
 if __name__ == "__main__":
     # Model testing

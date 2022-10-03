@@ -313,7 +313,7 @@ The differentials of the weight functions in Fourier space then becomes,
   \label{eq:weight_functions_fourier_diff}
   \pd{\hat{w}_0 \lb \mathbf{k}\rb}{R} &= - 2 \pi |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb  \\
   \pd{\hat{w}_1 \lb \mathbf{k}\rb}{R} &= j_0\lb 2 \pi R |\mathbf{k}| \rb - 2 \pi R |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb \\
-  \pd{\hat{w}_2 \lb \mathbf{k}\rb}{R} &= 8 \pi R j_0\lb 2 \pi R |\mathbf{k}| \rb - 8 \pi R^2 |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \pd{\hat{w}_2 \lb \mathbf{k}\rb}{R} &= 8 \pi R j_0\lb 2 \pi R |\mathbf{k}| \rb - 8 \pi^2 R^2 |\mathbf{k}| j_1\lb 2 \pi R |\mathbf{k}| \rb  \\
   \pd{\hat{w}_3 \lb \mathbf{k}\rb}{R}  &=  \frac{1}{6 \pi^2 |\mathbf{k}|^3} \pd{}{R}\biggl( \lb 2 \pi R |\mathbf{k}|\rb ^3 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb \biggr)  \nonumber \\
                                       &=  \frac{1}{6 \pi^2 |\mathbf{k}|^3} 3 \lb 2 \pi R |\mathbf{k}|\rb ^2  j_0\lb 2 \pi R |\mathbf{k}| \rb 2 \pi |\mathbf{k}| \nonumber  \\
                                       &=  4 \pi R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
@@ -329,7 +329,6 @@ Finally,
 \begin{equation}
   \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{T} = \pd{\hat{w}_\alpha \lb \mathbf{k}\rb}{R} \pd{R}{T}
 \end{equation}
-
 
 \subsection{Density shift contributions}
 
@@ -364,21 +363,63 @@ Differentiating we get,
 \end{align}
 
 
+\subsection{Generic weight functions}
+Generic weight functions of Dirac delta and heaviside functions are,
+\begin{align}
+  \label{eq:generic_weight_functions_fourier}
+  \hat{w}_\delta \lb \mathbf{k}\rb &=  \beta(R) \tilde{w}_\delta = \beta(R) 4 \pi (R \Psi)^2 j_0\lb 2 \pi R \Psi |\mathbf{k}| \rb \\
+  \hat{w}_\Theta \lb \mathbf{k}\rb &=  \beta(R) \tilde{w}_\Theta = \beta(R) \frac{4}{3} \pi (R\Psi)^3 \lb j_0\lb 2 \pi R\Psi |\mathbf{k}| \rb + j_2\lb 2 \pi R\Psi |\mathbf{k}| \rb \rb  \\
+\end{align}
+Here, $\Psi$ simply scale the width of the weight, $\beta(R)$ is a
+prefactor depending on $R$. We also introduce the utility variable
+$\lambda(R)$,
+\begin{align}
+  \label{eq:lambdas}
+  \lambda_\delta \lb R \rb &=  \beta(R) 4 \pi (R \Psi)^2  \\
+  \lambda_\Theta  \lb R \rb &=  \beta(R) \tilde{w}_\Theta = \beta(R) \frac{4}{3} \pi (R\Psi)^3.
+\end{align}
+
+The differentials of the generic weight functions in Fourier space then becomes,
+\begin{align}
+  \label{eq:generic_weight_functions_fourier_diff}
+  \pd{\hat{w}_\delta \lb \mathbf{k}\rb}{R} &=  \lambda_{\delta,R} j_0\lb 2 \pi R \Psi |\mathbf{k}| \rb - \lambda(R) 2 \pi R \Psi |\mathbf{k}| j_1\lb 2 \pi R \Psi |\mathbf{k}| \rb  \\
+  \pd{\hat{w}_\Theta \lb \mathbf{k}\rb}{R}  &=  \frac{\beta(R)}{6 \pi^2 |\mathbf{k}|^3} \pd{}{R}\biggl( \lb 2 \pi R \Psi |\mathbf{k}|\rb ^3 \lb j_0\lb 2 \pi R \Psi |\mathbf{k}| \rb + j_2\lb 2 \pi R \Psi |\mathbf{k}| \rb \rb \biggr) + \beta_R \tilde{w}_\Theta  \nonumber \\
+                                           &=  \frac{\beta(R)}{6 \pi^2 |\mathbf{k}|^3} 3 \lb 2 \pi R \Psi |\mathbf{k}|\rb ^2  j_0\lb 2 \pi R \Psi |\mathbf{k}| \rb 2 \pi \Psi |\mathbf{k}| + \beta_R \tilde{w}_\Theta \nonumber  \\
+                                           &=  \beta(R) 4 \pi R^2 \Psi^2 j_0\lb 2 \pi R \Psi |\mathbf{k}| \rb + \beta_R \tilde{w}_\Theta
+\end{align}
+
+
+\subsubsection{Generic density shift contributions}
+Where,
+\begin{align}
+  \label{eq:generic_weight_functions_steady}
+  w_\delta^{\rm{s}} &= \beta(R) 4 \pi (R \Psi)^2 = \lambda_\delta(R)  \\
+  w_\Theta^{\rm{s}} &= \beta(R) \frac{4}{3} \pi (R \Psi)^3 = \lambda_\Theta(R).
+\end{align}
+
+Differentiating we get,
+\begin{align}
+  \label{eq:generic_weight_functions_steady_diff}
+  \pd{w_\delta^{\rm{s}}}{R} &= \lambda_{\delta,R} \\
+  \pd{w_\Theta^{\rm{s}}}{R} &= \lambda_{\Theta,R}
+\end{align}
+
+
 \section{Other excess quantities}
 Knowing the entropy all the other excess energy densities can be
 calculated. The internal energy density is known from
 \begin{equation}
-  \ref{eq:energy}
+  \label{eq:energy}
   u^\excess = f^\excess + T s^\excess.
 \end{equation}
 Further, the enthalpy is known from,
 \begin{equation}
-  \ref{eq:enthalpy}
+  \label{eq:enthalpy}
   h^\excess = T s^\excess + \underset{i}{\sum} \rho_i \mu_i^\excess,
 \end{equation}
 where the excess chemical potential can be calculated from
 \begin{equation}
-  \ref{eq:chem_pot}
+  \label{eq:chem_pot}
   \mu_i^\excess = \mu_i - \kB T \ln \lb \rho_i \rb - \rm{Const.}
 \end{equation}
 as the chemical potential, $\mu_i$, is always specified for the
@@ -393,7 +434,7 @@ simulations. \todo{Effect of external potential?}
 For the planar geometry the parallel component of the pressure tensor
 is given from the grand potential density,
 \begin{equation}
-  \ref{eq:parallel_pressure}
+  \label{eq:parallel_pressure}
   p_\parallel = - f + \underset{i}{\sum} \rho_i \mu_i.
 \end{equation}
 

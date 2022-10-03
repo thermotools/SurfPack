@@ -23,17 +23,31 @@ class WeightFunction(object):
         """
 
         Args:
-        rho_b (ndarray): Bulk densities
-        R (ndarray): Particle radius for all components
+        wf_type (WeightFunctionType): Type of weight
+        kernel_radius (float): Width of weight
+        alias (string): Alias for acessing weight
+        prefactor (string): Weight prefactor as function of R (R=kernel_radius and not particle radius)
+        convolve (bool): Perform convolution= Default: True
+        calc_from (string): Calculate from another weight? Default: None
         """
         assert (convolve==True and calc_from is None) or (convolve==False and calc_from is not None)
         self.wf_type = wf_type
         self.kernel_radius = kernel_radius
         self.alias = alias
         self.prefactor_str = prefactor
-        self.prefactor = lambdify(("R"), sympify(prefactor), "numpy")
-        self.inv_prefactor_R = lambdify(("R"), sympify("1.0/("+prefactor+")").diff("R"), "numpy")
-        self.inv_prefactor_RR = lambdify(("R"), sympify("1.0/("+prefactor+")").diff("R", 2), "numpy")
+        self.prefactor = lambdify(("R,Psi"), sympify(prefactor), "numpy")
+        self.prefactor_R = lambdify(("R,Psi"), sympify(prefactor).diff("R"), "numpy")
+        if wf_type == WeightFunctionType.DELTA:
+            integral = "4.0*pi*R**2*Psi**2"
+        elif wf_type == WeightFunctionType.THETA:
+            integral = "4.0*pi*R**3*Psi**3/3.0"
+        elif wf_type == WeightFunctionType.NORMTHETA:
+            integral = "1.0"
+        elif wf_type == WeightFunctionType.DELTAVEC:
+            integral = "2*pi" # Dummy
+        self.lamb = lambdify(("R,Psi"), sympify(integral+"*"+prefactor), "numpy")
+        self.lamb_R = lambdify(("R,Psi"), sympify(integral+"*"+prefactor).diff("R"), "numpy")
+        self.lamb_RR = lambdify(("R,Psi"), sympify(integral+"*"+prefactor).diff("R", 2), "numpy")
         self.convolve = convolve
         self.calc_from = calc_from
         # For transformations
@@ -75,7 +89,7 @@ class WeightFunction(object):
         self.R_T = R_T
         self.geometry = grid.geometry
         self.fn = np.zeros(grid.n_grid)
-        self.prefactor_evaluated = self.prefactor(R)
+        self.prefactor_evaluated = self.prefactor(R,self.kernel_radius)
         if self.geometry == Geometry.PLANAR:
             self.generate_planar_fourier_weights(grid, R, R_T)
         elif self.geometry == Geometry.SPHERICAL:
@@ -101,20 +115,20 @@ class WeightFunction(object):
         self.generate_planar_fourier_weights_T(grid, R, R_T)
         if self.convolve:
             if self.wf_type == WeightFunctionType.THETA:
-                self.w_conv_steady = (4.0/3.0)*np.pi*(R_kernel**3)
-                self.fw[:] = 4/3 * np.pi * R_kernel**3 * \
+                self.w_conv_steady = self.lamb(R,self.kernel_radius)
+                self.fw[:] = self.w_conv_steady * \
                     (spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R))
             elif self.wf_type == WeightFunctionType.NORMTHETA:
                 self.w_conv_steady = 1.0
                 self.fw[:] = spherical_jn(0, self.k_cos_R) + spherical_jn(2, self.k_cos_R)
             elif self.wf_type == WeightFunctionType.DELTA:
                 # The convolution of the fourier weights for steady profile
-                self.w_conv_steady = 4.0*np.pi*R_kernel**2
-                self.fw[:] = 4.0 * np.pi * R_kernel**2 * spherical_jn(0, self.k_cos_R)
+                self.w_conv_steady = self.lamb(R,self.kernel_radius)
+                self.fw[:] = self.w_conv_steady * spherical_jn(0, self.k_cos_R)
             elif self.wf_type == WeightFunctionType.DELTAVEC:
                 # The convolution of the fourier weights for steady profile
                 self.w_conv_steady = 0.0
-                self.fw[:] = - self.k_sin * \
+                self.fw[:] = - self.prefactor_evaluated * self.k_sin * \
                     (4.0/3.0 * np.pi * R_kernel**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
                 # elif self.alias == "wv1":
                 #     print("Setting vw1")
@@ -127,26 +141,21 @@ class WeightFunction(object):
         self.fw_T = np.zeros(grid.n_grid)
         R_kernel = R*self.kernel_radius
         if self.wf_type == WeightFunctionType.THETA:
-            self.fw_T[:] = 4 * np.pi * R_kernel**2 * spherical_jn(0, self.k_cos_R)
-            self.w_conv_steady_T = 4 * np.pi * R_kernel**2
+            self.w_conv_steady_T = self.lamb_R(R,self.kernel_radius)
+            self.fw_T[:] = self.w_conv_steady_T * spherical_jn(0, self.k_cos_R)
+            beta_R = self.prefactor_R(R,self.kernel_radius)
+            if beta_R != 0.0:
+                self.fw_T[:] += beta_R*self.fw[:]/self.prefactor_evaluated
         elif self.wf_type == WeightFunctionType.NORMTHETA:
             self.fw_T[:] = -3*spherical_jn(2, self.k_cos_R)/R
             self.w_conv_steady_T = 0.0
         elif self.wf_type == WeightFunctionType.DELTA:
-            if self.inv_prefactor_R(R) == 0.0:
-                #n2 type weight
-                self.fw_T[:] = 8 * np.pi * R_kernel * (spherical_jn(0, self.k_cos_R) - 0.5*self.k_cos_R*spherical_jn(1, self.k_cos_R))
-                self.w_conv_steady_T = 8 * np.pi * R_kernel
-            elif self.inv_prefactor_RR(R) == 0.0:
-                #n1 type weight
-                self.fw_T[:] = spherical_jn(0, self.k_cos_R) - self.k_cos_R * spherical_jn(1, self.k_cos_R)
-                self.w_conv_steady_T = self.kernel_radius
-            else:
-                #n0 type weight
-                self.fw_T[:] = - self.k_cos * spherical_jn(1, self.k_cos_R)
-                self.w_conv_steady_T = 0.0
+            lamb = self.lamb(R,self.kernel_radius)
+            lamb_R = self.lamb_R(R,self.kernel_radius)
+            self.fw_T[:] = lamb_R * spherical_jn(0, self.k_cos_R) - lamb*self.k_cos_R*spherical_jn(1, self.k_cos_R)
+            self.w_conv_steady_T = lamb_R
         elif self.wf_type == WeightFunctionType.DELTAVEC:
-            if self.inv_prefactor_R(R) == 0.0:
+            if self.lamb_R(R,self.kernel_radius) == 0.0:
                self.fw_T[:] = - 4 * np.pi * self.k_sin_R * R_kernel * spherical_jn(0, self.k_sin_R)
             else:
                 self.fw_T[:] = - self.k_sin_R * spherical_jn(0, self.k_sin_R) + spherical_jn(1, self.k_sin_R)
@@ -508,6 +517,14 @@ class WeightFunctions(object):
                                          alias = alias,
                                          prefactor = "1.0", # Not important. Will be calculated.
                                          convolve=True)
+
+    def add_weight(self, alias, kernel_radius, wf_type, prefactor, convolve=True, calc_from=None):
+        self.wfs[alias] = WeightFunction(wf_type=wf_type,
+                                         kernel_radius=kernel_radius,
+                                         alias=alias,
+                                         prefactor=prefactor,
+                                         convolve=convolve,
+                                         calc_from=calc_from)
 
     def get_correlation_factor(self, label, R):
         """

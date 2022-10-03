@@ -36,7 +36,7 @@ vle_p = equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
 interf_p = PlanarInterface.from_profile(vle_p, interf.profile, domain_size=100.0, n_grid=1024, invert_states=True)
 
 interf_p.single_convolution()
-F_p = interf_p.get_excess_helmholtz_energy_density()
+F_p = interf_p.get_excess_free_energy_density()
 n_0_p = interf_p.convolver.weighted_densities.n0
 n_1_p = interf_p.convolver.weighted_densities.n1
 n_2_p = interf_p.convolver.weighted_densities.n2
@@ -49,7 +49,7 @@ T_m = T - eps_T
 vle_m = equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
 interf_m = PlanarInterface.from_profile(vle_m, interf.profile, domain_size=100.0, n_grid=1024, invert_states=True)
 interf_m.single_convolution()
-F_m = interf_m.get_excess_helmholtz_energy_density()
+F_m = interf_m.get_excess_free_energy_density()
 n_0_m = interf_m.convolver.weighted_densities.n0
 n_1_m = interf_m.convolver.weighted_densities.n1
 n_2_m = interf_m.convolver.weighted_densities.n2
@@ -67,12 +67,19 @@ leg = plt.legend(loc="best", numpoints=1, frameon=False)
 plt.show()
 plt.clf()
 
-# interf.convolver.convolve_density_profile_T(interf.profile.densities)
+n_0= interf.convolver.weighted_densities.n["w0"]
+plt.plot(interf.grid.z, n_0,label="n0")
+print(n_0[512])
+leg = plt.legend(loc="best", numpoints=1, frameon=False)
+plt.show()
 
-# dndT = interf.convolver.weighted_densities_T.n["w0"]
-# dndT_num = (n_0_p-n_0_m)/(2*eps_T)
-# plt.plot(interf.grid.z, dndT_num,label="Num. n0")
-# plt.plot(interf.grid.z, dndT,label="Anal. n0")
+
+interf.convolver.convolve_density_profile_T(interf.profile.densities)
+
+dndT = interf.convolver.weighted_densities_T.n["w0"]
+dndT_num = (n_0_p-n_0_m)/(2*eps_T)
+plt.plot(interf.grid.z, dndT_num,label="Num. n0")
+plt.plot(interf.grid.z, dndT,label="Anal. n0")
 
 # dndT = interf.convolver.weighted_densities_T.n["w1"]
 # dndT_num = (n_1_p-n_1_m)/(2*eps_T)
@@ -105,9 +112,9 @@ plt.clf()
 # plt.plot(interf.grid.z, dndT_num,label="Num. n_disp")
 # plt.plot(interf.grid.z, dndT[comp,:],label="Anal. n_disp")
 
-# leg = plt.legend(loc="best", numpoints=1, frameon=False)
-# plt.show()
-
+leg = plt.legend(loc="best", numpoints=1, frameon=False)
+plt.show()
+sys.exit()
 s_scaling = 1.0e-6
 s_E = interf.get_excess_entropy_density_real_units()
 plt.plot(interf.grid.z, s_E*s_scaling,label=r"$s^{\rm{E}}$ functional")
