@@ -232,6 +232,39 @@ class WeightedDensitiesMaster(WeightedDensities):
         self.logn3neg[:] = np.log(self.n3neg[:])
         self.n32[:] = self.n3[:] ** 2
 
+    def perturbate(self, alias, eps=1.0e-5, ic=0):
+        """ Method intended for debugging functional differentials
+        Args:
+        alias (string): Name of weigthed density
+        eps (float): Size and direction of relative perturbation
+        ic (int): Component index
+        Return:
+        (np.ndarray): Density before perturbation
+        """
+        n = np.zeros_like(self.n3neg)
+        if alias == "rho":
+            n[:] = self.rho.densities[ic][:]
+            self.rho.densities[ic][:] += self.rho.densities[ic][:]*eps
+        else:
+            n[:] = self.n[alias][ic,:]
+            self.n[alias][ic,:] += self.n[alias][ic,:]*eps
+            self.update_utility_variables()
+        return n
+
+    def set_density(self, n, alias, ic=0):
+        """ Set weighted density
+        Args:
+        n (np.ndarray): Densities
+        alias (string): Name of weigthed density
+        ic (int): Component index
+        """
+        if alias == "rho":
+            self.rho.densities[ic][:] = n[:]
+        else:
+            self.n[alias][ic,:] = n[:]
+            self.update_utility_variables()
+
+
 class CompWeightedDifferentials():
     """
     """
@@ -290,6 +323,9 @@ class CompWeightedDifferentials():
                 elif "3" in alias:
                     self.d[alias] = self.d3
 
+        # Differentials not requiring convolutions
+        self.mu_of_rho = np.zeros(n_grid)
+
         # One - body direct correlation function
         self.corr = np.zeros(n_grid)
 
@@ -314,6 +350,8 @@ class CompWeightedDifferentials():
         for wf in self.wfs:
             if self.wfs[wf].convolve:
                 self.corr[:] -= self.d_conv[wf][:]
+        # Add differentials with respect to local density
+        self.corr[:] -= self.mu_of_rho[:]
 
     def set_functional_differentials(self, functional, ic):
         """
@@ -338,6 +376,9 @@ class CompWeightedDifferentials():
             alias = self.wfs[wf].alias
             if alias not in self.wfs.fmt_aliases:
                 self.d[alias][:] = functional.diff[alias][:, ic]
+
+        if functional.mu_of_rho is not None:
+            self.mu_of_rho[:] = functional.mu_of_rho[:, ic]
 
 
     def print(self, index=None):

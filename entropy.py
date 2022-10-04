@@ -59,7 +59,7 @@ n_2v_m = interf_m.convolver.weighted_densities.n2v
 n_disp_m = interf_m.convolver.weighted_densities.n["w_disp"]
 
 vol_fac = (interf.functional.thermo.sigma[0]/interf.functional.grid_reducing_lenght)**3
-s_num = -interf.functional.thermo.eps_div_kb[0]*vol_fac*(F_p-F_m)/(2*eps_T)
+s_num = -interf.functional.thermo.eps_div_kb[0]*(F_p-F_m)/(2*eps_T)
 s = interf.get_excess_entropy_density()
 plt.plot(interf.grid.z, s_num,label="Numerical")
 plt.plot(interf.grid.z, s,label="Analytical")

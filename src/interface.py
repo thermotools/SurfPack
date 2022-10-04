@@ -750,6 +750,40 @@ class Interface(ABC):
         print(f"  pressure + omega: {self.bulk.red_pressure_left + omega_a[0]}")
         print(f"  thermopack pressure: {self.bulk.left_state.pressure()*reducing}")
 
+    def test_functional_differential(self, alias, eps=1.0e-5, ic=0):
+        """ Method intended for debugging functional differentials
+        Args:
+        alias (string): Name of weigthed density
+        eps (float): Size and direction of relative perturbation
+        ic (int): If set, the local density will be set.
+        """
+        self.single_convolution()
+        # Evaluate differential
+        self.convolver.functional.differentials(self.convolver.weighted_densities)
+        diff = np.zeros(self.grid.n_grid)
+        if alias == "rho":
+            diff[:] = self.functional.mu_of_rho[:, ic]
+        else:
+            diff[:] = self.functional.diff[alias][:, ic]
+        # Perturbate density
+        n = self.convolver.weighted_densities.perturbate(alias=alias, eps=-eps, ic=ic)
+        Fm = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        # Reset density
+        self.convolver.weighted_densities.set_density(n, alias=alias, ic=ic)
+        # Perturbate density
+        n = self.convolver.weighted_densities.perturbate(alias=alias, eps=eps, ic=ic)
+        Fp = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        # Reset density
+        self.convolver.weighted_densities.set_density(n, alias=alias, ic=ic)
+        # Plot differentials
+        plt.plot(self.grid.z,(Fp - Fm)/(2*n*eps),label="Numeric")
+        plt.plot(self.grid.z,diff,label="Analytic")
+        plt.xlabel("$z$")
+        plt.title("Numerical test of differential for: "+alias)
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        plt.show()
+
+
 class PlanarInterface(Interface):
     """
     Utility class for simplifying specification of PLANAR interface

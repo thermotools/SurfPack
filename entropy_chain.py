@@ -18,6 +18,12 @@ vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 # Define interface with initial tanh density profile
 interf = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(1), domain_size=100.0, n_grid=1024, invert_states=True)
 
+#interf.functional.test_eos_differentials(vle.liquid.v, vle.liquid.x)
+#interf.test_functional_differential("rho")
+#interf.test_functional_differential("w_rho_hc")
+#interf.test_functional_differential("w_lambda_hc")
+#interf.test_functional_differential("w_disp")
+sys.exit()
 # Solve for equilibrium profile
 interf.solve(log_iter=True)
 
@@ -60,7 +66,7 @@ n_2v_m = interf_m.convolver.weighted_densities.n2v
 n_disp_m = interf_m.convolver.weighted_densities.n["w_disp"]
 
 vol_fac = (interf.functional.thermo.sigma[0]/interf.functional.grid_reducing_lenght)**3
-s_num = -interf.functional.thermo.eps_div_kb[0]*vol_fac*(F_p-F_m)/(2*eps_T)
+s_num = -interf.functional.thermo.eps_div_kb[0]*(F_p-F_m)/(2*eps_T)
 s = interf.get_excess_entropy_density()
 plt.plot(interf.grid.z, s_num,label="Numerical")
 plt.plot(interf.grid.z, s,label="Analytical")
