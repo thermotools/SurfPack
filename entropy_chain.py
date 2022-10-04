@@ -23,9 +23,11 @@ interf = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(
 #interf.test_functional_differential("w_rho_hc")
 #interf.test_functional_differential("w_lambda_hc")
 #interf.test_functional_differential("w_disp")
-sys.exit()
+#interf.test_functional_in_bulk()
+#sys.exit()
 # Solve for equilibrium profile
-interf.solve(log_iter=True)
+#interf.solve(log_iter=True)
+interf.single_convolution()
 
 # Plot profile
 # interf.plot_equilibrium_density_profiles(plot_actual_densities=True,

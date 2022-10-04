@@ -783,6 +783,84 @@ class Interface(ABC):
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
+    def test_functional_in_bulk(self):
+        """ Plot bulk and functional values together
+        """
+        # Make sure convolver is set up
+        self.single_convolution()
+
+        sigma = self.functional.thermo.sigma[0]
+        eps = self.functional.thermo.eps_div_kb[0]*KB
+        Rgas = self.functional.thermo.Rgas
+        #s_scaling = NA*sigma**3/interf.functional.thermo.Rgas
+        #energy_scaling = sigma**3/eps
+
+        s_E = self.get_excess_entropy_density()
+        a_E = self.get_excess_free_energy_density()
+        p_T = self.parallel_pressure()
+        h_E = self.get_excess_enthalpy_density()
+        u_E = self.get_excess_energy_density()
+        p = self.parallel_pressure()
+
+        len_fac = self.functional.grid_reducing_lenght/self.functional.thermo.sigma[0]
+        s_scaling = (NA*sigma**3)/Rgas
+        plt.plot(self.grid.z*len_fac, s_E,label=r"Functional")
+        plt.plot([self.grid.z[0]*len_fac], s_scaling*np.array([self.bulk.left_state.specific_excess_entropy()/self.bulk.left_state.specific_volume()]),
+                 label=r"Bulk left", linestyle="None", marker="o")
+        plt.plot([self.grid.z[-1]*len_fac], s_scaling*np.array([self.bulk.right_state.specific_excess_entropy()/self.bulk.right_state.specific_volume()]),
+                 label=r"Bulk right", linestyle="None", marker="o")
+        plt.ylabel(r"$s_{\rm{E}}^*$")
+        plt.xlabel("$z/\sigma$")
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        plt.show()
+
+        energy_scaling = sigma**3/eps
+        plt.plot(self.grid.z*len_fac, a_E,label=r"Functional")
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_free_energy()/self.bulk.left_state.specific_volume()]),
+                 label=r"Bulk left", linestyle="None", marker="o")
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.specific_excess_free_energy()/self.bulk.right_state.specific_volume()]),
+                 label=r"Bulk right", linestyle="None", marker="o")
+        plt.ylabel(r"$a_{\rm{E}}^*$")
+        plt.xlabel("$z/\sigma$")
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        plt.show()
+
+        plt.plot(self.grid.z*len_fac, p,label=r"Functional")
+        p_scaling = sigma**3/eps
+        plt.plot([self.grid.z[0]*len_fac], p_scaling*np.array([self.bulk.left_state.pressure()]),
+                 label=r"Bulk left", linestyle="None", marker="o")
+        plt.plot([self.grid.z[-1]*len_fac], p_scaling*np.array([self.bulk.right_state.pressure()]),
+                 label=r"Bulk right", linestyle="None", marker="o")
+        plt.ylabel(r"$p^*$")
+        plt.xlabel("$z/\sigma$")
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        plt.show()
+
+        plt.plot(self.grid.z*len_fac, u_E,label=r"Functional")
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_energy()/self.bulk.left_state.specific_volume()]),
+                 label=r"Bulk liquid", linestyle="None", marker="o")
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.specific_excess_energy()/self.bulk.right_state.specific_volume()]),
+                 label=r"Bulk vapour", linestyle="None", marker="o")
+        plt.ylabel(r"$u_{\rm{E}}^*$")
+        plt.xlabel("$z/\sigma$")
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        plt.show()
+
+        plt.plot(self.grid.z*len_fac, h_E,label=r"Functional")
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_enthalpy()/self.bulk.left_state.specific_volume()]),
+                 label=r"Bulk liquid", linestyle="None", marker="o")
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.specific_excess_enthalpy()/self.bulk.right_state.specific_volume()]),
+                 label=r"Bulk vapour", linestyle="None", marker="o")
+        plt.ylabel(r"$h_{\rm{E}}^*$")
+        plt.xlabel("$z/\sigma$")
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        plt.show()
+
+    def test_entropy(self):
+        """ Test entropy differential numerically
+        """
+
+
 
 class PlanarInterface(Interface):
     """

@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 # Set up thermopack and equilibrium state
 thermopack = pcsaft()
 thermopack.init("C1")
-T = 140.0
+T_star = 0.7
+T = T_star*thermopack.eps_div_kb[0]
 vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
 # Define interface with initial tanh density profile

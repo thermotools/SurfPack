@@ -518,24 +518,4 @@ class pc_saft(saft_dispersion):
 
 
 if __name__ == "__main__":
-    # Model testing
-
-    pcs = get_thermopack_model("PC-SAFT")
-    pcs.init("C1")
-    PCS_functional = pc_saft(1, pcs, T_red=110.0/165.0)
-    print(PCS_functional.d_hs[0], PCS_functional.T)
-    dens_pcs = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
-
-    v = pcs.specific_volume(PCS_functional.T,
-                            1.0e6,
-                            np.array([1.0]),
-                            pcs.LIQPH)
-    rho = (NA * PCS_functional.grid_reducing_lenght ** 3)/v
-    PCS_functional.test_bulk_differentials(rho)
-    dens = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
-    dens.set_testing_values(rho)
-    # dens.print(print_utilities=True)
-    PCS_functional.test_differentials(dens)
-    corr = PCS_functional.get_bulk_correlation(rho)
-    mu = PCS_functional.bulk_excess_chemical_potential(rho)
-    print("corr, mu", corr, mu)
+    pass
