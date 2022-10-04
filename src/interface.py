@@ -856,11 +856,6 @@ class Interface(ABC):
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
-    def test_entropy(self):
-        """ Test entropy differential numerically
-        """
-
-
 
 class PlanarInterface(Interface):
     """
