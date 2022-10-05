@@ -33,7 +33,7 @@ class saft_dispersion(Whitebear):
             self.grid_reducing_lenght = thermo.sigma[0]
         R = np.zeros(thermo.nc)
         R[:] = 0.5*self.d_hs[:]/self.grid_reducing_lenght
-        Whitebear.__init__(self, N, R, grid_unit)
+        Whitebear.__init__(self, N, R, thermo.m, grid_unit)
         self.name = "Generic-SAFT"
         self.short_name = "GS"
         # Add normalized theta weight
@@ -139,7 +139,7 @@ class saft_dispersion(Whitebear):
 
         """
         mu_ex = Whitebear.bulk_excess_chemical_potential(self, rho_b)
-        # PC-SAFT contributions
+        # Dispersion contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
         rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
@@ -200,7 +200,6 @@ class saft_dispersion(Whitebear):
 
         """
         d_T = Whitebear.temperature_differential(self, dens)
-
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(self.n_grid):
@@ -361,8 +360,8 @@ class pc_saft(saft_dispersion):
                         # Contribution not to be convolved:
                         self.mu_of_rho[i, j] += (self.thermo.m[j]-1.0)*(np.log(rho_j) - lng_jj - np.log(lambda_hc[j]) + 1.0)
                         # Convolved contributions:
-                        self.mu_rho_hc[i, :] = -(self.thermo.m[j]-1.0)*rho_j*lng_jj_n
-                        self.mu_lambda_hc[i, :] = -(self.thermo.m[j]-1.0)*rho_j/lambda_hc[j]
+                        self.mu_rho_hc[i, j] = -(self.thermo.m[j]-1.0)*rho_j*lng_jj_n
+                        self.mu_lambda_hc[i, j] = -(self.thermo.m[j]-1.0)*rho_j/lambda_hc[j]
 
     def bulk_compressibility(self, rho_b):
         """
@@ -406,7 +405,7 @@ class pc_saft(saft_dispersion):
         """
         mu_ex = saft_dispersion.bulk_excess_chemical_potential(self, rho_b)
         if np.any(self.chain_functional_active):
-            # PC-SAFT contributions
+            # Hard-chain contributions
             rho_thermo = np.zeros_like(rho_b)
             rho_thermo[:] = rho_b[:]
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
@@ -416,8 +415,7 @@ class pc_saft(saft_dispersion):
             for j in range(self.nc):
                 if self.chain_functional_active[j]:
                     lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_n=True)
-                    lng_jj_n *= (NA*self.grid_reducing_lenght**3) # Reducing unit
-                    a_n = -(self.thermo.m[j]-1.0)*(rho_b[j]*lng_jj_n + lng_jj/V)
+                    a_n = -(self.thermo.m[j]-1.0)*(rho_thermo[j]*lng_jj_n + lng_jj)
                     mu_ex += a_n
         return mu_ex
 
@@ -444,8 +442,7 @@ class pc_saft(saft_dispersion):
                 if self.chain_functional_active[j]:
                     lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=rho_thermo, i=j+1, lng_n=True)
                     phi -= (self.thermo.m[j]-1.0)*rho_b[j]*lng_jj
-                    lng_jj_n *= (NA*self.grid_reducing_lenght**3) # Reducing unit
-                    a_n = -(self.thermo.m[j]-1.0)*(rho_b[j]*lng_jj_n + lng_jj/V)
+                    a_n = -(self.thermo.m[j]-1.0)*(rho_thermo[j]*lng_jj_n + lng_jj/V)
                     dphidn_comb[n:] += a_n
 
         else:
@@ -472,7 +469,7 @@ class pc_saft(saft_dispersion):
                 for j in range(self.nc):
                     if self.chain_functional_active[j]:
                         rho_j = dens.rho.densities[j][i]
-                        lng_jj, lng_jj_t = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_t=True)
+                        lng_jj, lng_jj_t, = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_t=True)
                         d_T[i] += -(self.thermo.m[j]-1.0)*rho_j*lng_jj_t
         return d_T
 

@@ -152,7 +152,7 @@ class WeightFunction(object):
         elif self.wf_type == WeightFunctionType.DELTA:
             lamb = self.lamb(R,self.kernel_radius)
             lamb_R = self.lamb_R(R,self.kernel_radius)
-            self.fw_T[:] = lamb_R * spherical_jn(0, self.k_cos_R) - lamb*self.k_cos*spherical_jn(1, self.k_cos_R)
+            self.fw_T[:] = lamb_R * spherical_jn(0, self.k_cos_R) - self.kernel_radius*lamb*self.k_cos*spherical_jn(1, self.k_cos_R)
             self.w_conv_steady_T = lamb_R
         elif self.wf_type == WeightFunctionType.DELTAVEC:
             if self.lamb_R(R,self.kernel_radius) == 0.0:

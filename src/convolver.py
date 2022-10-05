@@ -363,14 +363,14 @@ class CompWeightedDifferentials():
         Returns:
 
         """
-        self.d0[:] = functional.d0[:]
-        self.d1[:] = functional.d1[:]
-        self.d2[:] = functional.d2[:]
-        self.d3[:] = functional.d3[:]
-        self.d1v[:] = functional.d1v[:]
-        self.d2v[:] = functional.d2v[:]
-        self.d2eff[:] = functional.d2eff[:]
-        self.d2veff[:] = functional.d2veff[:]
+        self.d0[:] = self.ms*functional.d0[:]
+        self.d1[:] = self.ms*functional.d1[:]
+        self.d2[:] = self.ms*functional.d2[:]
+        self.d3[:] = self.ms*functional.d3[:]
+        self.d1v[:] = self.ms*functional.d1v[:]
+        self.d2v[:] = self.ms*functional.d2v[:]
+        self.d2eff[:] = self.ms*functional.d2eff[:]
+        self.d2veff[:] = self.ms*functional.d2veff[:]
 
         for wf in self.wfs:
             alias = self.wfs[wf].alias
@@ -568,7 +568,7 @@ class Convolver(object):
             # for wf in self.functional.wf.wfs:
             #     self.comp_wfs[i].wfs[wf].update_dependencies(self.comp_weighted_densities[i])
             # Account for segments
-            self.comp_weighted_densities[i].update_after_convolution()
+            #self.comp_weighted_densities[i].update_after_convolution()
             # print("n0",self.comp_weighted_densities[i].n["w0"])
             # print("n1",self.comp_weighted_densities[i].n["w1"])
             # print("n2",self.comp_weighted_densities[i].n["w2"])

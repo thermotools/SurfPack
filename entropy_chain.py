@@ -24,10 +24,10 @@ interf = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(
 #interf.test_functional_differential("w_lambda_hc")
 #interf.test_functional_differential("w_disp")
 #interf.test_functional_in_bulk()
-#sys.exit()
+
 # Solve for equilibrium profile
-#interf.solve(log_iter=True)
-interf.single_convolution()
+interf.solve(log_iter=True)
+#interf.single_convolution()
 
 # Plot profile
 # interf.plot_equilibrium_density_profiles(plot_actual_densities=True,
@@ -53,6 +53,8 @@ n_3_p = interf_p.convolver.weighted_densities.n3
 n_1v_p = interf_p.convolver.weighted_densities.n1v
 n_2v_p = interf_p.convolver.weighted_densities.n2v
 n_disp_p = interf_p.convolver.weighted_densities.n["w_disp"]
+n_rho_hc_p = interf_p.convolver.weighted_densities.n["w_rho_hc"]
+n_lambda_hc_p = interf_p.convolver.weighted_densities.n["w_lambda_hc"]
 
 T_m = T - eps_T
 vle_m = equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
@@ -66,6 +68,8 @@ n_3_m = interf_m.convolver.weighted_densities.n3
 n_1v_m = interf_m.convolver.weighted_densities.n1v
 n_2v_m = interf_m.convolver.weighted_densities.n2v
 n_disp_m = interf_m.convolver.weighted_densities.n["w_disp"]
+n_rho_hc_m = interf_m.convolver.weighted_densities.n["w_rho_hc"]
+n_lambda_hc_m = interf_m.convolver.weighted_densities.n["w_lambda_hc"]
 
 vol_fac = (interf.functional.thermo.sigma[0]/interf.functional.grid_reducing_lenght)**3
 s_num = -interf.functional.thermo.eps_div_kb[0]*(F_p-F_m)/(2*eps_T)
@@ -114,8 +118,21 @@ plt.clf()
 # plt.plot(interf.grid.z, dndT_num,label="Num. n_disp")
 # plt.plot(interf.grid.z, dndT[comp,:],label="Anal. n_disp")
 
+# comp = 0
+# dndT = interf.convolver.weighted_densities_T.n["w_rho_hc"]
+# dndT_num = (n_rho_hc_p[comp,:]-n_rho_hc_m[comp,:])/(2*eps_T)
+# plt.plot(interf.grid.z, dndT_num,label="Num. rho_hc")
+# plt.plot(interf.grid.z, dndT[comp,:],label="Anal. rho_hc")
+
+# comp = 0
+# dndT = interf.convolver.weighted_densities_T.n["w_lambda_hc"]
+# dndT_num = (n_lambda_hc_p[comp,:]-n_lambda_hc_m[comp,:])/(2*eps_T)
+# plt.plot(interf.grid.z, dndT_num,label="Num. lambda_hc")
+# plt.plot(interf.grid.z, dndT[comp,:],label="Anal. lambda_hc")
+
 # leg = plt.legend(loc="best", numpoints=1, frameon=False)
 # plt.show()
+# sys.exit()
 
 s_scaling = 1.0e-6
 s_E = interf.get_excess_entropy_density_real_units()
@@ -127,7 +144,7 @@ plt.plot([interf.grid.z[-1]], s_scaling*np.array([vle.vapor.specific_excess_entr
 plt.ylabel(r"$s^{\rm{E}}$ (MJ/m$^3$/K)")
 plt.xlabel("$z$ (Å)")
 leg = plt.legend(loc="best", numpoints=1, frameon=False)
-plt.savefig("methane_140K.pdf")
+#plt.savefig("propane.pdf")
 plt.show()
 
 s_scaling = 1.0

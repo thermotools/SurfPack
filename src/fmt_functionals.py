@@ -9,25 +9,26 @@ class bulk_weighted_densities:
     Utility class for calculating bulk states.
     """
 
-    def __init__(self, rho_b, R):
+    def __init__(self, rho_b, R, ms):
         """
 
         Args:
             rho_b (ndarray): Bulk densities
             R (ndarray): Particle radius for all components
+            ms (ndarray): Segment number for all components
         """
         self.rho_i = np.zeros_like(rho_b)
-        self.rho_i[:] = rho_b[:]
+        self.rho_i[:] = ms*rho_b[:]
         self.n = np.zeros(4)
-        self.n[0] = np.sum(rho_b)
-        self.n[1] = np.sum(R * rho_b)
-        self.n[2] = 4*np.pi*np.sum(R ** 2 * rho_b)
-        self.n[3] = 4 * np.pi * np.sum(R ** 3 * rho_b) / 3
-        self.dndrho = np.zeros((4, np.shape(rho_b)[0]))
-        self.dndrho[0, :] = 1.0
-        self.dndrho[1, :] = R
-        self.dndrho[2, :] = 4*np.pi*R**2
-        self.dndrho[3, :] = 4*np.pi*R**3/3
+        self.n[0] = np.sum(self.rho_i)
+        self.n[1] = np.sum(R * self.rho_i)
+        self.n[2] = 4*np.pi*np.sum(R ** 2 * self.rho_i)
+        self.n[3] = 4 * np.pi * np.sum(R ** 3 * self.rho_i) / 3
+        self.dndrho = np.zeros((4, np.shape(self.rho_i)[0]))
+        self.dndrho[0, :] = ms
+        self.dndrho[1, :] = ms*R
+        self.dndrho[2, :] = ms*4*np.pi*R**2
+        self.dndrho[3, :] = ms*4*np.pi*R**3/3
 
     def print(self):
         print("Bulk weighted densities:")
@@ -46,16 +47,19 @@ class Rosenfeld:
     doi:10.1103/PhysRevLett.63.980
     """
 
-    def __init__(self, N, R=np.array([0.5]), grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (integer): Grid size
             R (ndarray): Particle radius for all components
+            ms (ndarray): Segment number for all components
+            grid_unit (LenghtUnit): Information on how lenght is reduced (Deafult: ANGSTROM)
         """
         self.name = "Rosenfeld"
         self.short_name = "RF"
         self.R = R
+        self.ms = ms
         self.nc = np.shape(R)[0]
         self.n_grid = N
         # Define units for simulation grid
@@ -123,7 +127,7 @@ class Rosenfeld:
         Returns:
             float: compressibility
         """
-        bd = bulk_weighted_densities(rho_b, self.R)
+        bd = bulk_weighted_densities(rho_b, self.R, self.ms)
         phi, dphidn = self.bulk_functional_with_differentials(
             bd, only_hs_system=True)
         beta_p_ex = - phi + np.sum(dphidn[:4] * bd.n)
@@ -143,7 +147,7 @@ class Rosenfeld:
         float: Excess reduced HS chemical potential ()
 
         """
-        bd = bulk_weighted_densities(rho_b, self.R)
+        bd = bulk_weighted_densities(rho_b, self.R, self.ms)
         phi, dphidn = self.bulk_functional_with_differentials(
             bd, only_hs_system=True)
         mu_ex = np.zeros(self.nc)
@@ -247,7 +251,7 @@ class Rosenfeld:
         Return:
             corr (np.ndarray): One particle correlation function
         """
-        bd = bulk_weighted_densities(rho_b, self.R)
+        bd = bulk_weighted_densities(rho_b, self.R, self.ms)
         _, dphidn = self.bulk_functional_with_differentials(
             bd, only_hs_system=only_hs_system)
         corr = np.zeros(self.nc)
@@ -256,6 +260,7 @@ class Rosenfeld:
                 self.R[i] * dphidn[1] + \
                 (4 * np.pi * self.R[i] ** 2) * dphidn[2] + \
                 4 * np.pi * self.R[i] ** 3 * dphidn[3] / 3
+            corr[i] *= self.ms[i]
             if np.shape(dphidn)[0] > 4:
                 corr[i] += dphidn[4+i]
 
@@ -297,16 +302,16 @@ class Rosenfeld:
 
         """
         print("Testing functional " + self.name)
-        bd0 = bulk_weighted_densities(rho_b, self.R)
+        bd0 = bulk_weighted_densities(rho_b, self.R, self.ms)
         phi, dphidn = self.bulk_functional_with_differentials(bd0)
 
         print("HS functional differentials:")
         for i in range(4):
-            bd = bulk_weighted_densities(rho_b, self.R)
+            bd = bulk_weighted_densities(rho_b, self.R, self.ms)
             eps = 1.0e-5 * bd.n[i]
             bd.n[i] += eps
             phi2, dphidn2 = self.bulk_functional_with_differentials(bd)
-            bd = bulk_weighted_densities(rho_b, self.R)
+            bd = bulk_weighted_densities(rho_b, self.R, self.ms)
             eps = 1.0e-5 * bd.n[i]
             bd.n[i] -= eps
             phi1, dphidn1 = self.bulk_functional_with_differentials(bd)
@@ -320,13 +325,13 @@ class Rosenfeld:
             eps = 1.0e-5 * rho_b[i]
             rho_b_local[:] = rho_b[:]
             rho_b_local[i] += eps
-            bd = bulk_weighted_densities(rho_b_local, self.R)
+            bd = bulk_weighted_densities(rho_b_local, self.R, self.ms)
             phi2, dphidn1 = self.bulk_functional_with_differentials(bd)
             phi2_hs, _ = self.bulk_functional_with_differentials(
                 bd, only_hs_system=True)
             rho_b_local[:] = rho_b[:]
             rho_b_local[i] -= eps
-            bd = bulk_weighted_densities(rho_b_local, self.R)
+            bd = bulk_weighted_densities(rho_b_local, self.R, self.ms)
             phi1, dphidn1 = self.bulk_functional_with_differentials(bd)
             phi1_hs, _ = self.bulk_functional_with_differentials(
                 bd, only_hs_system=True)
@@ -362,15 +367,16 @@ class Whitebear(Rosenfeld):
 
     """
 
-    def __init__(self, N, R=np.array([0.5]), grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
             N (integer): Grid size
             R (ndarray): Particle radius for all components
-            grid_unit (LenghtUnit): Unit used for grid
+            ms (ndarray): Segment number for all components
+            grid_unit (LenghtUnit): Information on how lenght is reduced (Deafult: ANGSTROM)
         """
-        Rosenfeld.__init__(self, N, R, grid_unit=grid_unit)
+        Rosenfeld.__init__(self, N, R, ms, grid_unit=grid_unit)
         self.name = "White Bear"
         self.short_name = "WB"
         self.numerator = None
@@ -478,13 +484,16 @@ class WhitebearMarkII(Whitebear):
     doi: 10.1088/0953-8984/18/37/002
     """
 
-    def __init__(self, N, R=np.array([0.5]), grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
+            N (integer): Grid size
             R (ndarray): Radius of particles
+            ms (ndarray): Segment number for all components
+            grid_unit (LenghtUnit): Information on how lenght is reduced (Deafult: ANGSTROM)
         """
-        Whitebear.__init__(self, N, R, grid_unit)
+        Whitebear.__init__(self, N, R, ms, grid_unit)
         self.name = "White Bear Mark II"
         self.short_name = "WBII"
         self.phi2_div3 = None

@@ -52,6 +52,34 @@ class Bulk(object):
         self.mu_scaled_beta = self.mu_ig_scaled_beta + self.mu_res_scaled_beta
         self.real_mu = functional.thermo.chemical_potential_tv(self.temperature, volume=1.0, n=left_state.partial_density())
 
+        # Test
+        # mu_res_left, = functional.thermo.chemical_potential_tv(self.temperature, volume=left_state.v, n=left_state.x, property_flag="R")
+        # mu_res_left /= (self.temperature*functional.thermo.Rgas)
+        # print("left",mu_res_left)
+        # mu_res_right, = functional.thermo.chemical_potential_tv(self.temperature, volume=right_state.v, n=right_state.x, property_flag="R")
+        # mu_res_right /= (self.temperature*functional.thermo.Rgas)
+        # print("right",mu_res_right)
+        # print("Thermopack mu_res", mu_res_right, self.mu_res_scaled_beta,
+        #       mu_res_right - self.mu_res_scaled_beta)
+
+        # a_hs, a_hs_n, = functional.thermo.a_hard_sphere(self.temperature, volume=left_state.v, n=left_state.x, a_n=True)
+        # a_disp, a_disp_n, = functional.thermo.a_dispersion(self.temperature, volume=left_state.v, n=left_state.x, a_n=True)
+        # mu_disp = a_disp + a_disp_n
+        # mu_hs = a_hs + a_hs_n
+        # print("left mu_disp, mu_hs", mu_disp, mu_hs)
+
+        # rho = 1.0/right_state.v
+        # a_hs, a_hs_n, = functional.thermo.a_hard_sphere(self.temperature, volume=1.0, n=right_state.partial_density(), a_n=True)
+        # a_disp, a_disp_n, = functional.thermo.a_dispersion(self.temperature, volume=1.0, n=right_state.partial_density(), a_n=True)
+        # mu_disp = a_disp + rho*a_disp_n
+        # mu_hs = a_hs + rho*a_hs_n
+        # m = functional.thermo.m[0]
+        # mu_hs *= m
+        # print("right mu_disp, mu_hs", mu_disp, mu_hs, mu_disp + mu_hs)
+        # print("right mu_chain", mu_res_right - mu_disp - mu_hs)
+        # print("m",m, self.mu_res_scaled_beta)
+        # sys.exit()
+
     @property
     def red_pressure_right(self):
         # Calculate reduced pressure
