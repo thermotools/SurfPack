@@ -25,7 +25,7 @@ temperatures["0.6"] = {"T_star": 0.6, "filename": "T06.csv"}
 temperatures["0.65"] = {"T_star": 0.6415, "filename": "T065.csv"}
 temperatures["0.7"] = {"T_star": 0.69, "filename": "T07.csv"}
 # Select temperature:
-temperature = temperatures["0.56"]
+temperature = temperatures["0.7"]
 
 # Set up thermopack and equilibrium state
 thermopack = ljs_uv()
