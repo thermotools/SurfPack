@@ -327,8 +327,6 @@ class pc_saft(saft_dispersion):
                         f_chain = rho_j*(np.log(rho_j) - 1.0)
                         f_chain -= rho_j*(lng_jj + np.log(lambda_hc[j]) - 1.0)
                         f[i] += (self.thermo.m[j]-1.0)*f_chain
-                        # if i == 512:
-                        #     print("f: rho_j",dens.n[self.rho_hc_name][0, i], f[i])
 
         return f
 
@@ -355,8 +353,6 @@ class pc_saft(saft_dispersion):
                         rho_j = dens.rho.densities[j][i]
                         lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_n=True)
                         lng_jj_n /= (NA*self.grid_reducing_lenght**3) # Reducing unit
-                        # if i == 512:
-                        #     print("diff: rho_j",dens.n[self.rho_hc_name][0, i], lng_jj)
                         # Contribution not to be convolved:
                         self.mu_of_rho[i, j] += (self.thermo.m[j]-1.0)*(np.log(rho_j) - lng_jj - np.log(lambda_hc[j]) + 1.0)
                         # Convolved contributions:
@@ -428,7 +424,7 @@ class pc_saft(saft_dispersion):
         bd (bulk_weighted_densities): bulk_weighted_densities
         only_hs_system (bool): Only calculate for hs-system
         """
-        phi, dphidn = saft_dispersion.bulk_functional_with_differentials(self, bd)
+        phi, dphidn = saft_dispersion.bulk_functional_with_differentials(self, bd, only_hs_system)
         if not only_hs_system and np.any(self.chain_functional_active):
             rho_vec = bd.rho_i
             rho_mix = np.sum(rho_vec)
@@ -487,7 +483,7 @@ class pc_saft(saft_dispersion):
             lng, lng_t, lng_v, lng_n, lng_tt, lng_tv, lng_vv, lng_tn, lng_vn, lng_nn = self.thermo.lng_ii(
                 self.T, V, n, 1, lng_t=True, lng_v=True, lng_n=True, lng_tt=True, lng_vv=True,
                 lng_tv=True, lng_tn=True, lng_vn=True, lng_nn=True)
-
+            print("lng",lng)
             eps = 1.0e-5
             dT = self.T*eps
             lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T + dT, V, n, 1, lng_t=True, lng_v=True, lng_n=True)

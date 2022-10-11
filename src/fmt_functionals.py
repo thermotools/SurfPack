@@ -36,6 +36,10 @@ class bulk_weighted_densities:
         print("n_1: ", self.n[1])
         print("n_2: ", self.n[2])
         print("n_3: ", self.n[3])
+        print("dn_0_drho: ", self.dndrho[0, :])
+        print("dn_1_drho: ", self.dndrho[1, :])
+        print("dn_2_drho: ", self.dndrho[2, :])
+        print("dn_3_drho: ", self.dndrho[3, :])
 
 
 class Rosenfeld:

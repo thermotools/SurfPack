@@ -380,7 +380,6 @@ class CompWeightedDifferentials():
         if functional.mu_of_rho is not None:
             self.mu_of_rho[:] = functional.mu_of_rho[:, ic]
 
-
     def print(self, index=None):
         """
         """
@@ -462,7 +461,6 @@ class Convolver(object):
                 self.comp_wfs[i][wfun].generate_fourier_weights(grid, R[i], R_T[i])
             self.comp_weighted_densities.append(WeightedDensities(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
             self.comp_differentials.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
-
 
         # Overall weighted densities
         self.weighted_densities = WeightedDensitiesMaster(n_grid=grid.n_grid, wfs=functional.wf, nc=functional.thermo.nc)
