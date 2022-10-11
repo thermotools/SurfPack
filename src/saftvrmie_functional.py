@@ -29,6 +29,32 @@ class saftvrqmie_functional(saft_dispersion):
                                  grid_unit=grid_unit)
         self.name = "SAFTVRQ-MIE"
         self.short_name = "SVRQM"
+        # Set up non-additive correction
+        self.na_enabled = False
+        self.delta_ij = None
+        self.delta_T_ij = None
+        self.d_ij = None
+        self.d_T_ij = None
+        if svrqm.nc > 1:
+            _, self.na_enabled = svrqm.test_fmt_compatibility()
+        if self.na_enabled:
+            self.d_ij = np.zeors((svrqm.nc, svrqm.nc))
+            self.delta_ij = np.zeors((svrqm.nc, svrqm.nc))
+            self.d_T_ij = np.zeors((svrqm.nc, svrqm.nc))
+            self.delta_T_ij = np.zeors((svrqm.nc, svrqm.nc))
+            for i in range(svrqm.nc):
+                self.d_ij[i,i] = self.d_hs[i]
+                self.d_T_ij[i,i] = self.d_T_hs[i]
+                self.delta_ij[i,i] = self.d_ij[i,i]
+                self.delta_T_ij[i,i] = self.d_T_ij[i,i]
+                for j in range(i+1,svrqm.nc):
+                    self.d_ij[i,j] = 0.5*(self.d_hs[i]+self.d_hs[j])
+                    self.d_ij[j,i] = self.d_ij[i,j]
+                    self.d_T_ij[i,j] = 0.5*(self.d_T_hs[i]+self.d_T_hs[j])
+                    self.d_T_ij[j,i] = self.d_T_ij[i,j]
+                    self.delta_ij[i,j], self.delta_T_ij[i,j] = svrqm.hard_sphere_diameters_ij(i+1, j+1, self.T)
+                    self.delta_ij[j,i] = self.delta_ij[i,j]
+                    self.delta_T_ij[j,i] = self.delta_T_ij[i,j]
 
 class saftvrmie_functional(saft_dispersion):
     """

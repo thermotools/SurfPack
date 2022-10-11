@@ -50,6 +50,11 @@ class Interface(ABC):
             None
         """
         t_red = temperature/thermopack.eps_div_kb[0]
+
+        # Test functional can be used
+        is_fmt_consistent, _ = thermopack.test_fmt_compatibility()
+        if not is_fmt_consistent:
+            raise AssertionError("thermopack model not compatible with FMT")
         # Create functional
         if isinstance(thermopack, pcsaft):
             self.functional = pc_saft(n_grid, thermopack, t_red, **functional_kwargs)
@@ -620,9 +625,9 @@ class Interface(ABC):
             grid_unit = self.functional.grid_unit
         fig, ax = plt.subplots(1, 1)
         if grid_unit==LenghtUnit.REDUCED:
-            ax.set_xlabel("$z/\sigma_{11}$")
+            ax.set_xlabel(r"$z/\sigma_{11}$")
         elif grid_unit==LenghtUnit.ANGSTROM:
-            ax.set_xlabel("$z$ (Å)")
+            ax.set_xlabel(r"$z$ (Å)")
         if self.functional.grid_unit == LenghtUnit.ANGSTROM and grid_unit == LenghtUnit.REDUCED:
             len_fac = 1.0/(self.functional.thermo.sigma[0]*1e10)
         else:
@@ -810,7 +815,7 @@ class Interface(ABC):
         plt.plot([self.grid.z[-1]*len_fac], s_scaling*np.array([self.bulk.right_state.specific_excess_entropy()/self.bulk.right_state.specific_volume()]),
                  label=r"Bulk right", linestyle="None", marker="o")
         plt.ylabel(r"$s_{\rm{E}}^*$")
-        plt.xlabel("$z/\sigma$")
+        plt.xlabel(r"$z/\sigma$")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
@@ -821,7 +826,7 @@ class Interface(ABC):
         plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.specific_excess_free_energy()/self.bulk.right_state.specific_volume()]),
                  label=r"Bulk right", linestyle="None", marker="o")
         plt.ylabel(r"$a_{\rm{E}}^*$")
-        plt.xlabel("$z/\sigma$")
+        plt.xlabel(r"$z/\sigma$")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
@@ -832,7 +837,7 @@ class Interface(ABC):
         plt.plot([self.grid.z[-1]*len_fac], p_scaling*np.array([self.bulk.right_state.pressure()]),
                  label=r"Bulk right", linestyle="None", marker="o")
         plt.ylabel(r"$p^*$")
-        plt.xlabel("$z/\sigma$")
+        plt.xlabel(r"$z/\sigma$")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
@@ -852,7 +857,7 @@ class Interface(ABC):
         plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.specific_excess_enthalpy()/self.bulk.right_state.specific_volume()]),
                  label=r"Bulk vapour", linestyle="None", marker="o")
         plt.ylabel(r"$h_{\rm{E}}^*$")
-        plt.xlabel("$z/\sigma$")
+        plt.xlabel(r"$z/\sigma$")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 

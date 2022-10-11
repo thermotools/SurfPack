@@ -89,7 +89,7 @@ def test_ljs_entropy():
     # Test result
     assert(s == approx(s_num, rel=1.0e-6))
 
-def test_ljs_proporties():
+def test_ljs_properties():
     """Test ljs entropy"""
 
     domain_size=100.0
