@@ -79,17 +79,6 @@ class saft_dispersion(Whitebear):
         """
         Whitebear.differentials(self, dens)
         self.mu_of_rho.fill(0.0)
-        # All densities must be positive
-        #prdm = dens.n[self.disp_name] > 0.0  # Positive rho_disp value mask
-        #print(np.shape(dens.n[self.disp_name]))
-        #for i in range(self.nc):
-        #    np.logical_and(prdm, dens.n[self.disp_name][i, :] > 0.0, out=prdm)
-        #print(np.shape(prdm))
-        # prdm = dens.rho_disp > 0.0  # Positive rho_disp value mask
-        # for i in range(self.nc):
-        #     np.logical_and(prdm, dens.rho_disp_array[:, i] > 0.0, out=prdm)
-        # Mask for zero and negative value of rho_disp
-        #non_prdm = np.invert(prdm)
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(self.n_grid):
@@ -99,11 +88,10 @@ class saft_dispersion(Whitebear):
             a, a_n, = self.thermo.a_dispersion(
                 self.T, V, rho_thermo, a_n=True)
             self.mu_disp[i, :] = (a + rho_thermo[:]*a_n[:])
-        #self.mu_disp[non_prdm, :] = 0.0
 
     def bulk_compressibility(self, rho_b):
         """
-        Calculates the PC-SAFT compressibility.
+        Calculates the reduced compressibility.
         Multiply by rho*kB*T to get pressure.
 
         Args:
@@ -128,7 +116,7 @@ class saft_dispersion(Whitebear):
 
     def bulk_excess_chemical_potential(self, rho_b):
         """
-        Calculates the reduced HS excess chemical potential from the bulk
+        Calculates the reduced excess chemical potential from the bulk
         packing fraction.
 
         Args:
@@ -152,42 +140,6 @@ class saft_dispersion(Whitebear):
         a_n += a
         mu_ex += a_n
         return mu_ex
-
-    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
-        """
-        Calculates the functional differentials wrpt. the weighted densities
-        in the bulk phase.
-
-        Args:
-        bd (bulk_weighted_densities): bulk_weighted_densities
-        only_hs_system (bool): Only calculate for hs-system
-        """
-        phi, dphidn = Whitebear.bulk_functional_with_differentials(self, bd)
-        if not only_hs_system:
-            rho_vec = bd.rho_i
-            rho_mix = np.sum(rho_vec)
-            V = 1.0
-            rho_thermo = np.zeros_like(rho_vec)
-            rho_thermo[:] = rho_vec[:]/(NA*self.grid_reducing_lenght**3)
-            a, a_n, = self.thermo.a_dispersion(
-                self.T, V, rho_thermo, a_n=True)
-            phi += rho_mix*a
-            dphidn_comb = np.zeros(4 + self.nc)
-            dphidn_comb[:4] = dphidn
-            dphidn_comb[4:] = a + rho_thermo[:]*a_n[:]
-        else:
-            dphidn_comb = dphidn
-        return phi, dphidn_comb
-
-    def get_differential(self, i):
-        """
-        Get differential number i
-        """
-        if i <= 5:
-            d = Whitebear.get_differential(self, i)
-        else:
-            d = self.mu_disp[i-6, :]
-        return d
 
     def temperature_differential(self, dens):
         """
@@ -414,36 +366,6 @@ class pc_saft(saft_dispersion):
                     a_n = -(self.thermo.m[j]-1.0)*(rho_thermo[j]*lng_jj_n + lng_jj)
                     mu_ex += a_n
         return mu_ex
-
-    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
-        """
-        Calculates the functional differentials wrpt. the weighted densities
-        in the bulk phase.
-
-        Args:
-        bd (bulk_weighted_densities): bulk_weighted_densities
-        only_hs_system (bool): Only calculate for hs-system
-        """
-        phi, dphidn = saft_dispersion.bulk_functional_with_differentials(self, bd, only_hs_system)
-        if not only_hs_system and np.any(self.chain_functional_active):
-            rho_vec = bd.rho_i
-            rho_mix = np.sum(rho_vec)
-            V = 1.0
-            rho_thermo = np.zeros_like(rho_vec)
-            rho_thermo[:] = rho_vec[:]/(NA*self.grid_reducing_lenght**3)
-            n = np.shape(dphidn)[0]
-            dphidn_comb = np.zeros(n + self.nc)
-            dphidn_comb[:n] = dphidn
-            for j in range(self.nc):
-                if self.chain_functional_active[j]:
-                    lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=rho_thermo, i=j+1, lng_n=True)
-                    phi -= (self.thermo.m[j]-1.0)*rho_b[j]*lng_jj
-                    a_n = -(self.thermo.m[j]-1.0)*(rho_thermo[j]*lng_jj_n + lng_jj/V)
-                    dphidn_comb[n:] += a_n
-
-        else:
-            dphidn_comb = dphidn
-        return phi, dphidn_comb
 
     def temperature_differential(self, dens):
         """

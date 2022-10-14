@@ -19,11 +19,15 @@ class bulk_weighted_densities:
         """
         self.rho_i = np.zeros_like(rho_b)
         self.rho_i[:] = ms*rho_b[:]
+        nc = np.shape(rho_b)[0]
+        self.na = np.zeros((4, nc))
+        self.na[0,:] = self.rho_i
+        self.na[1,:] = R * self.rho_i
+        self.na[2,:] = 4*np.pi*R ** 2 * self.rho_i
+        self.na[3,:] = 4 * np.pi * R ** 3 * self.rho_i / 3
         self.n = np.zeros(4)
-        self.n[0] = np.sum(self.rho_i)
-        self.n[1] = np.sum(R * self.rho_i)
-        self.n[2] = 4*np.pi*np.sum(R ** 2 * self.rho_i)
-        self.n[3] = 4 * np.pi * np.sum(R ** 3 * self.rho_i) / 3
+        for i in range(4):
+            self.n[i] = np.sum(self.na[i,:])
         self.dndrho = np.zeros((4, np.shape(self.rho_i)[0]))
         self.dndrho[0, :] = ms
         self.dndrho[1, :] = ms*R
@@ -70,14 +74,12 @@ class Rosenfeld:
         self.grid_unit = grid_unit
 
         # Allocate arrays for differentials
-        self.d0 = np.zeros(N)
-        self.d1 = np.zeros(N)
-        self.d2 = np.zeros(N)
-        self.d3 = np.zeros(N)
-        self.d1v = np.zeros(N)
-        self.d2v = np.zeros(N)
-        self.d2eff = np.zeros(N)
-        self.d2veff = np.zeros(N)
+        self.d0 = np.zeros((N, self.nc))
+        self.d1 = np.zeros((N, self.nc))
+        self.d2 = np.zeros((N, self.nc))
+        self.d3 = np.zeros((N, self.nc))
+        self.d1v = np.zeros((N, self.nc))
+        self.d2v = np.zeros((N, self.nc))
         self.d_T = np.zeros(N)
         # Set up FMT weights
         self.wf = WeightFunctions()
@@ -132,8 +134,7 @@ class Rosenfeld:
             float: compressibility
         """
         bd = bulk_weighted_densities(rho_b, self.R, self.ms)
-        phi, dphidn = self.bulk_functional_with_differentials(
-            bd, only_hs_system=True)
+        phi, dphidn = self.bulk_fmt_functional_with_differentials(bd)
         beta_p_ex = - phi + np.sum(dphidn[:4] * bd.n)
         beta_p_id = bd.n[0]
         z = (beta_p_id + beta_p_ex)/bd.n[0]
@@ -152,15 +153,14 @@ class Rosenfeld:
 
         """
         bd = bulk_weighted_densities(rho_b, self.R, self.ms)
-        phi, dphidn = self.bulk_functional_with_differentials(
-            bd, only_hs_system=True)
+        phi, dphidn = self.bulk_fmt_functional_with_differentials(bd)
         mu_ex = np.zeros(self.nc)
         for i in range(self.nc):
             mu_ex[i] = np.sum(dphidn[:4] * bd.dndrho[:, i])
 
         return mu_ex
 
-    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
+    def bulk_fmt_functional_with_differentials(self, bd):
         """
         Calculates the functional differentials wrpt. the weighted densities
         in the bulk phase.
@@ -190,19 +190,19 @@ class Rosenfeld:
         diff (array_like): Functional differentials
 
         """
-        self.d0[:] = -np.log(dens.n3neg[:])
-        self.d1[:] = dens.n2[:] / dens.n3neg[:]
-        self.d2[:] = dens.n1[:] / dens.n3neg[:] + \
+        self.d0[:, 0] = -np.log(dens.n3neg[:])
+        self.d1[:, 0] = dens.n2[:] / dens.n3neg[:]
+        self.d2[:, 0] = dens.n1[:] / dens.n3neg[:] + \
             (dens.n2[:] ** 2 - dens.n2v2[:]) / (8 * np.pi * dens.n3neg2[:])
-        self.d3[:] = dens.n0[:] / dens.n3neg[:] + (dens.n1[:] * dens.n2[:] - dens.n1v[:] * dens.n2v[:]) / \
+        self.d3[:, 0] = dens.n0[:] / dens.n3neg[:] + (dens.n1[:] * dens.n2[:] - dens.n1v[:] * dens.n2v[:]) / \
             dens.n3neg2[:] + (dens.n2[:] ** 3 - 3 * dens.n2[:] * dens.n2v2[:]) / \
             (12 * np.pi * dens.n3neg[:] ** 3)
-        self.d1v[:] = -dens.n2v[:] / dens.n3neg[:]
-        self.d2v[:] = -(dens.n1v[:] / dens.n3neg[:] + dens.n2[:]
+        self.d1v[:, 0] = -dens.n2v[:] / dens.n3neg[:]
+        self.d2v[:, 0] = -(dens.n1v[:] / dens.n3neg[:] + dens.n2[:]
                         * dens.n2v[:] / (4 * np.pi * dens.n3neg2[:]))
 
-        # Combining differentials
-        self.combine_differentials()
+        # Distribute differentials
+        self.distribute_component_differentials()
 
     def temperature_differential(self, dens):
         """
@@ -217,133 +217,19 @@ class Rosenfeld:
         self.d_T.fill(0.0)
         return self.d_T
 
-    def combine_differentials(self):
+    def distribute_component_differentials(self):
         """
-        Combining differentials to reduce number of convolution integrals
+        Copy differentials to component differentials
         """
-        self.d2eff[:] = self.d0[:] / (4 * np.pi * self.R ** 2) + \
-            self.d1[:] / (4 * np.pi * self.R) + self.d2[:]
-        self.d2veff[:] = self.d1v[:] / (4 * np.pi * self.R) + self.d2v[:]
-
-    def get_differential(self, i):
-        """
-        Get differential number i
-        """
-        if i == 0:
-            d = self.d0
-        elif i == 1:
-            d = self.d1
-        elif i == 2:
-            d = self.d2
-        elif i == 3:
-            d = self.d3
-        elif i == 4:
-            d = self.d1v
-        elif i == 5:
-            d = self.d2v
-        else:
-            raise ValueError("get_differential: Index out of bounds")
-        return d
-
-    def get_bulk_correlation(self, rho_b, only_hs_system=False):
-        """
-        Intended only for debugging
-        Args:
-            rho_b (np.ndarray): Bulk densities
-            only_hs_system (bool): Only calculate for hs-system
-
-        Return:
-            corr (np.ndarray): One particle correlation function
-        """
-        bd = bulk_weighted_densities(rho_b, self.R, self.ms)
-        _, dphidn = self.bulk_functional_with_differentials(
-            bd, only_hs_system=only_hs_system)
-        corr = np.zeros(self.nc)
-        for i in range(self.nc):
-            corr[i] = dphidn[0] + \
-                self.R[i] * dphidn[1] + \
-                (4 * np.pi * self.R[i] ** 2) * dphidn[2] + \
-                4 * np.pi * self.R[i] ** 3 * dphidn[3] / 3
-            corr[i] *= self.ms[i]
-            if np.shape(dphidn)[0] > 4:
-                corr[i] += dphidn[4+i]
-
-        corr = -corr
-        return corr
-
-    def test_differentials(self, dens0):
-        """
-
-        Args:
-            dens0 (weighted_densities_1D): Weighted densities
-
-        """
-        print("Testing functional " + self.name)
-        self.differentials(dens0)
-        #F0 = self.excess_free_energy(dens0)
-        eps = 1.0e-5
-        ni0 = np.zeros_like(dens0.n0)
-        dni = np.zeros_like(dens0.n0)
-        for i in range(dens0.n_max_test):
-            ni0[:] = dens0.get_density(i)
-            dni[:] = eps * ni0[:]
-            dens0.set_density(i, ni0 - dni)
-            dens0.update_utility_variables()
-            F1 = self.excess_free_energy(dens0)
-            dens0.set_density(i, ni0 + dni)
-            dens0.update_utility_variables()
-            F2 = self.excess_free_energy(dens0)
-            dens0.set_density(i, ni0)
-            dens0.update_utility_variables()
-            dFdn_num = (F2 - F1) / (2 * dni)
-            print("Differential: ", i, dFdn_num, self.get_differential(i), (dFdn_num -self.get_differential(i))/self.get_differential(i))
-
-    def test_bulk_differentials(self, rho_b):
-        """
-
-        Args:
-            rho_b (np.ndarray): Bulk densities
-
-        """
-        print("Testing functional " + self.name)
-        bd0 = bulk_weighted_densities(rho_b, self.R, self.ms)
-        phi, dphidn = self.bulk_functional_with_differentials(bd0)
-
-        print("HS functional differentials:")
-        for i in range(4):
-            bd = bulk_weighted_densities(rho_b, self.R, self.ms)
-            eps = 1.0e-5 * bd.n[i]
-            bd.n[i] += eps
-            phi2, dphidn2 = self.bulk_functional_with_differentials(bd)
-            bd = bulk_weighted_densities(rho_b, self.R, self.ms)
-            eps = 1.0e-5 * bd.n[i]
-            bd.n[i] -= eps
-            phi1, dphidn1 = self.bulk_functional_with_differentials(bd)
-            dphidn_num = (phi2 - phi1) / (2 * eps)
-            print("Differential: ", i, dphidn_num, dphidn[i])
-
-        mu_ex = self.bulk_excess_chemical_potential(rho_b)
-        rho_b_local = np.zeros_like(rho_b)
-        print("Functional differentials:")
-        for i in range(self.nc):
-            eps = 1.0e-5 * rho_b[i]
-            rho_b_local[:] = rho_b[:]
-            rho_b_local[i] += eps
-            bd = bulk_weighted_densities(rho_b_local, self.R, self.ms)
-            phi2, dphidn1 = self.bulk_functional_with_differentials(bd)
-            phi2_hs, _ = self.bulk_functional_with_differentials(
-                bd, only_hs_system=True)
-            rho_b_local[:] = rho_b[:]
-            rho_b_local[i] -= eps
-            bd = bulk_weighted_densities(rho_b_local, self.R, self.ms)
-            phi1, dphidn1 = self.bulk_functional_with_differentials(bd)
-            phi1_hs, _ = self.bulk_functional_with_differentials(
-                bd, only_hs_system=True)
-            dphidrho_num_no_hs = (phi2 - phi2_hs - phi1 + phi1_hs) / (2 * eps)
-            dphidrho_num = (phi2 - phi1) / (2 * eps)
-            if np.shape(dphidn)[0] > 4:
-                print("Differential: ", "[4:]", dphidrho_num_no_hs, np.sum(dphidn[4:]), (dphidrho_num_no_hs - np.sum(dphidn[4:]))/np.sum(dphidn[4:]))
-            print("Chemical potential comp.: ", i, dphidrho_num, mu_ex[i])
+        for i in range(self.nc-1,0,-1):
+            print(i)
+            self.d0[:, i] = self.d0[:, 0]
+            self.d1[:, i] = self.d1[:, 0]
+            self.d2[:, i] = self.d2[:, 0]
+            self.d3[:, i] = self.d3[:, 0]
+            self.d1v[:, i] = self.d1v[:, 0]
+            self.d2v[:, i] = self.d2v[:, 0]
+            sys.exit()
 
 
     def test_eos_differentials(self, V, n):
@@ -408,7 +294,7 @@ class Whitebear(Rosenfeld):
 
         return f
 
-    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
+    def bulk_fmt_functional_with_differentials(self, bd):
         """
         Calculates the functional differentials wrpt. the weighted densities
         in the bulk phase.
@@ -455,28 +341,30 @@ class Whitebear(Rosenfeld):
         pn3m = dens.n3 > 0.0  # Positive value n3 mask
         non_pn3m = np.invert(pn3m)  # Mask for zero and negative value of n3
 
-        self.d0[pn3m] = -dens.logn3neg[pn3m]
-        self.d1[pn3m] = dens.n2[pn3m] / dens.n3neg[pn3m]
-        self.d2[pn3m] = dens.n1[pn3m] / dens.n3neg[pn3m] + 3 * (dens.n2[pn3m] ** 2 - dens.n2v2[pn3m]) * \
+        self.d0[pn3m, 0] = -dens.logn3neg[pn3m]
+        self.d1[pn3m, 0] = dens.n2[pn3m] / dens.n3neg[pn3m]
+        self.d2[pn3m, 0] = dens.n1[pn3m] / dens.n3neg[pn3m] + 3 * (dens.n2[pn3m] ** 2 - dens.n2v2[pn3m]) * \
             self.numerator[pn3m] / self.denumerator[pn3m]
-        self.d3[pn3m] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
+        self.d3[pn3m, 0] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
             (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) / dens.n3neg2[pn3m] + \
             (dens.n2[pn3m] ** 3 - 3 * dens.n2[pn3m] * dens.n2v2[pn3m]) * \
             ((dens.n3[pn3m] * (5 - dens.n3[pn3m]) - 2) /
              (self.denumerator[pn3m] * dens.n3neg[pn3m]) - dens.logn3neg[pn3m] / (
                 18 * np.pi * dens.n3[pn3m] ** 3))
-        self.d1v[pn3m] = -dens.n2v[pn3m] / dens.n3neg[pn3m]
-        self.d2v[pn3m] = -dens.n1v[pn3m] / dens.n3neg[pn3m] - 6 * dens.n2[pn3m] * dens.n2v[pn3m] * \
+        self.d1v[pn3m, 0] = -dens.n2v[pn3m] / dens.n3neg[pn3m]
+        self.d2v[pn3m, 0] = -dens.n1v[pn3m] / dens.n3neg[pn3m] - 6 * dens.n2[pn3m] * dens.n2v[pn3m] * \
             self.numerator[pn3m] / self.denumerator[pn3m]
 
-        # Combining differentials
-        self.combine_differentials()
-
         # Set non positive n3 grid points to zero
-        self.d3[non_pn3m] = 0.0
-        self.d2eff[non_pn3m] = 0.0
-        self.d2veff[non_pn3m] = 0.0
+        self.d0[non_pn3m, 0] = 0.0
+        self.d1[non_pn3m, 0] = 0.0
+        self.d2[non_pn3m, 0] = 0.0
+        self.d3[non_pn3m, 0] = 0.0
+        self.d1v[non_pn3m, 0] = 0.0
+        self.d2v[non_pn3m, 0] = 0.0
 
+        # Distribute differentials
+        self.distribute_component_differentials()
 
 class WhitebearMarkII(Whitebear):
     """
@@ -583,7 +471,7 @@ class WhitebearMarkII(Whitebear):
              (bd.n[3] ** 2 * bd.n[3]) - 4 / bd.n[3] ** 2 + 2 / bd.n[3] + 2)
         return phi2_div3, dphi2dn3_div3, phi3_div3, dphi3dn3_div3
 
-    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
+    def bulk_fmt_functional_with_differentials(self, bd):
         """
         Calculates the functional differentials wrpt. the weighted densities
         in the bulk phase.
@@ -634,78 +522,35 @@ class WhitebearMarkII(Whitebear):
             self.denumerator = np.zeros_like(dens.n0)
         self.denumerator[:] = (24.0 * np.pi * dens.n3neg2[:])
 
-        self.d0[pn3m] = -dens.logn3neg[pn3m]
-        self.d1[pn3m] = dens.n2[pn3m] * \
+        self.d0[pn3m, 0] = -dens.logn3neg[pn3m]
+        self.d1[pn3m, 0] = dens.n2[pn3m] * \
             (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m]
-        self.d2[pn3m] = dens.n1[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] + 3 * (
+        self.d2[pn3m, 0] = dens.n1[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] + 3 * (
             dens.n2[pn3m] ** 2 - dens.n2v2[pn3m]) * self.numerator[pn3m] / self.denumerator[pn3m]
-        self.d3[pn3m] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
+        self.d3[pn3m, 0] = dens.n0[pn3m] / dens.n3neg[pn3m] + \
             (dens.n1[pn3m] * dens.n2[pn3m] - dens.n1v[pn3m] * dens.n2v[pn3m]) * \
             ((1 + self.phi2_div3[pn3m]) / dens.n3neg2[pn3m] +
              self.dphi2dn3_div3[pn3m] / dens.n3neg[pn3m]) + \
             (dens.n2[pn3m] ** 3 - 3 * dens.n2[pn3m] * dens.n2v2[pn3m]) / self.denumerator[pn3m] * \
             (-self.dphi3dn3_div3[pn3m] + 2 *
              self.numerator[pn3m] / dens.n3neg[pn3m])
-        self.d1v[pn3m] = -dens.n2v[pn3m] * \
+        self.d1v[pn3m, 0] = -dens.n2v[pn3m] * \
             (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m]
-        self.d2v[pn3m] = -dens.n1v[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] \
+        self.d2v[pn3m, 0] = -dens.n1v[pn3m] * (1 + self.phi2_div3[pn3m]) / dens.n3neg[pn3m] \
             - 6 * dens.n2[pn3m] * dens.n2v[pn3m] * \
             self.numerator[pn3m] / self.denumerator[pn3m]
 
-        # Combining differentials
-        self.combine_differentials()
-
         # Set non positive n3 grid points to zero
-        self.d3[non_pn3m] = 0.0
-        self.d2eff[non_pn3m] = 0.0
-        self.d2veff[non_pn3m] = 0.0
+        self.d0[non_pn3m, 0] = 0.0
+        self.d1[non_pn3m, 0] = 0.0
+        self.d2[non_pn3m, 0] = 0.0
+        self.d3[non_pn3m, 0] = 0.0
+        self.d1v[non_pn3m, 0] = 0.0
+        self.d2v[non_pn3m, 0] = 0.0
+
+        # Distribute differentials
+        self.distribute_component_differentials()
 
 
 if __name__ == "__main__":
     pass
-    # Model testing
-
-    # pcs = get_thermopack_model("PC-SAFT")
-    # pcs.init("C1")
-    # PCS_functional = pc_saft(1, pcs, T_red=110.0/165.0)
-    # print(PCS_functional.d_hs[0], PCS_functional.T)
-    # dens_pcs = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
-
-    # v = pcs.specific_volume(PCS_functional.T,
-    #                         1.0e6,
-    #                         np.array([1.0]),
-    #                         pcs.LIQPH)
-    # rho = (NA * PCS_functional.d_hs[0] ** 3)/v
-    # PCS_functional.test_bulk_differentials(rho)
-    # dens = weighted_densities_pc_saft_1D(1, PCS_functional.R, ms=[1.0])
-    # dens.set_testing_values(rho)
-    # # dens.print(print_utilities=True)
-    # PCS_functional.test_differentials(dens)
-    # corr = PCS_functional.get_bulk_correlation(rho)
-    # mu = PCS_functional.bulk_excess_chemical_potential(rho)
-    # print("corr, mu", corr, mu)
-
-    # Hard sphere functionals
-    # dens = weighted_densities_1D(1, 0.5)
-    # dens.set_testing_values()
-    # dens.print(print_utilities=True)
-    #
-    # RF_functional = Rosenfeld(N=1)
-    # corr = RF_functional.get_bulk_correlation(np.array([rho]))
-    # mu = RF_functional.bulk_excess_chemical_potential(np.array([rho]))
-    # print("corr, mu", corr, mu)
-
-    # RF_functional.test_differentials(dens)
-    # WB_functional = Whitebear(N=1)
-    # WB_functional.test_differentials(dens)
-    # WBII_functional = WhitebearMarkII(N=1)
-    # WBII_functional.test_differentials(dens)
-
-    # rho = np.array([0.5, 0.1])
-    # R = np.array([0.5, 0.3])
-    # RF_functional = Rosenfeld(N=1, R=R)
-    # RF_functional.test_bulk_differentials(rho)
-    # WB_functional = Whitebear(N=1, R=R)
-    # WB_functional.test_bulk_differentials(rho)
-    # WBII_functional = WhitebearMarkII(N=1, R=R)
-    # WBII_functional.test_bulk_differentials(rho)

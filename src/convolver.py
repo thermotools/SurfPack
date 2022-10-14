@@ -61,15 +61,6 @@ class WeightedDensities():
         # Pointer to local densities
         self.rho = None
 
-    # def update_utility_variables(self):
-    #     """
-    #     """
-    #     self.n3neg[:] = 1.0 - self.n3[:]
-    #     self.n3neg2[:] = self.n3neg[:] ** 2
-    #     self.n2v2[:] = self.n2v[:] ** 2
-    #     self.logn3neg[:] = np.log(self.n3neg[:])
-    #     self.n32[:] = self.n3[:] ** 2
-
     def update_after_convolution(self):
         """
         """
@@ -78,15 +69,6 @@ class WeightedDensities():
             if wd in self.wfs.fmt_aliases:
                 self.n[wd][:] *= self.ms
 
-        # self.n2[:] *= self.ms
-        # self.n3[:] *= self.ms
-        # self.n2v[:] *= self.ms
-        # Get remaining densities from convoultion results
-        # self.n1v[:] = self.n2v[:] / (4 * np.pi * self.R)
-        # self.n0[:] = self.n2[:] / (4 * np.pi * self.R ** 2)
-        # self.n1[:] = self.n2[:] / (4 * np.pi * self.R)
-    #     self.update_utility_variables()
-
     def __getitem__(self, wd):
         return self.n[wd]
 
@@ -94,12 +76,6 @@ class WeightedDensities():
         """
         Set weights to zero
         """
-        # self.n2[:] = 0.0
-        # self.n3[:] = 0.0
-        # self.n2v[:] = 0.0
-        # self.n0[:] = 0.0
-        # self.n1[:] = 0.0
-        # self.n1v[:] = 0.0
         for wd in self.n:
             self.n[wd].fill(0.0)
         # Need access to local density in some functionals:
@@ -109,12 +85,6 @@ class WeightedDensities():
         """
         Add weights
         """
-        # self.n2[:] += other.n2[:]
-        # self.n3[:] += other.n3[:]
-        # self.n2v[:] += other.n2v[:]
-        # self.n0[:] += other.n0[:]
-        # self.n1[:] += other.n1[:]
-        # self.n1v[:] += other.n1v[:]
         # Add FMT densities
         for wd in self.n:
             if wd in self.wfs.fmt_aliases:
@@ -156,21 +126,6 @@ class WeightedDensities():
             else:
                 print(wd.replace("w", "n") +": ", self.n[wd][index])
 
-
-        # if print_utilities:
-        #     if index is None:
-        #         print("n3neg: ", self.n3neg)
-        #         print("n3neg2: ", self.n3neg2)
-        #         print("n2v2: ", self.n2v2)
-        #         print("logn3neg: ", self.logn3neg)
-        #         print("n32: ", self.n32)
-        #     else:
-        #         print("n3neg: ", self.n3neg[index])
-        #         print("n3neg2: ", self.n3neg2[index])
-        #         print("n2v2: ", self.n2v2[index])
-        #         print("logn3neg: ", self.logn3neg[index])
-        #         print("n32: ", self.n32[index])
-
     def plot(self, r, show=True):
         """
 
@@ -198,11 +153,31 @@ class WeightedDensities():
             plt.show()
         return ax1, ax2
 
+    def get_fmt_densities(self, index):
+        """
+
+        Args:
+            index (int): Grid position
+        Returns:
+            np.ndarray: Array of FMT weighted densities
+        """
+
+        return np.array([self.n0[index],
+                         self.n1[index],
+                         self.n2[index],
+                         self.n3[index],
+                         self.n1v[index],
+                         self.n2v[index]])
+
 class WeightedDensitiesMaster(WeightedDensities):
     """
     """
 
-    def __init__(self, n_grid: int, wfs: WeightFunctions, nc: int):
+    def __init__(self,
+                 n_grid: int,
+                 wfs: WeightFunctions,
+                 nc: int,
+                 comp_weighted_densities: WeightedDensities):
         """
 
         Args:
@@ -211,6 +186,8 @@ class WeightedDensitiesMaster(WeightedDensities):
             ms:
         """
         WeightedDensities.__init__(self, n_grid, wfs, ms=1.0)
+        # Need access to component weigthed densities
+        self.comp_weighted_densities = comp_weighted_densities
         # Utilities
         self.n3neg = np.zeros(n_grid)
         self.n3neg2 = np.zeros(n_grid)
@@ -287,17 +264,8 @@ class CompWeightedDifferentials():
         self.d3 = np.zeros(n_grid)
         self.d1v = np.zeros(n_grid)
         self.d2v = np.zeros(n_grid)
-        # Utilities
-        self.d2eff = np.zeros(n_grid)
-        self.d2veff = np.zeros(n_grid)
 
         # Convolved properties
-        # self.d3_conv = np.zeros(n_grid)
-        # self.d2eff_conv = np.zeros(n_grid)
-        # self.d2veff_conv = np.zeros(n_grid)
-        # self.d_conv["w3"] = self.d3_conv
-        # self.d_conv["w2eff"] = self.d2eff_conv
-        # self.d_conv["wv2eff"] = self.d2veff_conv
         self.d_conv = {} # Effective results
         self.d_eff = np.zeros(n_grid)
 
@@ -363,14 +331,12 @@ class CompWeightedDifferentials():
         Returns:
 
         """
-        self.d0[:] = self.ms*functional.d0[:]
-        self.d1[:] = self.ms*functional.d1[:]
-        self.d2[:] = self.ms*functional.d2[:]
-        self.d3[:] = self.ms*functional.d3[:]
-        self.d1v[:] = self.ms*functional.d1v[:]
-        self.d2v[:] = self.ms*functional.d2v[:]
-        self.d2eff[:] = self.ms*functional.d2eff[:]
-        self.d2veff[:] = self.ms*functional.d2veff[:]
+        self.d0[:] = self.ms*functional.d0[:, ic]
+        self.d1[:] = self.ms*functional.d1[:, ic]
+        self.d2[:] = self.ms*functional.d2[:, ic]
+        self.d3[:] = self.ms*functional.d3[:, ic]
+        self.d1v[:] = self.ms*functional.d1v[:, ic]
+        self.d2v[:] = self.ms*functional.d2v[:, ic]
 
         for wf in self.wfs:
             alias = self.wfs[wf].alias
@@ -389,13 +355,6 @@ class CompWeightedDifferentials():
                 print(wd.replace("w", "d") +": ", self.d[wd][:])
             else:
                 print(wd.replace("w", "d") +": ", self.d[wd][index])
-        print("d2_eff: ", self.d2eff)
-        print("d2v_eff: ", self.d2veff)
-        # print("\nConvolution results")
-        # print("d2eff_conv: ", self.d2eff_conv)
-        # print("d3_conv: ", self.d3_conv)
-        # print("d2veff_conv: ", self.d2veff_conv)
-        # print("corr: ", self.corr)
 
     # def plot(self, r, show=True):
     #     """
@@ -463,8 +422,14 @@ class Convolver(object):
             self.comp_differentials.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
 
         # Overall weighted densities
-        self.weighted_densities = WeightedDensitiesMaster(n_grid=grid.n_grid, wfs=functional.wf, nc=functional.thermo.nc)
-        self.weighted_densities_T = WeightedDensitiesMaster(n_grid=grid.n_grid, wfs=functional.wf, nc=functional.thermo.nc)
+        self.weighted_densities = WeightedDensitiesMaster(n_grid=grid.n_grid,
+                                                          wfs=functional.wf,
+                                                          nc=functional.thermo.nc,
+                                                          comp_weighted_densities=self.comp_weighted_densities)
+        self.weighted_densities_T = WeightedDensitiesMaster(n_grid=grid.n_grid,
+                                                            wfs=functional.wf,
+                                                            nc=functional.thermo.nc,
+                                                            comp_weighted_densities=self.comp_weighted_densities)
 
     def convolve_density_profile(self, rho):
         """
@@ -520,11 +485,6 @@ class Convolver(object):
                                                                 self.comp_differentials[i].d_conv[wf])
             # Calculate one-particle correlation
             self.comp_differentials[i].update_after_convolution()
-
-        # print("d2eff",self.comp_differentials[0].d_conv["w2"])
-        # print("d3",self.comp_differentials[0].d_conv["w3"])
-        # print("d2veff",self.comp_differentials[0].d_conv["wv2"])
-        # print("d_disp",self.comp_differentials[0].d_conv["w_disp"])
 
     def update_functional_differentials(self):
         """

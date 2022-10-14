@@ -168,32 +168,6 @@ class ljs_wca_base_functional(saft_dispersion):
         mu_ex += a_n
         return mu_ex
 
-    def bulk_functional_with_differentials(self, bd, only_hs_system=False):
-        """
-        Calculates the functional differentials wrpt. the weighted densities
-        in the bulk phase.
-
-        Args:
-        bd (bulk_weighted_densities): bulk_weighted_densities
-        only_hs_system (bool): Only calculate for hs-system
-        """
-        phi, dphidn = saft_dispersion.bulk_functional_with_differentials(self, bd, only_hs_system=only_hs_system)
-        if not only_hs_system:
-            rho_vec = bd.rho_i
-            rho_mix = np.sum(rho_vec)
-            V = 1.0
-            rho_thermo = np.zeros_like(rho_vec)
-            rho_thermo[:] = rho_vec[:]/(NA*self.grid_reducing_lenght**3)
-            a, a_n, = self.thermo.a_soft_repulsion(
-                self.T, V, rho_thermo, a_n=True)
-            phi += rho_mix*a
-            dphidn_comb = np.zeros(np.shape(dphidn)[0] + self.nc)
-            dphidn_comb[:np.shape(dphidn)[0]] = dphidn
-            dphidn_comb[np.shape(dphidn)[0]:] = a + rho_thermo[:]*a_n[:]
-        else:
-            dphidn_comb = dphidn
-        return phi, dphidn_comb
-
     def temperature_differential(self, dens):
         """
         Calculates the functional differentials wrpt. temperature
