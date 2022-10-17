@@ -87,7 +87,7 @@ class saft_dispersion(Whitebear):
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_n, = self.thermo.a_dispersion(
                 self.T, V, rho_thermo, a_n=True)
-            self.mu_disp[i, :] = (a + rho_thermo[:]*a_n[:])
+            self.mu_disp[i, :] = (a + np.sum(rho_thermo)*a_n[:])
 
     def bulk_compressibility(self, rho_b):
         """
@@ -136,7 +136,7 @@ class saft_dispersion(Whitebear):
         n = rho_thermo
         a, a_n, = self.thermo.a_dispersion(
             self.T, V, n, a_n=True)
-        a_n *= n
+        a_n *= rho_mix
         a_n += a
         mu_ex += a_n
         return mu_ex

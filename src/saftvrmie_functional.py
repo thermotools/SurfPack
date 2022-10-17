@@ -2,6 +2,7 @@
 import numpy as np
 import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from constants import NA, RGAS, LenghtUnit
+from fmt_functionals import bulk_weighted_densities
 from pcsaft_functional import saft_dispersion
 from pyctp.saftvrmie import saftvrmie
 from pyctp.saftvrqmie import saftvrqmie
@@ -40,12 +41,12 @@ class saftvrqmie_functional(saft_dispersion):
         if svrqm.nc > 1:
             _, self.na_enabled = svrqm.test_fmt_compatibility()
         if self.na_enabled:
-            self.d_ij = np.zeors((svrqm.nc, svrqm.nc))
-            self.delta_ij = np.zeors((svrqm.nc, svrqm.nc))
-            self.d_T_ij = np.zeors((svrqm.nc, svrqm.nc))
-            self.delta_T_ij = np.zeors((svrqm.nc, svrqm.nc))
-            self.mu_ij = np.zeors((svrqm.nc, svrqm.nc))
-            self.mu_ij_T = np.zeors((svrqm.nc, svrqm.nc))
+            self.d_ij = np.zeros((svrqm.nc, svrqm.nc))
+            self.delta_ij = np.zeros((svrqm.nc, svrqm.nc))
+            self.d_T_ij = np.zeros((svrqm.nc, svrqm.nc))
+            self.delta_T_ij = np.zeros((svrqm.nc, svrqm.nc))
+            self.mu_ij = np.zeros((svrqm.nc, svrqm.nc))
+            self.mu_ij_T = np.zeros((svrqm.nc, svrqm.nc))
             for i in range(svrqm.nc):
                 self.d_ij[i,i] = self.d_hs[i]
                 self.d_T_ij[i,i] = self.d_T_hs[i]
@@ -58,12 +59,21 @@ class saftvrqmie_functional(saft_dispersion):
                     self.d_ij[j,i] = self.d_ij[i,j]
                     self.d_T_ij[i,j] = 0.5*(self.d_T_hs[i]+self.d_T_hs[j])
                     self.d_T_ij[j,i] = self.d_T_ij[i,j]
-                    self.delta_ij[i,j], self.delta_T_ij[i,j] = svrqm.hard_sphere_diameters_ij(i+1, j+1, self.T)
+                    self.delta_ij[i,j], self.delta_T_ij[i,j] = svrqm.hard_sphere_diameter_ij(i+1, j+1, self.T)
                     self.delta_ij[j,i] = self.delta_ij[i,j]
                     self.delta_T_ij[j,i] = self.delta_T_ij[i,j]
                     self.mu_ij[i,j] = self.d_hs[i]*self.d_hs[j]/(self.d_hs[i]+self.d_hs[j])
+                    self.mu_ij[j,i] = self.mu_ij[i,j]
                     self.mu_ij_T[i,j] = (self.d_T_hs[i]*self.d_hs[j] + self.d_hs[i]*self.d_T_hs[j])/(self.d_hs[i]+self.d_hs[j]) \
                         - (self.d_T_hs[i] + self.d_T_hs[j] )*self.mu_ij[i,j]/(self.d_hs[i]+self.d_hs[j])
+                    self.mu_ij_T[j,i] = self.mu_ij_T[i,j]
+
+            self.d_ij /= self.grid_reducing_lenght
+            self.delta_ij /= self.grid_reducing_lenght
+            self.d_T_ij /= self.grid_reducing_lenght
+            self.delta_T_ij /= self.grid_reducing_lenght
+            self.mu_ij /= self.grid_reducing_lenght
+            self.mu_ij_T /= self.grid_reducing_lenght
 
     def excess_free_energy(self, dens):
         """
@@ -106,7 +116,7 @@ class saftvrqmie_functional(saft_dispersion):
                     n_alpha_j = dens.comp_weighted_densities[j].get_fmt_densities(i)
                     for k in range(j+1,self.thermo.nc):
                         n_alpha_k = dens.comp_weighted_densities[k].get_fmt_densities(i)
-                        g_jk, g_jk_n, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], g_ij_n=True)
+                        g_jk, g_jk_n, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], calc_g_ij_n=True)
                         ck = -4*np.pi*self.d_ij[j,k]**2*(self.d_ij[j,k] - self.delta_ij[j,k])
                         self.d0[i, j] += ck*n_alpha_k[0]*g_jk
                         self.d0[i, k] += ck*n_alpha_j[0]*g_jk
@@ -154,7 +164,7 @@ class saftvrqmie_functional(saft_dispersion):
             bd = bulk_weighted_densities(rho_b, self.R, self.ms)
             phi, dphidn, d0_i = self.bulk_na_functional_with_differentials(bd)
             for i in range(self.nc):
-                mu_ex[i] += np.sum(dphidn[:4] * bd.dndrho[:, i]) + np.sum(d0_i * bd.dndrho[:, i])
+                mu_ex[i] += np.sum(dphidn[:4] * bd.dndrho[:, i]) + d0_i[i] * bd.dndrho[0, i]
         return mu_ex
 
     def bulk_na_functional_with_differentials(self, bd):
@@ -172,12 +182,13 @@ class saftvrqmie_functional(saft_dispersion):
         d1 = 0.0
         d2 = 0.0
         d3 = 0.0
-        d0_i = np.zeros_like(bd.na)
+        d0_i = np.zeros(self.thermo.nc)
         if self.na_enabled:
-            n_alpha = np.zeros(bd.n[:]+[0.0, 0.0])
+            n_alpha = np.zeros(6)
+            n_alpha[:4] = bd.n[:]
             for j in range(self.thermo.nc):
                 for k in range(j+1,self.thermo.nc):
-                    g_jk, g_jk_n, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], g_ij_n=True)
+                    g_jk, g_jk_n, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], calc_g_ij_n=True)
                     ck = -4*np.pi*self.d_ij[j,k]**2*(self.d_ij[j,k] - self.delta_ij[j,k])
                     phi += ck*bd.na[0,j]*bd.na[0,k]*g_jk
                     d0_i[j] += ck*bd.na[0,k]*g_jk
@@ -228,34 +239,29 @@ class saftvrqmie_functional(saft_dispersion):
         saft_dispersion.test_eos_differentials(self, V, n)
         if self.na_enabled:
             print("Non-additive functional:")
-            # lng, lng_t, lng_v, lng_n, lng_tt, lng_tv, lng_vv, lng_tn, lng_vn, lng_nn = self.thermo.lng_ii(
-            #     self.T, V, n, 1, lng_t=True, lng_v=True, lng_n=True, lng_tt=True, lng_vv=True,
-            #     lng_tv=True, lng_tn=True, lng_vn=True, lng_nn=True)
-            # print("lng",lng)
-            # eps = 1.0e-5
-            # dT = self.T*eps
-            # lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T + dT, V, n, 1, lng_t=True, lng_v=True, lng_n=True)
-            # lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T - dT, V, n, 1, lng_t=True, lng_v=True, lng_n=True)
-            # print(f"lng_T: {lng_t}, {(lngp-lngm)/2/dT}")
-            # print(f"lng_TT: {lng_tt}, {(lngp_t-lngm_t)/2/dT}")
-            # print(f"lng_TV: {lng_tv}, {(lngp_v-lngm_v)/2/dT}")
-            # print(f"lng_Tn: {lng_tn}, {(lngp_n-lngm_n)/2/dT}")
-            # dV = V*eps
-            # lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T, V + dV, n, 1, lng_t=True, lng_v=True, lng_n=True)
-            # lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T, V - dV, n, 1, lng_t=True, lng_v=True, lng_n=True)
-            # print(f"lng_V: {lng_v}, {(lngp-lngm)/2/dV}")
-            # print(f"lng_VV: {lng_vv}, {(lngp_v-lngm_v)/2/dV}")
-            # print(f"lng_TV: {lng_tv}, {(lngp_t-lngm_t)/2/dV}")
-            # print(f"lng_Vn: {lng_vn}, {(lngp_n-lngm_n)/2/dV}")
-            # eps = 1.0e-5
-            # dn = np.zeros_like(n)
-            # dn[0] = n[0]*eps
-            # lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T, V, n + dn, 1, lng_t=True, lng_v=True, lng_n=True)
-            # lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T, V, n - dn, 1, lng_t=True, lng_v=True, lng_n=True)
-            # print(f"lng_n: {lng_n}, {(lngp-lngm)/2/dn[0]}")
-            # print(f"lng_Vn: {lng_vn}, {(lngp_v-lngm_v)/2/dn[0]}")
-            # print(f"lng_Tn: {lng_tn}, {(lngp_t-lngm_t)/2/dn[0]}")
-            # print(f"lng_nn: {lng_nn}, {(lngp_n-lngm_n)/2/dn[0]}")
+            bd = bulk_weighted_densities(rho_b=(n/V)*NA*self.grid_reducing_lenght**3, R=self.R, ms=self.ms)
+            n_alpha = np.zeros(6)
+            n_alpha[:4] = bd.n[:]
+            n_alpha[-1] = 1.0e-3
+            eps = 1.0e-5
+            for j in range(self.nc):
+                for k in range(j, self.nc):
+                    g_jk, g_jk_n, g_jk_T, = self.thermo.calc_bmcsl_gij_fmt(n_alpha,
+                                                                   self.mu_ij[j,k],
+                                                                   calc_g_ij_n=True,
+                                                                   mu_ij_T=self.mu_ij_T[j,k])
+
+                    n_alpha_p = np.zeros(6)
+                    n_alpha_m = np.zeros(6)
+                    for i in range(6):
+                        if abs(n_alpha[i]) > 0.0:
+                            n_alpha_p[:] = n_alpha
+                            n_alpha_m[:] = n_alpha
+                            n_alpha_p[i] += n_alpha[i]*eps
+                            n_alpha_m[i] -= n_alpha[i]*eps
+                            g_jk_p, = self.thermo.calc_bmcsl_gij_fmt(n_alpha_p,self.mu_ij[j,k])
+                            g_jk_m, = self.thermo.calc_bmcsl_gij_fmt(n_alpha_m,self.mu_ij[j,k])
+                            print("j,k,alpha",j,k,i,(g_jk_p-g_jk_m)/(2*n_alpha[i]*eps), g_jk_n[i])
 
 class saftvrmie_functional(saft_dispersion):
     """
@@ -284,4 +290,56 @@ class saftvrmie_functional(saft_dispersion):
 
 if __name__ == "__main__":
     # Model testing
-    pass
+    eps = 1.0e-5
+    T = 25.0
+    svrqm = saftvrqmie()
+    svrqm.init("H2,Ne",additive_hard_sphere_reference=True)
+    svrqm.set_tmin(2.0)
+    svrqmf = saftvrqmie_functional(N=1, svrqm=svrqm, T_red=T/svrqm.eps_div_kb[0])
+    #
+    Tp = T + T*eps
+    svrqmfp = saftvrqmie_functional(N=1, svrqm=svrqm, T_red=Tp/svrqm.eps_div_kb[0])
+    #
+    Tm = T - T*eps
+    svrqmfm = saftvrqmie_functional(N=1, svrqm=svrqm, T_red=Tm/svrqm.eps_div_kb[0])
+    for i in range(svrqm.nc):
+        for j in range(svrqm.nc):
+            print("i,j",i,j)
+            print("d_ij",(svrqmfp.d_ij[i,j]-svrqmfm.d_ij[i,j])/(2*T*eps), svrqmf.d_T_ij[i,j])
+            print("delta_ij",(svrqmfp.delta_ij[i,j]-svrqmfm.delta_ij[i,j])/(2*T*eps), svrqmf.delta_T_ij[i,j])
+            print("mu_ij",(svrqmfp.mu_ij[i,j]-svrqmfm.mu_ij[i,j])/(2*T*eps), svrqmf.mu_ij_T[i,j])
+
+    from pyctp.thermopack_state import equilibrium
+    vle = equilibrium.bubble_pressure(svrqm, T, z=np.array([0.5,0.5]))
+    rho_b = np.zeros_like(vle.liquid.partial_density())
+    rho_b[:] = vle.liquid.partial_density()*NA*svrqmf.grid_reducing_lenght**3
+    print(rho_b,svrqmf.ms)
+    bd = bulk_weighted_densities(rho_b, svrqmf.R, svrqmf.ms)
+    phi, dphidn, d0_i = svrqmf.bulk_na_functional_with_differentials(bd)
+    for i in range(svrqm.nc):
+        n010 = bd.na[0,i]
+        bd.na[0,i] = n010 + eps*n010
+        phi_p, _, _ = svrqmf.bulk_na_functional_with_differentials(bd)
+        bd.na[0,i] = n010 - eps*n010
+        phi_m, _, _ = svrqmf.bulk_na_functional_with_differentials(bd)
+        bd.na[0,i] = n010
+        print(i,(phi_p-phi_m)/(2*eps*n010), d0_i[i])
+    z = svrqmf.bulk_compressibility(rho_b)
+    print("z thermopack",vle.pressure()*vle.liquid.specific_volume()/(svrqm.Rgas*T))
+    print("z functional",z)
+    mu = svrqmf.bulk_excess_chemical_potential(rho_b)
+    mu_thermopack = vle.liquid.excess_chemical_potential()/(svrqm.Rgas*T)
+    print("beta mu excess thermopack",mu_thermopack)
+    print("beta mu excess functional",mu)
+    print("beta mu excess difference",mu-mu_thermopack)
+
+    x = vle.liquid.x
+    v = vle.liquid.v
+    a_hs, a_hs_n, = svrqm.a_hard_sphere(T, volume=v, n=x, a_n=True)
+    a_disp, a_disp_n, = svrqm.a_dispersion(T, volume=v, n=x, a_n=True)
+    mu_disp = a_disp + a_disp_n
+    mu_hs = a_hs + a_hs_n
+    print("mu_disp, mu_hs", mu_disp, mu_hs)
+
+    # Testing eos
+    svrqmf.test_eos_differentials(vle.liquid.specific_volume(), vle.liquid.x)
