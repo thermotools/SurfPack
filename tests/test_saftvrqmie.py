@@ -8,9 +8,9 @@ from pytest import approx
 import pytest
 
 
-@pytest.mark.parametrize('inpt', [{"T": 20.369, "gamma": 0.0018429563519096466},
-                                  {"T": 25.0, "gamma": 0.0010842767252945544},
-                                  {"T": 30.0, "gamma": 0.00032485807783920787}])
+@pytest.mark.parametrize('inpt', [{"T": 20.369, "gamma": 0.0018429563521940614},
+                                  {"T": 25.0, "gamma": 0.0010842767231806062},
+                                  {"T": 30.0, "gamma": 0.00032485786159997345}])
 def test_hydrogen_surface_tension(inpt):
     """Test SAFT-VRQ Mie functional for hydrogen"""
 

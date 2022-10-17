@@ -8,8 +8,8 @@ from pytest import approx
 import pytest
 
 
-@pytest.mark.parametrize('inpt', [{"Ts": 0.625, "gamma": 0.7158132731155862},
-                                  {"Ts": 0.8, "gamma": 0.40430364035092536}])
+@pytest.mark.parametrize('inpt', [{"Ts": 0.625, "gamma": 0.715813273112878},
+                                  {"Ts": 0.8, "gamma": 0.40430366433037573}])
 def test_ljs_surface_tension(inpt):
     """Test PeTS functional"""
 

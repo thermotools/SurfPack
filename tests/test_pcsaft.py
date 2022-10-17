@@ -128,4 +128,4 @@ def test_pcsaft_chain_entropy():
 
     print((s - s_num)/s_num)
     # Test result
-    assert(s == approx(s_num, rel=1.0e-6))
+    assert(s == approx(s_num, rel=5.0e-6))

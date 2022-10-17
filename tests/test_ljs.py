@@ -9,9 +9,9 @@ from pytest import approx
 import pytest
 
 
-@pytest.mark.parametrize('inpt', [{"functional_kwargs":{}, "gamma": 0.22309092128554645},
+@pytest.mark.parametrize('inpt', [{"functional_kwargs":{}, "gamma": 0.22309091860873706},
                                   {"functional_kwargs":{"psi_disp": 1.4, "psi_soft_rep": 1.4},
-                                   "gamma": 0.34711467901407866}])
+                                   "gamma": 0.34711467904618676}])
 def test_ljs_surface_tension(inpt):
     """Test ljs functional"""
 
@@ -122,4 +122,4 @@ def test_ljs_properties():
     print(f"a_E={a_E[idx]}, h_E={h_E[idx]}, u_E={u_E[idx]}, s_E={s_E[idx]}, p={p[idx]}")
     # Test result
     assert((a_E[idx], h_E[idx], u_E[idx], s_E[idx], p[idx]) ==
-           approx((-0.6300822402716728, -1.732418370953793, -1.1989924891427794, -0.8127289269587238, -0.17852334676992881), rel=1.0e-8))
+           approx((-0.6300822393687519, -1.7324182766087972, -1.1989924945855779, -0.8127289360240373, -0.17852327051686853), rel=1.0e-8))
