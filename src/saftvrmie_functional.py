@@ -41,39 +41,60 @@ class saftvrqmie_functional(saft_dispersion):
         if svrqm.nc > 1:
             _, self.na_enabled = svrqm.test_fmt_compatibility()
         if self.na_enabled:
-            self.d_ij = np.zeros((svrqm.nc, svrqm.nc))
-            self.delta_ij = np.zeros((svrqm.nc, svrqm.nc))
-            self.d_T_ij = np.zeros((svrqm.nc, svrqm.nc))
-            self.delta_T_ij = np.zeros((svrqm.nc, svrqm.nc))
-            self.mu_ij = np.zeros((svrqm.nc, svrqm.nc))
-            self.mu_ij_T = np.zeros((svrqm.nc, svrqm.nc))
-            for i in range(svrqm.nc):
-                self.d_ij[i,i] = self.d_hs[i]
-                self.d_T_ij[i,i] = self.d_T_hs[i]
-                self.delta_ij[i,i] = self.d_ij[i,i]
-                self.delta_T_ij[i,i] = self.d_T_ij[i,i]
-                self.mu_ij[i,i] = 0.5*self.d_hs[i]
-                self.mu_ij_T[i,i] = 0.5*self.d_T_hs[i]
-                for j in range(i+1,svrqm.nc):
-                    self.d_ij[i,j] = 0.5*(self.d_hs[i]+self.d_hs[j])
-                    self.d_ij[j,i] = self.d_ij[i,j]
-                    self.d_T_ij[i,j] = 0.5*(self.d_T_hs[i]+self.d_T_hs[j])
-                    self.d_T_ij[j,i] = self.d_T_ij[i,j]
-                    self.delta_ij[i,j], self.delta_T_ij[i,j] = svrqm.hard_sphere_diameter_ij(i+1, j+1, self.T)
-                    self.delta_ij[j,i] = self.delta_ij[i,j]
-                    self.delta_T_ij[j,i] = self.delta_T_ij[i,j]
-                    self.mu_ij[i,j] = self.d_hs[i]*self.d_hs[j]/(self.d_hs[i]+self.d_hs[j])
-                    self.mu_ij[j,i] = self.mu_ij[i,j]
-                    self.mu_ij_T[i,j] = (self.d_T_hs[i]*self.d_hs[j] + self.d_hs[i]*self.d_T_hs[j])/(self.d_hs[i]+self.d_hs[j]) \
-                        - (self.d_T_hs[i] + self.d_T_hs[j] )*self.mu_ij[i,j]/(self.d_hs[i]+self.d_hs[j])
-                    self.mu_ij_T[j,i] = self.mu_ij_T[i,j]
+            self.calc_additive_diameters()
+            self.calc_non_additive_diameters()
+            self.calc_bmcsl_mu()
 
-            self.d_ij /= self.grid_reducing_lenght
-            self.delta_ij /= self.grid_reducing_lenght
-            self.d_T_ij /= self.grid_reducing_lenght
-            self.delta_T_ij /= self.grid_reducing_lenght
-            self.mu_ij /= self.grid_reducing_lenght
-            self.mu_ij_T /= self.grid_reducing_lenght
+    def calc_additive_diameters(self):
+        """
+        """
+        self.d_ij = np.zeros((self.nc, self.nc))
+        self.d_T_ij = np.zeros((self.nc, self.nc))
+        for i in range(self.nc):
+            self.d_ij[i,i] = self.d_hs[i]
+            self.d_T_ij[i,i] = self.d_T_hs[i]
+            for j in range(i+1,self.nc):
+                self.d_ij[i,j] = 0.5*(self.d_hs[i]+self.d_hs[j])
+                self.d_ij[j,i] = self.d_ij[i,j]
+                self.d_T_ij[i,j] = 0.5*(self.d_T_hs[i]+self.d_T_hs[j])
+                self.d_T_ij[j,i] = self.d_T_ij[i,j]
+
+        self.d_ij /= self.grid_reducing_lenght
+        self.d_T_ij /= self.grid_reducing_lenght
+
+    def calc_non_additive_diameters(self):
+        """
+        """
+        self.delta_ij = np.zeros((self.nc, self.nc))
+        self.delta_T_ij = np.zeros((self.nc, self.nc))
+        for i in range(self.nc):
+            self.delta_ij[i,i] = self.d_ij[i,i]
+            self.delta_T_ij[i,i] = self.d_T_ij[i,i]
+            for j in range(i+1,self.nc):
+                self.delta_ij[i,j], self.delta_T_ij[i,j] = self.thermo.hard_sphere_diameter_ij(i+1, j+1, self.T)
+                self.delta_ij[j,i] = self.delta_ij[i,j]
+                self.delta_T_ij[j,i] = self.delta_T_ij[i,j]
+
+        self.delta_ij /= self.grid_reducing_lenght
+        self.delta_T_ij /= self.grid_reducing_lenght
+
+    def calc_bmcsl_mu(self):
+        """
+        """
+        self.mu_ij = np.zeros((self.nc, self.nc))
+        self.mu_ij_T = np.zeros((self.nc, self.nc))
+        for i in range(self.nc):
+            self.mu_ij[i,i] = 0.5*self.d_hs[i]
+            self.mu_ij_T[i,i] = 0.5*self.d_T_hs[i]
+            for j in range(i+1,self.nc):
+                self.mu_ij[i,j] = self.d_hs[i]*self.d_hs[j]/(self.d_hs[i]+self.d_hs[j])
+                self.mu_ij[j,i] = self.mu_ij[i,j]
+                self.mu_ij_T[i,j] = (self.d_T_hs[i]*self.d_hs[j] + self.d_hs[i]*self.d_T_hs[j])/(self.d_hs[i]+self.d_hs[j]) \
+                    - (self.d_T_hs[i] + self.d_T_hs[j])*self.mu_ij[i,j]/(self.d_hs[i]+self.d_hs[j])
+                self.mu_ij_T[j,i] = self.mu_ij_T[i,j]
+
+        self.mu_ij /= self.grid_reducing_lenght
+        self.mu_ij_T /= self.grid_reducing_lenght
 
     def excess_free_energy(self, dens):
         """
@@ -90,9 +111,9 @@ class saftvrqmie_functional(saft_dispersion):
         if self.na_enabled:
             for i in range(self.n_grid):
                 n_alpha = dens.get_fmt_densities(i)
-                for j in range(self.thermo.nc):
+                for j in range(self.nc):
                     n_alpha_j = dens.comp_weighted_densities[j].get_fmt_densities(i)
-                    for k in range(j+1,self.thermo.nc):
+                    for k in range(j+1,self.nc):
                         n_alpha_k = dens.comp_weighted_densities[k].get_fmt_densities(i)
                         g_jk, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k])
                         f[i] -= 4*np.pi*n_alpha_j[0]*n_alpha_k[0]*self.d_ij[j,k]**2*g_jk*(self.d_ij[j,k] - self.delta_ij[j,k])
@@ -109,12 +130,20 @@ class saftvrqmie_functional(saft_dispersion):
 
         """
         saft_dispersion.differentials(self, dens)
+        # self.d0[:, :] = 0.0
+        # self.d1[:, :] = 0.0
+        # self.d2[:, :] = 0.0
+        # self.d3[:, :] = 0.0
+        # self.d1v[:, :] = 0.0
+        # self.d2v[:, :] = 0.0
+        # self.mu_disp[:, :] = 0.0
+        # return
         if self.na_enabled:
             for i in range(self.n_grid):
                 n_alpha = dens.get_fmt_densities(i)
-                for j in range(self.thermo.nc):
+                for j in range(self.nc):
                     n_alpha_j = dens.comp_weighted_densities[j].get_fmt_densities(i)
-                    for k in range(j+1,self.thermo.nc):
+                    for k in range(j+1,self.nc):
                         n_alpha_k = dens.comp_weighted_densities[k].get_fmt_densities(i)
                         g_jk, g_jk_n, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], calc_g_ij_n=True)
                         ck = -4*np.pi*self.d_ij[j,k]**2*(self.d_ij[j,k] - self.delta_ij[j,k])
@@ -182,12 +211,12 @@ class saftvrqmie_functional(saft_dispersion):
         d1 = 0.0
         d2 = 0.0
         d3 = 0.0
-        d0_i = np.zeros(self.thermo.nc)
+        d0_i = np.zeros(self.nc)
         if self.na_enabled:
             n_alpha = np.zeros(6)
             n_alpha[:4] = bd.n[:]
-            for j in range(self.thermo.nc):
-                for k in range(j+1,self.thermo.nc):
+            for j in range(self.nc):
+                for k in range(j+1,self.nc):
                     g_jk, g_jk_n, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], calc_g_ij_n=True)
                     ck = -4*np.pi*self.d_ij[j,k]**2*(self.d_ij[j,k] - self.delta_ij[j,k])
                     phi += ck*bd.na[0,j]*bd.na[0,k]*g_jk
@@ -215,13 +244,12 @@ class saftvrqmie_functional(saft_dispersion):
         if self.na_enabled:
             for i in range(self.n_grid):
                 n_alpha = dens.get_fmt_densities(i)
-                for j in range(self.thermo.nc):
+                for j in range(self.nc):
                     n_alpha_j = dens.comp_weighted_densities[j].get_fmt_densities(i)
-                    for k in range(j+1,self.thermo.nc):
+                    for k in range(j+1,self.nc):
                         n_alpha_k = dens.comp_weighted_densities[k].get_fmt_densities(i)
                         g_jk, g_jk_T, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], mu_ij_T=self.mu_ij_T[j,k])
                         ck = -4*np.pi*n_alpha_j[0]*n_alpha_k[0]
-                        g_jk*self.d_ij[j,k]**2*(self.d_ij[j,k] - self.delta_ij[j,k])
                         d_T[i] += ck*g_jk_T*self.d_ij[j,k]**2*(self.d_ij[j,k] - self.delta_ij[j,k]) \
                             + 2*ck*g_jk*self.d_ij[j,k]*(self.d_ij[j,k] - self.delta_ij[j,k])*self.d_T_ij[j,k] \
                             + ck*g_jk*self.d_ij[j,k]**2*self.d_T_ij[j,k] \
@@ -242,15 +270,15 @@ class saftvrqmie_functional(saft_dispersion):
             bd = bulk_weighted_densities(rho_b=(n/V)*NA*self.grid_reducing_lenght**3, R=self.R, ms=self.ms)
             n_alpha = np.zeros(6)
             n_alpha[:4] = bd.n[:]
-            n_alpha[-1] = 1.0e-3
+            n_alpha[-1] = -0.5*bd.n[2]
             eps = 1.0e-5
+            g_T = np.zeros((self.nc,self.nc))
             for j in range(self.nc):
                 for k in range(j, self.nc):
-                    g_jk, g_jk_n, g_jk_T, = self.thermo.calc_bmcsl_gij_fmt(n_alpha,
-                                                                   self.mu_ij[j,k],
-                                                                   calc_g_ij_n=True,
-                                                                   mu_ij_T=self.mu_ij_T[j,k])
-
+                    g_jk, g_jk_n, g_T[j,k], = self.thermo.calc_bmcsl_gij_fmt(n_alpha,
+                                                                             self.mu_ij[j,k],
+                                                                             calc_g_ij_n=True,
+                                                                             mu_ij_T=self.mu_ij_T[j,k])
                     n_alpha_p = np.zeros(6)
                     n_alpha_m = np.zeros(6)
                     for i in range(6):
@@ -262,6 +290,35 @@ class saftvrqmie_functional(saft_dispersion):
                             g_jk_p, = self.thermo.calc_bmcsl_gij_fmt(n_alpha_p,self.mu_ij[j,k])
                             g_jk_m, = self.thermo.calc_bmcsl_gij_fmt(n_alpha_m,self.mu_ij[j,k])
                             print("j,k,alpha",j,k,i,(g_jk_p-g_jk_m)/(2*n_alpha[i]*eps), g_jk_n[i])
+            # Temperature differentials
+            T = self.T
+            self.T = T + T*eps
+            self.calc_hs_diameters()
+            self.calc_additive_diameters()
+            self.calc_non_additive_diameters()
+            self.calc_bmcsl_mu()
+            g_Tp = np.zeros((self.nc,self.nc))
+            for j in range(self.nc):
+                for k in range(j, self.nc):
+                    g_Tp[j,k], = self.thermo.calc_bmcsl_gij_fmt(n_alpha,self.mu_ij[j,k])
+            self.T = T - T*eps
+            self.calc_hs_diameters()
+            self.calc_additive_diameters()
+            self.calc_non_additive_diameters()
+            self.calc_bmcsl_mu()
+            g_Tm = np.zeros((self.nc,self.nc))
+            for j in range(self.nc):
+                for k in range(j, self.nc):
+                    g_Tm[j,k], = self.thermo.calc_bmcsl_gij_fmt(n_alpha,self.mu_ij[j,k])
+            # Reset
+            self.T = T
+            self.calc_hs_diameters()
+            self.calc_additive_diameters()
+            self.calc_non_additive_diameters()
+            self.calc_bmcsl_mu()
+            for j in range(self.nc):
+                for k in range(j, self.nc):
+                    print("T: j,k",j,k,(g_Tp[j,k]-g_Tm[j,k])/(2*T*eps), g_T[j,k])
 
 class saftvrmie_functional(saft_dispersion):
     """
@@ -310,7 +367,7 @@ if __name__ == "__main__":
             print("mu_ij",(svrqmfp.mu_ij[i,j]-svrqmfm.mu_ij[i,j])/(2*T*eps), svrqmf.mu_ij_T[i,j])
 
     from pyctp.thermopack_state import equilibrium
-    vle = equilibrium.bubble_pressure(svrqm, T, z=np.array([0.5,0.5]))
+    vle = equilibrium.bubble_pressure(svrqm, T, z=np.array([0.4,0.6]))
     rho_b = np.zeros_like(vle.liquid.partial_density())
     rho_b[:] = vle.liquid.partial_density()*NA*svrqmf.grid_reducing_lenght**3
     print(rho_b,svrqmf.ms)

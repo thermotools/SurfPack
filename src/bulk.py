@@ -69,14 +69,14 @@ class Bulk(object):
         # print("left mu_disp, mu_hs", mu_disp, mu_hs)
 
         # rho = 1.0/right_state.v
-        # a_hs, a_hs_n, = functional.thermo.a_hard_sphere(self.temperature, volume=1.0, n=right_state.partial_density(), a_n=True)
-        # a_disp, a_disp_n, = functional.thermo.a_dispersion(self.temperature, volume=1.0, n=right_state.partial_density(), a_n=True)
-        # mu_disp = a_disp + rho*a_disp_n
-        # mu_hs = a_hs + rho*a_hs_n
+        # a_hs, a_hs_n, = functional.thermo.a_hard_sphere(self.temperature, volume=right_state.v, n=right_state.x, a_n=True)
+        # a_disp, a_disp_n, = functional.thermo.a_dispersion(self.temperature, volume=right_state.v, n=right_state.x, a_n=True)
+        # mu_disp = a_disp + a_disp_n
+        # mu_hs = a_hs + a_hs_n
         # m = functional.thermo.m[0]
         # mu_hs *= m
         # print("right mu_disp, mu_hs", mu_disp, mu_hs, mu_disp + mu_hs)
-        # print("right mu_chain", mu_res_right - mu_disp - mu_hs)
+        #print("right mu_chain", mu_res_right - mu_disp - mu_hs)
         # print("m",m, self.mu_res_scaled_beta)
         # sys.exit()
 
@@ -161,6 +161,17 @@ class Bulk(object):
         elif prop == Properties.CHEMPOT_SUM:
             prop_b = prop_scaling*np.array([np.sum(self.left_state.excess_chemical_potential()*self.left_state.x)/self.left_state.specific_volume(),
                                             np.sum(self.right_state.excess_chemical_potential()*self.right_state.x)/self.right_state.specific_volume()])
+        elif prop == Properties.CHEMPOT:
+            prop_b = prop_scaling*np.array([self.left_state.excess_chemical_potential()/(self.temperature*self.functional.thermo.Rgas)
+                                            + np.log(self.get_reduced_density(self.left_state.x/self.left_state.specific_volume())),
+                                            self.right_state.excess_chemical_potential()/(self.temperature*self.functional.thermo.Rgas)
+                                            + np.log(self.get_reduced_density(self.right_state.x/self.right_state.specific_volume()))])
+        elif prop == Properties.CHEMPOT_ID:
+            prop_b = prop_scaling*np.array([np.log(self.get_reduced_density(self.left_state.x/self.left_state.specific_volume())),
+                                            np.log(self.get_reduced_density(self.right_state.x/self.right_state.specific_volume()))])
+        elif prop == Properties.CHEMPOT_EX:
+            prop_b = prop_scaling*np.array([self.left_state.excess_chemical_potential()/(self.temperature*self.functional.thermo.Rgas),
+                                            self.right_state.excess_chemical_potential()/(self.temperature*self.functional.thermo.Rgas)])
         elif prop == Properties.PARALLEL_PRESSURE:
             prop_b = prop_scaling*np.array([self.left_state.pressure(), self.right_state.pressure()])
 

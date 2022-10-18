@@ -119,7 +119,7 @@ class Interface(ABC):
             # #denum = np.dot(exp_beta_mu, integrals)
             #print("integrals",integrals)
             exp_mu = self.n_tot / integrals
-            #print("exp_mu",exp_mu)
+            #print("mu",np.log(exp_mu), self.bulk.mu_scaled_beta)
             #self.cDFT.mu_scaled_beta[:] = np.log(0.02276177)
             #exp_mu = np.exp(self.bulk.mu_scaled_beta)
             if self.do_exp_mu:
@@ -170,7 +170,7 @@ class Interface(ABC):
 
         for ic in range(n_c):
             res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.convolver.correlation(ic)[:]
-                       + beta_mu[:] - self.bulk.beta * self.v_ext[ic][:]) \
+                       + beta_mu[ic] - self.bulk.beta * self.v_ext[ic][:]) \
                 + xvec[ic * n_grid:(ic+1)*n_grid]
 
         if self.specification == Specification.NUMBER_OF_MOLES:
@@ -187,7 +187,7 @@ class Interface(ABC):
             print("Interface need to be initialized before calling solve")
         else:
             self.reset_cache()
-            self.n_tot = self.calculate_total_mass()
+            self.n_tot = self.calculate_total_moles()
             #print("n_tot", self.n_tot)
             # Set up convolver
             self.convolver = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
@@ -404,15 +404,12 @@ class Interface(ABC):
         return gamma
 
 
-    def calculate_total_mass(self):
+    def calculate_total_moles(self):
         """
-        Calculates the overall mass of the system.
-
-        Args:
-            dens (densities): Density profiles
+        Calculates the overall moles of the system.
 
         Returns:
-            (float): Surface tension (mol)
+            (float): Number of moles (mol)
         """
 
         n_tot = 0.0
@@ -431,8 +428,8 @@ class Interface(ABC):
         integral = np.zeros(n_c)
         for ic in range(n_c):
             integral[ic] = np.sum(self.grid.integration_weights*
-                np.exp(self.convolver.correlation(ic)[:]
-                       - self.bulk.beta * self.v_ext[ic][:]))
+                                  np.exp(self.convolver.correlation(ic)[:]
+                                         - self.bulk.beta * self.v_ext[ic][:]))
         return integral
 
     def calculate_equimolar_dividing_surface(self):
@@ -446,7 +443,7 @@ class Interface(ABC):
         rho1 = np.sum(self.bulk.reduced_density_left)
         rho2 = np.sum(self.bulk.reduced_density_right)
 
-        N = self.calculate_total_mass()
+        N = self.calculate_total_moles()
         if self.grid.geometry == Geometry.PLANAR:
             V = self.grid.domain_size
             prefac = 1.0
@@ -573,6 +570,19 @@ class Interface(ABC):
         # Scale to real units
         s *= self.functional.thermo.Rgas/(NA*self.functional.thermo.sigma[0]**3)
         return s
+
+    def chemical_potential(self, ic=0, properties="IE"):
+        """
+        Get chemical potential (J/mol)
+        Args:
+           ic (int): Component index
+        """
+        mu = np.zeros(self.grid.n_grid)
+        if "E" in properties:
+            mu[:] -= self.convolver.correlation(ic)[:]
+        if "I" in properties:
+            mu[:] += np.log(self.profile.densities[ic][:])
+        return mu
 
     def print_perform_minimization_message(self):
         """
@@ -771,20 +781,23 @@ class Interface(ABC):
         else:
             diff[:] = self.functional.diff[alias][:, ic]
         # Perturbate density
-        n = self.convolver.weighted_densities.perturbate(alias=alias, eps=-eps, ic=ic)
+        n,ni = self.convolver.weighted_densities.perturbate(alias=alias,eps=-eps,ic=ic)
+        n0 = np.zeros_like(n)
+        n0[:] = n
         Fm = self.functional.excess_free_energy(self.convolver.weighted_densities)
         # Reset density
-        self.convolver.weighted_densities.set_density(n, alias=alias, ic=ic)
+        self.convolver.weighted_densities.set_density(n,ni,alias=alias,ic=ic)
         # Perturbate density
-        n = self.convolver.weighted_densities.perturbate(alias=alias, eps=eps, ic=ic)
+        n,ni = self.convolver.weighted_densities.perturbate(alias=alias,eps=eps,ic=ic)
         Fp = self.functional.excess_free_energy(self.convolver.weighted_densities)
         # Reset density
-        self.convolver.weighted_densities.set_density(n, alias=alias, ic=ic)
+        self.convolver.weighted_densities.set_density(n,ni,alias=alias,ic=ic)
         # Plot differentials
-        plt.plot(self.grid.z,(Fp - Fm)/(2*n*eps),label="Numeric")
+        n_div = n if ni is None else ni
+        plt.plot(self.grid.z,(Fp - Fm)/(2*n_div*eps),label="Numeric")
         plt.plot(self.grid.z,diff,label="Analytic")
         plt.xlabel("$z$")
-        plt.title("Numerical test of differential for: "+alias)
+        plt.title("Numerical test of differential for: " + alias + " of component " + str(ic))
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
@@ -799,6 +812,7 @@ class Interface(ABC):
         Rgas = self.functional.thermo.Rgas
         #s_scaling = NA*sigma**3/interf.functional.thermo.Rgas
         #energy_scaling = sigma**3/eps
+        len_fac = self.functional.grid_reducing_lenght/self.functional.thermo.sigma[0]
 
         s_E = self.get_excess_entropy_density()
         a_E = self.get_excess_free_energy_density()
@@ -807,8 +821,19 @@ class Interface(ABC):
         u_E = self.get_excess_energy_density()
         p = self.parallel_pressure()
 
-        len_fac = self.functional.grid_reducing_lenght/self.functional.thermo.sigma[0]
+        mu_b = self.bulk.get_property(Properties.CHEMPOT, reduced_property=False)
+        for ic in range(self.functional.nc):
+            mu = self.chemical_potential(ic,"IE")
+            plt.figure()
+            plt.plot(self.grid.z*len_fac, mu,label=r"Functional")
+            plt.plot([self.grid.z[0]*len_fac], mu_b[0][ic], label=r"Bulk left", linestyle="None", marker="o")
+            plt.plot([self.grid.z[-1]*len_fac], mu_b[1][ic], label=r"Bulk right", linestyle="None", marker="o")
+            plt.ylabel("$\\mu^*_{\\rm{"+str(ic+1)+"}}$")
+            plt.xlabel(r"$z/\sigma$")
+            leg = plt.legend(loc="best", numpoints=1, frameon=False)
+
         s_scaling = (NA*sigma**3)/Rgas
+        plt.figure()
         plt.plot(self.grid.z*len_fac, s_E,label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], s_scaling*np.array([self.bulk.left_state.specific_excess_entropy()/self.bulk.left_state.specific_volume()]),
                  label=r"Bulk left", linestyle="None", marker="o")
@@ -817,9 +842,9 @@ class Interface(ABC):
         plt.ylabel(r"$s_{\rm{E}}^*$")
         plt.xlabel(r"$z/\sigma$")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
-        plt.show()
 
         energy_scaling = sigma**3/eps
+        plt.figure()
         plt.plot(self.grid.z*len_fac, a_E,label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_free_energy()/self.bulk.left_state.specific_volume()]),
                  label=r"Bulk left", linestyle="None", marker="o")
@@ -828,8 +853,8 @@ class Interface(ABC):
         plt.ylabel(r"$a_{\rm{E}}^*$")
         plt.xlabel(r"$z/\sigma$")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
-        plt.show()
 
+        plt.figure()
         plt.plot(self.grid.z*len_fac, p,label=r"Functional")
         p_scaling = sigma**3/eps
         plt.plot([self.grid.z[0]*len_fac], p_scaling*np.array([self.bulk.left_state.pressure()]),
@@ -839,8 +864,8 @@ class Interface(ABC):
         plt.ylabel(r"$p^*$")
         plt.xlabel(r"$z/\sigma$")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
-        plt.show()
 
+        plt.figure()
         plt.plot(self.grid.z*len_fac, u_E,label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_energy()/self.bulk.left_state.specific_volume()]),
                  label=r"Bulk liquid", linestyle="None", marker="o")
@@ -849,8 +874,8 @@ class Interface(ABC):
         plt.ylabel(r"$u_{\rm{E}}^*$")
         plt.xlabel("$z/\sigma$")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
-        plt.show()
 
+        plt.figure()
         plt.plot(self.grid.z*len_fac, h_E,label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_enthalpy()/self.bulk.left_state.specific_volume()]),
                  label=r"Bulk liquid", linestyle="None", marker="o")

@@ -8,18 +8,15 @@ Classical density functinal theory for thermopack
 
 # List of todos (Remove when accomplished)
   * Implement Lanczos sigma
-  * Test the chain term implementation
   * Test with a wall potential
   * Implement postprocessing routine to extract useful variables
   * The thermopack association term implementation must be revised
   * Implement association into the DFT code [[2]](#2)
   * Implement one-dimensional cylindrical geometries
   * Extract radial distribution function and compare to simulations
-  * Implement a consistent WCA-reference, test for the LJs fluid
-  * Mixture implementation for saft-vrq Mie
   * Entropy for spherical
-  * Set prefactors using sympy getting a more generic framework.
-  * Implement PETS functional [[3]](#3)
+  * Optimize thermopack to avoid calculating hs-diamater every time
+  * Optimize SAFT-VR Mie loops
 
 # References
 <a id="1">[1]</a>

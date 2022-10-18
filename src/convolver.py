@@ -219,16 +219,24 @@ class WeightedDensitiesMaster(WeightedDensities):
         (np.ndarray): Density before perturbation
         """
         n = np.zeros_like(self.n3neg)
+        ni = None
         if alias == "rho":
             n[:] = self.rho.densities[ic][:]
             self.rho.densities[ic][:] += self.rho.densities[ic][:]*eps
+        elif alias in self.wfs.fmt_aliases:
+            # Perturbate component density
+            ni = np.zeros_like(self.n3neg)
+            n[:] = self.n[alias][:]
+            ni[:] = self.comp_weighted_densities[ic].n[alias][:]
+            self.comp_weighted_densities[ic].n[alias][:] += ni[:]*eps
+            self.n[alias][:] += ni[:]*eps
+            self.update_utility_variables()
         else:
             n[:] = self.n[alias][ic,:]
             self.n[alias][ic,:] += self.n[alias][ic,:]*eps
-            self.update_utility_variables()
-        return n
+        return n, ni
 
-    def set_density(self, n, alias, ic=0):
+    def set_density(self, n, ni, alias, ic=0):
         """ Set weighted density
         Args:
         n (np.ndarray): Densities
@@ -237,9 +245,12 @@ class WeightedDensitiesMaster(WeightedDensities):
         """
         if alias == "rho":
             self.rho.densities[ic][:] = n[:]
+        elif alias in self.wfs.fmt_aliases:
+            self.n[alias][:] = n[:]
+            self.comp_weighted_densities[ic].n[alias][:] = ni[:]
+            self.update_utility_variables()
         else:
             self.n[alias][ic,:] = n[:]
-            self.update_utility_variables()
 
 
 class CompWeightedDifferentials():

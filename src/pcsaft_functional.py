@@ -25,7 +25,7 @@ class saft_dispersion(Whitebear):
         self.thermo = thermo
         self.T_red = T_red
         self.T = self.T_red * self.thermo.eps_div_kb[0]
-        self.d_hs, self.d_T_hs = thermo.hard_sphere_diameters(self.T)
+        self.calc_hs_diameters()
 
         if grid_unit == LenghtUnit.ANGSTROM:
             self.grid_reducing_lenght = 1.0e-10
@@ -44,6 +44,11 @@ class saft_dispersion(Whitebear):
         # Add storage container for differentials only depending on local density
         # No convolution required
         self.mu_of_rho = np.zeros((N, self.nc))
+
+    def calc_hs_diameters(self):
+        """
+        """
+        self.d_hs, self.d_T_hs = self.thermo.hard_sphere_diameters(self.T)
 
     def excess_free_energy(self, dens):
         """

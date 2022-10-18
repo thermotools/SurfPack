@@ -48,6 +48,9 @@ class Properties(DftEnum):
     ENTHALPY = 15
     CHEMPOT_SUM = 16
     PARALLEL_PRESSURE = 17
+    CHEMPOT = 18
+    CHEMPOT_ID = 19
+    CHEMPOT_EX = 21
 
 # Plot utility
 LINE_STYLES = OrderedDict(

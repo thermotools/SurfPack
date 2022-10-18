@@ -222,15 +222,12 @@ class Rosenfeld:
         Copy differentials to component differentials
         """
         for i in range(self.nc-1,0,-1):
-            print(i)
             self.d0[:, i] = self.d0[:, 0]
             self.d1[:, i] = self.d1[:, 0]
             self.d2[:, i] = self.d2[:, 0]
             self.d3[:, i] = self.d3[:, 0]
             self.d1v[:, i] = self.d1v[:, 0]
             self.d2v[:, i] = self.d2v[:, 0]
-            sys.exit()
-
 
     def test_eos_differentials(self, V, n):
         """
