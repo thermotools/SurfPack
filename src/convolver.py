@@ -88,7 +88,7 @@ class WeightedDensities():
         # Add FMT densities
         for wd in self.n:
             if wd in self.wfs.fmt_aliases:
-                self.n[wd][:] = other.n[wd][:]
+                self.n[wd][:] += other.n[wd][:]
         return self
 
     def set_testing_values(self, rho=None):
