@@ -94,6 +94,29 @@ class saft_dispersion(Whitebear):
                 self.T, V, rho_thermo, a_n=True)
             self.mu_disp[i, :] = (a + np.sum(rho_thermo)*a_n[:])
 
+    def bulk_excess_free_energy_density(self, rho_b):
+        """
+        Calculates the excess free energy density.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess free energy density ()
+
+        """
+        phi = Whitebear.bulk_excess_free_energy_density(self, rho_b)
+        # Dispersion contributions
+        rho_thermo = np.zeros_like(rho_b)
+        rho_thermo[:] = rho_b[:]
+        rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+        rho_mix = np.sum(rho_thermo)
+        V = 1.0/rho_mix
+        n = rho_thermo*V
+        a, = self.thermo.a_dispersion(self.T, V, n)
+        phi += a*rho_mix*NA*self.grid_reducing_lenght**3
+        return phi
+
     def bulk_compressibility(self, rho_b):
         """
         Calculates the reduced compressibility.
@@ -316,6 +339,31 @@ class pc_saft(saft_dispersion):
                         self.mu_rho_hc[i, j] = -(self.thermo.m[j]-1.0)*rho_j*lng_jj_n
                         self.mu_lambda_hc[i, j] = -(self.thermo.m[j]-1.0)*rho_j/lambda_hc[j]
 
+    def bulk_excess_free_energy_density(self, rho_b):
+        """
+        Calculates the excess free energy density.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess free energy density ()
+
+        """
+        phi = Whitebear.bulk_excess_free_energy_density(self, rho_b)
+        if np.any(self.chain_functional_active):
+            # Hard-chain contributions
+            rho_thermo = np.zeros_like(rho_b)
+            rho_thermo[:] = rho_b[:]
+            rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+            V = 1.0/rho_mix
+            n = rho_thermo/rho_mix
+            for j in range(self.nc):
+                if self.chain_functional_active[j]:
+                    lng_jj, = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1)
+                    phi -= (self.thermo.m[j]-1.0)*rho_b[j]*lng_jj
+        return phi
+
     def bulk_compressibility(self, rho_b):
         """
         Calculates the PC-SAFT compressibility.
@@ -362,7 +410,6 @@ class pc_saft(saft_dispersion):
             rho_thermo = np.zeros_like(rho_b)
             rho_thermo[:] = rho_b[:]
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
-            rho_mix = np.sum(rho_thermo)
             V = 1.0
             n = rho_thermo
             for j in range(self.nc):

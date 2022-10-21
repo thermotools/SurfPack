@@ -52,6 +52,19 @@ class Properties(DftEnum):
     CHEMPOT_ID = 19
     CHEMPOT_EX = 21
 
+class ReducedUnits(DftEnum):
+    REDUCED_MD = 101
+    REDUCED_RGAS = 102
+    REAL = 103
+
+class Units(DftEnum):
+    ENERGY = 110
+    PRESSURE = 120
+    ENTROPY = 130
+    ENERGY_DENSITY = 140
+    DENSITY = 150
+    ENTROPY_DENSITY = 160
+
 # Plot utility
 LINE_STYLES = OrderedDict(
     [('0',               (0, ())),
@@ -72,6 +85,30 @@ LCOLORS = ["k", "g", "r", "b", "grey", "m", "c", "y",
            "tomato", "peru", "olive", "royalblue", "darkviolet"]
 LMARKERS = ["*", "d", "o", "s", "+", "x", "1", "h", "2", "v", "p", "^", "X"]
 
+def get_property_label(prop, reduced, ic=0):
+    if prop == Properties.RHO:
+        label = r"$\rho^*$" if reduced else r"$\rho$ (mol/m$^3$)"
+    elif prop == Properties.FREE_ENERGY:
+        label = r"$a_{\rm{E}}^*$" if reduced else r"$a_{\rm{E}}$ (J/m$^3$)"
+    elif prop == Properties.ENERGY:
+        label = r"$e_{\rm{E}}^*$" if reduced else r"$e_{\rm{E}}$ (J/m$^3$)"
+    elif prop == Properties.ENTROPY:
+        label = r"$s_{\rm{E}}^*$" if reduced else r"$s_{\rm{E}}$ (J/m$^3$)"
+    elif prop == Properties.ENTHALPY:
+        label = r"$h_{\rm{E}}^*$" if reduced else r"$h_{\rm{E}}$ (J/m$^3$)"
+    elif prop == Properties.CHEMPOT_SUM:
+        label = r"CHEMPOT_SUM"
+    elif prop == Properties.PARALLEL_PRESSURE:
+        label = r"$p_{\parallel}^*$" if reduced else r"$p_{\parallel}$ (MPa)"
+    elif prop == Properties.CHEMPOT:
+        label = "$\\mu^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\mu_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
+    elif prop == Properties.CHEMPOT_ID:
+        label = "$\mu_{\rm{I}}^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\mu_{\rm{I}}_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
+    elif prop == Properties.CHEMPOT_EX:
+        label = "$\mu_{\rm{E}}^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\mu_{\rm{E}}_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
+    else:
+        raise ValueError("Wrong property in get_property_label")
+    return label
 
 if __name__ == "__main__":
 

@@ -116,6 +116,30 @@ class ljs_wca_base_functional(saft_dispersion):
             self.mu_soft_rep[i, :] = (a + rho_thermo[:]*a_n[:])
         #self.mu_disp[non_prdm, :] = 0.0
 
+    def bulk_excess_free_energy_density(self, rho_b):
+        """
+        Calculates the excess free energy density.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess free energy density ()
+
+        """
+        phi = saft_dispersion.bulk_excess_free_energy_density(self, rho_b)
+        # Sof-repulsion contributions
+        rho_thermo = np.zeros_like(rho_b)
+        rho_thermo[:] = rho_b[:]
+        rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+        rho_mix = np.sum(rho_thermo)
+        V = 1.0/rho_mix
+        n = rho_thermo/rho_mix
+        a,  = self.thermo.a_soft_repulsion(self.T, V, n)
+        phi += rho_mix*a*NA*self.grid_reducing_lenght**3
+        print("phi soft repulsion",rho_mix*a*NA*self.grid_reducing_lenght**3)
+        return phi
+
     def bulk_compressibility(self, rho_b):
         """
         Calculates the PC-SAFT compressibility.
@@ -128,7 +152,7 @@ class ljs_wca_base_functional(saft_dispersion):
             float: compressibility
         """
         z = saft_dispersion.bulk_compressibility(self, rho_b)
-        # PC-SAFT contributions
+        # Sof-repulsion contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
         rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)

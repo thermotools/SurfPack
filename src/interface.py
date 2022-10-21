@@ -3,7 +3,7 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from dft_numerics import dft_solver
-from constants import NA, KB, Geometry, Specification, LenghtUnit, LCOLORS, Properties
+from constants import NA, KB, Geometry, Specification, LenghtUnit, LCOLORS, Properties, get_property_label
 from bulk import Bulk
 from density_profile import Profile
 from grid import Grid
@@ -481,20 +481,22 @@ class Interface(ABC):
                 gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_right[i])
         return gamma
 
-    def get_excess_free_energy_density(self):
+    def get_excess_free_energy_density(self, reduced=True):
         """
         Calculates the Helmholtz energy in the system.
 
         Returns:
-            (array): Helmholtz energy for each grid point
+            (array): Helmholtz energy for each grid point (J/m3 or dimensionless)
         """
         if not self.profile:
             print("Need profile to calculate free energy density")
             return None
 
-        # FMT hard-sphere part
-        F = self.bulk.reduced_temperature * self.functional.excess_free_energy(self.convolver.weighted_densities) * \
-            (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+        F = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        if reduced:
+            F *= self.bulk.reduced_temperature*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+        else:
+            F *= KB*self.bulk.temperature/self.functional.grid_reducing_lenght**3
         return F
 
     def get_excess_chemical_potential_density_sum(self):
@@ -513,7 +515,7 @@ class Interface(ABC):
         mu_E *= (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
         return mu_E
 
-    def get_excess_enthalpy_density(self):
+    def get_excess_enthalpy_density(self, reduced=True):
         """
         Calculates the excess enthalpy density in reduced units
 
@@ -528,9 +530,11 @@ class Interface(ABC):
         sum_rho_mu_E = self.get_excess_chemical_potential_density_sum()
         h_E = np.zeros(self.grid.n_grid)
         h_E[:] = self.bulk.reduced_temperature*s_E[:] + sum_rho_mu_E[:]
+        if not reduced:
+            h_E[:] *= self.functional.thermo.eps_div_kb[0]*KB/self.functional.thermo.sigma[0]**3
         return h_E
 
-    def get_excess_energy_density(self):
+    def get_excess_energy_density(self, reduced=True):
         """
         Calculates the excess energy density in reduced units
 
@@ -542,36 +546,32 @@ class Interface(ABC):
             return None
         a_E = self.get_excess_free_energy_density()
         s_E = self.get_excess_entropy_density()
-        u_E = a_E + self.bulk.reduced_temperature*s_E
+        u_E = a_E + s_E*self.bulk.reduced_temperature
+        if not reduced:
+            u_E[:] *= self.functional.thermo.eps_div_kb[0]*KB/self.functional.thermo.sigma[0]**3
         return u_E
 
-    def get_excess_entropy_density(self):
+    def get_excess_entropy_density(self, reduced=True):
         """
-        Get reduced entropy per reduced volume (-)
+        Get reduced entropy per reduced volume (dimensionless or J/m3/K)
         """
         if not self.profile:
             print("Need profile to calculate entropy density")
             return None
 
         if self.s_E is None:
-            eps = self.functional.thermo.eps_div_kb[0]
             f = self.functional.excess_free_energy(self.convolver.weighted_densities)
             f_T = self.convolver.functional_temperature_differential_convolution(self.profile.densities)
             vol_fac = (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
-            s = (- f - self.bulk.reduced_temperature * f_T * eps)*vol_fac
+            s = (- f - self.bulk.temperature * f_T)*vol_fac
             self.s_E = s
-        return self.s_E
+        if reduced:
+            scaling = 1.0
+        else:
+            scaling = self.functional.thermo.Rgas/(NA*self.functional.thermo.sigma[0]**3)
+        return self.s_E*scaling
 
-    def get_excess_entropy_density_real_units(self):
-        """
-        Get entropy per volume (J/m3/K)
-        """
-        s = self.get_excess_entropy_density()
-        # Scale to real units
-        s *= self.functional.thermo.Rgas/(NA*self.functional.thermo.sigma[0]**3)
-        return s
-
-    def chemical_potential(self, ic=0, properties="IE"):
+    def chemical_potential(self, ic=0, properties="IE", reduced=True):
         """
         Get chemical potential (J/mol)
         Args:
@@ -627,9 +627,9 @@ class Interface(ABC):
         Args:
             data_dict: Additional data to plot
         """
-        if not self.converged:
-            self.print_perform_minimization_message()
-            return
+        # if not self.converged:
+        #     self.print_perform_minimization_message()
+        #     return
         prop_b_scaling = 1.0
         if not grid_unit:
             grid_unit = self.functional.grid_unit
@@ -801,25 +801,54 @@ class Interface(ABC):
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
-    def test_functional_in_bulk(self):
+    def test_functional_in_bulk(self, reduced=True):
         """ Plot bulk and functional values together
         """
-        # Make sure convolver is set up
+        # Make sure convlver is set up
         self.single_convolution()
 
         sigma = self.functional.thermo.sigma[0]
         eps = self.functional.thermo.eps_div_kb[0]*KB
         Rgas = self.functional.thermo.Rgas
-        #s_scaling = NA*sigma**3/interf.functional.thermo.Rgas
-        #energy_scaling = sigma**3/eps
-        len_fac = self.functional.grid_reducing_lenght/self.functional.thermo.sigma[0]
+        if reduced:
+            len_fac = self.functional.grid_reducing_lenght/self.functional.thermo.sigma[0]
+            x_label = r"$z/\sigma$"
+            energy_scaling = sigma**3/eps
+            s_scaling = (NA*sigma**3)/Rgas
+            p_scaling = sigma**3/eps
+        else:
+            if self.functional.grid_reducing_lenght == self.functional.thermo.sigma[0]:
+                len_fac = self.functional.thermo.sigma[0]*1e10
+            x_label = r"$z$ (Å)"
+            energy_scaling = 1.0
+            s_scaling = 1.0
+            p_scaling = 1.0e-6 # Pa -> MPa
 
-        s_E = self.get_excess_entropy_density()
-        a_E = self.get_excess_free_energy_density()
-        p_T = self.parallel_pressure()
-        h_E = self.get_excess_enthalpy_density()
-        u_E = self.get_excess_energy_density()
-        p = self.parallel_pressure()
+        s_E = self.get_excess_entropy_density(reduced)
+        a_E = self.get_excess_free_energy_density(reduced)
+        p = self.parallel_pressure(reduced)
+        h_E = self.get_excess_enthalpy_density(reduced)
+        u_E = self.get_excess_energy_density(reduced)
+
+        plt.figure()
+        plt.plot(self.grid.z*len_fac, s_E,label=r"Functional")
+        plt.plot([self.grid.z[0]*len_fac], s_scaling*np.array([self.bulk.left_state.excess_entropy_density()]),
+                 label=r"Bulk left", linestyle="None", marker="o")
+        plt.plot([self.grid.z[-1]*len_fac], s_scaling*np.array([self.bulk.right_state.excess_entropy_density()]),
+                 label=r"Bulk right", linestyle="None", marker="o")
+        plt.ylabel(get_property_label(Properties.ENTROPY, reduced))
+        plt.xlabel(x_label)
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+
+        plt.figure()
+        plt.plot(self.grid.z*len_fac, a_E,label=r"Functional")
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_free_energy_density()]),
+                 label=r"Bulk left", linestyle="None", marker="o")
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_free_energy_density()]),
+                 label=r"Bulk right", linestyle="None", marker="o")
+        plt.ylabel(get_property_label(Properties.FREE_ENERGY, reduced))
+        plt.xlabel(x_label)
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
         mu_b = self.bulk.get_property(Properties.CHEMPOT, reduced_property=False)
         for ic in range(self.functional.nc):
@@ -828,61 +857,39 @@ class Interface(ABC):
             plt.plot(self.grid.z*len_fac, mu,label=r"Functional")
             plt.plot([self.grid.z[0]*len_fac], mu_b[0][ic], label=r"Bulk left", linestyle="None", marker="o")
             plt.plot([self.grid.z[-1]*len_fac], mu_b[1][ic], label=r"Bulk right", linestyle="None", marker="o")
-            plt.ylabel("$\\mu^*_{\\rm{"+str(ic+1)+"}}$")
-            plt.xlabel(r"$z/\sigma$")
+            plt.ylabel(get_property_label(Properties.CHEMPOT, reduced, ic))
+            plt.xlabel(x_label)
             leg = plt.legend(loc="best", numpoints=1, frameon=False)
-
-        s_scaling = (NA*sigma**3)/Rgas
-        plt.figure()
-        plt.plot(self.grid.z*len_fac, s_E,label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], s_scaling*np.array([self.bulk.left_state.specific_excess_entropy()/self.bulk.left_state.specific_volume()]),
-                 label=r"Bulk left", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], s_scaling*np.array([self.bulk.right_state.specific_excess_entropy()/self.bulk.right_state.specific_volume()]),
-                 label=r"Bulk right", linestyle="None", marker="o")
-        plt.ylabel(r"$s_{\rm{E}}^*$")
-        plt.xlabel(r"$z/\sigma$")
-        leg = plt.legend(loc="best", numpoints=1, frameon=False)
-
-        energy_scaling = sigma**3/eps
-        plt.figure()
-        plt.plot(self.grid.z*len_fac, a_E,label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_free_energy()/self.bulk.left_state.specific_volume()]),
-                 label=r"Bulk left", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.specific_excess_free_energy()/self.bulk.right_state.specific_volume()]),
-                 label=r"Bulk right", linestyle="None", marker="o")
-        plt.ylabel(r"$a_{\rm{E}}^*$")
-        plt.xlabel(r"$z/\sigma$")
-        leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
         plt.figure()
         plt.plot(self.grid.z*len_fac, p,label=r"Functional")
-        p_scaling = sigma**3/eps
         plt.plot([self.grid.z[0]*len_fac], p_scaling*np.array([self.bulk.left_state.pressure()]),
                  label=r"Bulk left", linestyle="None", marker="o")
         plt.plot([self.grid.z[-1]*len_fac], p_scaling*np.array([self.bulk.right_state.pressure()]),
                  label=r"Bulk right", linestyle="None", marker="o")
-        plt.ylabel(r"$p^*$")
-        plt.xlabel(r"$z/\sigma$")
+        plt.ylabel(get_property_label(Properties.PARALLEL_PRESSURE, reduced))
+        plt.xlabel(x_label)
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
         plt.figure()
         plt.plot(self.grid.z*len_fac, u_E,label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_energy()/self.bulk.left_state.specific_volume()]),
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_energy_density()]),
                  label=r"Bulk liquid", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.specific_excess_energy()/self.bulk.right_state.specific_volume()]),
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_energy_density()]),
                  label=r"Bulk vapour", linestyle="None", marker="o")
-        plt.ylabel(r"$u_{\rm{E}}^*$")
-        plt.xlabel("$z/\sigma$")
+        plt.ylabel(get_property_label(Properties.ENERGY, reduced))
+        plt.xlabel(x_label)
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
+        print(energy_scaling,self.bulk.left_state.excess_enthalpy_density(), self.bulk.right_state.excess_enthalpy_density())
         plt.figure()
         plt.plot(self.grid.z*len_fac, h_E,label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.specific_excess_enthalpy()/self.bulk.left_state.specific_volume()]),
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_enthalpy_density()]),
                  label=r"Bulk liquid", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.specific_excess_enthalpy()/self.bulk.right_state.specific_volume()]),
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_enthalpy_density()]),
                  label=r"Bulk vapour", linestyle="None", marker="o")
-        plt.ylabel(r"$h_{\rm{E}}^*$")
-        plt.xlabel(r"$z/\sigma$")
+        plt.ylabel(get_property_label(Properties.ENTHALPY, reduced))
+        plt.xlabel(x_label)
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
@@ -993,7 +1000,7 @@ class PlanarInterface(Interface):
         gamma = np.sum(omega_a)
         return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
 
-    def parallel_pressure(self):
+    def parallel_pressure(self, reduced=True):
         """
         Calculates the parallel component of the pressure tensor
 

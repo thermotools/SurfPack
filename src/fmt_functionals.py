@@ -105,13 +105,13 @@ class Rosenfeld:
 
     def excess_free_energy(self, dens):
         """
-        Calculates the excess HS Helmholtz free energy from the weighted densities
+        Calculates the excess reduced hard-sphere Helmholtz free energy density from the weighted densities
 
         Args:
             dens (array_like): Weighted densities
 
         Returns:
-            array_like: Excess HS Helmholtz free energy ()
+            array_like: Excess reduced hard-sphere Helmholtz free energy (1/m3)
 
         """
         f = np.zeros(dens.n_grid)
@@ -121,6 +121,21 @@ class Rosenfeld:
              ** 2) / (24.0 * np.pi * dens.n3neg[:] ** 2)
 
         return f
+
+    def bulk_excess_free_energy_density(self, rho_b):
+        """
+        Calculates the excess free energy density.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess free energy density ()
+
+        """
+        bd = bulk_weighted_densities(rho_b, self.R, self.ms)
+        phi, _ = self.bulk_fmt_functional_with_differentials(bd)
+        return phi
 
     def bulk_compressibility(self, rho_b):
         """

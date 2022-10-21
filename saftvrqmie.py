@@ -6,6 +6,7 @@ from src.interface import PlanarInterface
 from src.constants import LenghtUnit, Properties
 import sys
 import matplotlib.pyplot as plt
+from fmt_functionals import bulk_weighted_densities
 
 def test_saftvrqmie_surface_tension():
     """Test saftvrqmie functional"""
@@ -17,7 +18,7 @@ def test_saftvrqmie_surface_tension():
     thermopack.set_tmin(5.0)
     vle = equilibrium.bubble_pressure(thermopack, T, z=np.array([0.4,0.6]))
     Tc = 50.0
-    n_grid = 32
+    n_grid = 1024
     domain_size=200.0
 
     # Define interface with initial tanh density profile
@@ -60,11 +61,29 @@ def test_saftvrqmie_surface_tension():
     interf.single_convolution()
 
     F = interf.functional.excess_free_energy(interf.convolver.weighted_densities)
-    # rho_bl = self.bulk.get_reduced_density(self.bulk.left_state.x/self.bulk.left_state.specific_volume())
-    # rho_br = self.bulk.get_reduced_density(self.bulk.right_state.x/self.bulk.right_state.specific_volume())
+    rho_bl = interf.bulk.get_reduced_density(interf.bulk.left_state.x/interf.bulk.left_state.specific_volume())
+    rho_br = interf.bulk.get_reduced_density(interf.bulk.right_state.x/interf.bulk.right_state.specific_volume())
 
     interf.functional.differentials(interf.convolver.weighted_densities)
-    print(interf.functional.mu_disp[-1, :])
+    print("n0",interf.convolver.weighted_densities.n0[-1])
+    print("n1",interf.convolver.weighted_densities.n1[-1])
+    print("n2",interf.convolver.weighted_densities.n2[-1])
+    print("n3",interf.convolver.weighted_densities.n3[-1])
+    print("d0",interf.functional.d0[-1, :])
+    print("d1",interf.functional.d1[-1, :])
+    print("d2",interf.functional.d2[-1, :])
+    print("d3",interf.functional.d3[-1, :])
+    #print(interf.functional.d1v[-1, :])
+    #print(interf.functional.d2v[-1, :])
+
+
+    bd_l = bulk_weighted_densities(rho_bl, interf.functional.R, interf.functional.ms)
+    phi_l, dphidn_l = interf.functional.bulk_fmt_functional_with_differentials(bd_l)
+    #print(dphidn_l)
+    bd_r = bulk_weighted_densities(rho_br, interf.functional.R, interf.functional.ms)
+    phi_r, dphidn_r = interf.functional.bulk_fmt_functional_with_differentials(bd_r)
+    print("n_r",bd_r.n)
+    print("dphidn_r",dphidn_r)
     # interf.plot_property_profiles(plot_reduced_property=True,
     #                               plot_equimolar_surface=False,
     #                               plot_bulk=True,

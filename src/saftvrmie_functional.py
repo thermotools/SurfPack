@@ -117,7 +117,6 @@ class saftvrqmie_functional(saft_dispersion):
                         n_alpha_k = dens.comp_weighted_densities[k].get_fmt_densities(i)
                         g_jk, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k])
                         f[i] -= 4*np.pi*n_alpha_j[0]*n_alpha_k[0]*self.d_ij[j,k]**2*g_jk*(self.d_ij[j,k] - self.delta_ij[j,k])
-
         return f
 
     def differentials(self, dens):
@@ -156,6 +155,24 @@ class saftvrqmie_functional(saft_dispersion):
                         self.d3[i, :] += ck*g_jk_n[3]
                         self.d1v[i, :] += ck*g_jk_n[4]
                         self.d2v[i, :] += ck*g_jk_n[5]
+
+    def bulk_excess_free_energy_density(self, rho_b):
+        """
+        Calculates the excess free energy density.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess free energy density ()
+
+        """
+        phi = saft_dispersion.bulk_excess_free_energy_density(self, rho_b)
+        if self.na_enabled:
+            bd = bulk_weighted_densities(rho_b, self.R, self.ms)
+            phi_na, _, _ = self.bulk_na_functional_with_differentials(bd)
+            phi += phi_na
+        return phi
 
     def bulk_compressibility(self, rho_b):
         """
