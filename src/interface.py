@@ -81,7 +81,6 @@ class Interface(ABC):
         self.bulk = None
         self.specification = specification
         self.n_tot = None
-        self.do_exp_mu = True
         self.convolver = None
         self.n_tot = None
         self.r_equimolar = None
@@ -114,19 +113,11 @@ class Interface(ABC):
         if self.specification == Specification.NUMBER_OF_MOLES:
             # Convolution integrals for densities
             self.convolver.convolve_density_profile(self.profile.densities)
-            #print("corr", self.convolver.correlation(0))
             integrals = self.integrate_df_vext()
-            # #denum = np.dot(exp_beta_mu, integrals)
-            #print("integrals",integrals)
-            exp_mu = self.n_tot / integrals
-            #print("mu",np.log(exp_mu), self.bulk.mu_scaled_beta)
-            #self.cDFT.mu_scaled_beta[:] = np.log(0.02276177)
-            #exp_mu = np.exp(self.bulk.mu_scaled_beta)
-            if self.do_exp_mu:
-                xvec[n_rho:n_rho + n_c] = exp_mu
-            else:
-                xvec[n_rho:n_rho + n_c] = np.log(exp_mu)
-
+            exp_beta_mu = np.exp(self.bulk.mu_scaled_beta)
+            denum = np.dot(exp_beta_mu, integrals)
+            z = exp_beta_mu * self.n_tot / integrals
+            xvec[n_rho:n_rho + n_c] = z
         return xvec
 
     def residual(self, xvec):
@@ -137,28 +128,7 @@ class Interface(ABC):
 
         n_rho = n_c * n_grid
         beta_mu = np.zeros(n_c)
-        if self.specification == Specification.NUMBER_OF_MOLES:
-            if self.do_exp_mu:
-                exp_beta_mu = np.zeros(n_c)
-                exp_beta_mu[:] = xvec[n_rho:n_rho + n_c]
-                beta_mu[:] = np.log(exp_beta_mu[:])
-                #print(beta_mu[:])
-            else:
-                beta_mu[:] = xvec[n_rho:n_rho + n_c]
-                exp_beta_mu = np.zeros(n_c)
-                exp_beta_mu[:] = np.exp(beta_mu[:])
-            exp_beta_mu_grid = np.zeros(n_c)
-            integrals = self.integrate_df_vext()
-            #print("integrals",integrals)
-            denum = np.dot(exp_beta_mu, integrals)
-            exp_beta_mu_grid[:] = self.n_tot * exp_beta_mu / denum
-            beta_mu_grid = np.zeros(n_c)
-            beta_mu_grid[:] = np.log(exp_beta_mu_grid[:])
-            if self.grid.geometry is Geometry.PLANAR:
-                # We know the chemical potential - use it
-                beta_mu[:] = self.bulk.mu_scaled_beta[:]
-        else:
-            beta_mu[:] = self.bulk.mu_scaled_beta[:]
+        beta_mu[:] = self.bulk.mu_scaled_beta[:]
 
         # Perform convolution integrals
         self.convolver.convolve_density_profile(prof)
@@ -174,10 +144,14 @@ class Interface(ABC):
                 + xvec[ic * n_grid:(ic+1)*n_grid]
 
         if self.specification == Specification.NUMBER_OF_MOLES:
-            if self.do_exp_mu:
-                res[n_rho:] = exp_beta_mu - exp_beta_mu_grid
-            else:
-                res[n_rho:] = beta_mu - beta_mu_grid
+            z = np.zeros(n_c)
+            z[:] = xvec[n_rho:n_rho + n_c]
+            exp_beta_mu = np.exp(beta_mu)
+            z_grid = np.zeros(n_c)
+            integrals = self.integrate_df_vext()
+            denum = np.dot(exp_beta_mu, integrals)
+            z_grid[:] = self.n_tot*exp_beta_mu/integrals
+            res[n_rho:] = z - z_grid
 
         return res
 

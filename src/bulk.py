@@ -163,7 +163,7 @@ class Bulk(object):
             prop_b = prop_scaling*np.column_stack((self.left_state.x/self.left_state.specific_volume(),
                                                    self.right_state.x/self.right_state.specific_volume()))
         elif prop == Properties.FREE_ENERGY:
-            prop_b = prop_scaling*np.array([self.left_state.excess_free_energy_densty(),
+            prop_b = prop_scaling*np.array([self.left_state.excess_free_energy_density(),
                                             self.right_state.excess_free_energy_density()])
         elif prop == Properties.ENERGY:
             prop_b = prop_scaling*np.array([self.left_state.excess_energy_density(),

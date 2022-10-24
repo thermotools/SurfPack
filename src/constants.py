@@ -52,19 +52,6 @@ class Properties(DftEnum):
     CHEMPOT_ID = 19
     CHEMPOT_EX = 21
 
-class ReducedUnits(DftEnum):
-    REDUCED_MD = 101
-    REDUCED_RGAS = 102
-    REAL = 103
-
-class Units(DftEnum):
-    ENERGY = 110
-    PRESSURE = 120
-    ENTROPY = 130
-    ENERGY_DENSITY = 140
-    DENSITY = 150
-    ENTROPY_DENSITY = 160
-
 # Plot utility
 LINE_STYLES = OrderedDict(
     [('0',               (0, ())),
