@@ -7,6 +7,8 @@ from src.constants import LenghtUnit, Properties
 import sys
 import matplotlib.pyplot as plt
 from fmt_functionals import bulk_weighted_densities
+from src.dft_numerics import dft_solver
+import time
 
 def test_saftvrqmie_surface_tension():
     """Test saftvrqmie functional"""
@@ -14,11 +16,12 @@ def test_saftvrqmie_surface_tension():
     # Set up thermopack and equilibrium state
     thermopack = saftvrqmie()
     thermopack.init("H2,Ne",additive_hard_sphere_reference=True)
-    T = 25.0
+    T = 24.59
     thermopack.set_tmin(5.0)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.array([0.4,0.6]))
-    Tc = 50.0
-    n_grid = 1024
+    z=np.array([0.0144,1.0-0.0144])
+    vle = equilibrium.bubble_pressure(thermopack, T, z)
+    Tc, _, _ = thermopack.critical(z)
+    n_grid = 512
     domain_size=200.0
 
     # Define interface with initial tanh density profile
@@ -26,12 +29,20 @@ def test_saftvrqmie_surface_tension():
                                                Tc,
                                                domain_size=domain_size,
                                                n_grid=n_grid)
+    # Solve for equilibrium profile
+    interf.solve(log_iter=True)
+    # Plot profile
+    # interf.plot_property_profiles(plot_reduced_property=True,
+    #                           plot_equimolar_surface=False,
+    #                           plot_bulk=True,
+    #                           include_legend=True,
+    #                           grid_unit=LenghtUnit.REDUCED)
 
     # Test differentials
     # interf.single_convolution()
-    # alias = "w0"
-    # interf.test_functional_differential(alias,ic=0)
-    # interf.test_functional_differential(alias,ic=1)
+    # for wf in interf.convolver.weighted_densities.wfs:
+    #     interf.test_functional_differential(wf,ic=0)
+    #     interf.test_functional_differential(wf,ic=1)
 
     # Test temperature differentials
     # eps_T = 1.0e-5
@@ -56,49 +67,15 @@ def test_saftvrqmie_surface_tension():
     # plt.clf()
 
     # Test bulk properties
-
-    # Plot profile
-    interf.single_convolution()
-
-    F = interf.functional.excess_free_energy(interf.convolver.weighted_densities)
-    rho_bl = interf.bulk.get_reduced_density(interf.bulk.left_state.x/interf.bulk.left_state.specific_volume())
-    rho_br = interf.bulk.get_reduced_density(interf.bulk.right_state.x/interf.bulk.right_state.specific_volume())
-
-    interf.functional.differentials(interf.convolver.weighted_densities)
-    print("n0",interf.convolver.weighted_densities.n0[-1])
-    print("n1",interf.convolver.weighted_densities.n1[-1])
-    print("n2",interf.convolver.weighted_densities.n2[-1])
-    print("n3",interf.convolver.weighted_densities.n3[-1])
-    print("d0",interf.functional.d0[-1, :])
-    print("d1",interf.functional.d1[-1, :])
-    print("d2",interf.functional.d2[-1, :])
-    print("d3",interf.functional.d3[-1, :])
-    #print(interf.functional.d1v[-1, :])
-    #print(interf.functional.d2v[-1, :])
-
-
-    bd_l = bulk_weighted_densities(rho_bl, interf.functional.R, interf.functional.ms)
-    phi_l, dphidn_l = interf.functional.bulk_fmt_functional_with_differentials(bd_l)
-    #print(dphidn_l)
-    bd_r = bulk_weighted_densities(rho_br, interf.functional.R, interf.functional.ms)
-    phi_r, dphidn_r = interf.functional.bulk_fmt_functional_with_differentials(bd_r)
-    print("n_r",bd_r.n)
-    print("dphidn_r",dphidn_r)
-    # interf.plot_property_profiles(plot_reduced_property=True,
-    #                               plot_equimolar_surface=False,
-    #                               plot_bulk=True,
-    #                               include_legend=True,
-    #                               grid_unit=LenghtUnit.REDUCED)
     interf.test_functional_in_bulk()
-
-    sys.exit()
-    # Solve for equilibrium profile
-    interf.solve()
-    print(interf.profile.densities[0][int(n_grid/2)])
     # Calculate surface tension
     gamma = interf.surface_tension_real_units()*1.0e3
     print(f"SAFT-VRQ Mie surface tension {gamma} mN/m")
-    print(f"SAFT-VRQ Mie (feos) surface tension 13.7944719 mN/m")
+    print(f"SAFT-VRQ Mie (feos) surface tension 4.24514776308888 mN/m")
 
 if __name__ == "__main__":
+    st = time.process_time()
     test_saftvrqmie_surface_tension()
+    et = time.process_time()
+    res = et - st
+    print('CPU Execution time:', res, 'seconds')

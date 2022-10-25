@@ -7,6 +7,34 @@ from pcsaft_functional import saft_dispersion
 from pyctp.saftvrmie import saftvrmie
 from pyctp.saftvrqmie import saftvrqmie
 
+def get_n0jxi(dens, i, j):
+    """
+    Calculates n0jxi=n0j*(1-n2vj*n2vj/n2j*n2j)
+
+    Args:
+    dens (array_like): Weighted densities
+    i (int): Cell index
+    j (int): Component index
+
+    Returns:
+    n0j (float): Corrected n0j density
+    n0j_diff (np.ndarray): Differentials of n0j
+
+    """
+    n_alpha_j = dens.comp_weighted_densities[j].get_fmt_densities(i)
+    n0j_diff = np.zeros_like(n_alpha_j)
+    fac = 1.0 - (n_alpha_j[-1]/n_alpha_j[2])**2
+    n0j = n_alpha_j[0]*fac
+    if n0j < 0.0:
+        print("Setting i,j to zero",i,j)
+        n0j = 0.0
+    else:
+        n0j_diff[0] = fac
+        n0j_diff[2] = 2*n_alpha_j[0]*n_alpha_j[-1]**2/n_alpha_j[2]**3
+        n0j_diff[-1] = -2*n_alpha_j[0]*n_alpha_j[-1]/n_alpha_j[2]**2
+
+    return n0j, n0j_diff
+
 class saftvrqmie_functional(saft_dispersion):
     """
 
@@ -108,15 +136,16 @@ class saftvrqmie_functional(saft_dispersion):
 
         """
         f = saft_dispersion.excess_free_energy(self, dens)
+        #f[:] = 0.0
         if self.na_enabled:
             for i in range(self.n_grid):
                 n_alpha = dens.get_fmt_densities(i)
                 for j in range(self.nc):
-                    n_alpha_j = dens.comp_weighted_densities[j].get_fmt_densities(i)
+                    n0j, _ = get_n0jxi(dens, i, j)
                     for k in range(j+1,self.nc):
-                        n_alpha_k = dens.comp_weighted_densities[k].get_fmt_densities(i)
+                        n0k, _ = get_n0jxi(dens, i, k)
                         g_jk, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k])
-                        f[i] -= 4*np.pi*n_alpha_j[0]*n_alpha_k[0]*self.d_ij[j,k]**2*g_jk*(self.d_ij[j,k] - self.delta_ij[j,k])
+                        f[i] -= 4*np.pi*n0j*n0k*self.d_ij[j,k]**2*g_jk*(self.d_ij[j,k] - self.delta_ij[j,k])
         return f
 
     def differentials(self, dens):
@@ -141,14 +170,18 @@ class saftvrqmie_functional(saft_dispersion):
             for i in range(self.n_grid):
                 n_alpha = dens.get_fmt_densities(i)
                 for j in range(self.nc):
-                    n_alpha_j = dens.comp_weighted_densities[j].get_fmt_densities(i)
+                    n0j, n0j_diff = get_n0jxi(dens, i, j)
                     for k in range(j+1,self.nc):
-                        n_alpha_k = dens.comp_weighted_densities[k].get_fmt_densities(i)
+                        n0k, n0k_diff = get_n0jxi(dens, i, k)
                         g_jk, g_jk_n, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], calc_g_ij_n=True)
                         ck = -4*np.pi*self.d_ij[j,k]**2*(self.d_ij[j,k] - self.delta_ij[j,k])
-                        self.d0[i, j] += ck*n_alpha_k[0]*g_jk
-                        self.d0[i, k] += ck*n_alpha_j[0]*g_jk
-                        ck *= n_alpha_j[0]*n_alpha_k[0]
+                        self.d0[i, j] += ck*n0k*g_jk*n0j_diff[0]
+                        self.d0[i, k] += ck*n0j*g_jk*n0k_diff[0]
+                        self.d2[i, j] += ck*n0k*g_jk*n0j_diff[2]
+                        self.d2[i, k] += ck*n0j*g_jk*n0k_diff[2]
+                        self.d2v[i, j] += ck*n0k*g_jk*n0j_diff[-1]
+                        self.d2v[i, k] += ck*n0j*g_jk*n0k_diff[-1]
+                        ck *= n0j*n0k
                         self.d0[i, :] += ck*g_jk_n[0]
                         self.d1[i, :] += ck*g_jk_n[1]
                         self.d2[i, :] += ck*g_jk_n[2]
@@ -262,11 +295,11 @@ class saftvrqmie_functional(saft_dispersion):
             for i in range(self.n_grid):
                 n_alpha = dens.get_fmt_densities(i)
                 for j in range(self.nc):
-                    n_alpha_j = dens.comp_weighted_densities[j].get_fmt_densities(i)
+                    n0j, _ = get_n0jxi(dens, i, j)
                     for k in range(j+1,self.nc):
-                        n_alpha_k = dens.comp_weighted_densities[k].get_fmt_densities(i)
+                        n0k, _ = get_n0jxi(dens, i, k)
                         g_jk, g_jk_T, = self.thermo.calc_bmcsl_gij_fmt(n_alpha, self.mu_ij[j,k], mu_ij_T=self.mu_ij_T[j,k])
-                        ck = -4*np.pi*n_alpha_j[0]*n_alpha_k[0]
+                        ck = -4*np.pi*n0j*n0k
                         d_T[i] += ck*g_jk_T*self.d_ij[j,k]**2*(self.d_ij[j,k] - self.delta_ij[j,k]) \
                             + 2*ck*g_jk*self.d_ij[j,k]*(self.d_ij[j,k] - self.delta_ij[j,k])*self.d_T_ij[j,k] \
                             + ck*g_jk*self.d_ij[j,k]**2*self.d_T_ij[j,k] \

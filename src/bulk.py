@@ -57,23 +57,20 @@ class Bulk(object):
         # Test
         # mu_res_left, = functional.thermo.chemical_potential_tv(self.temperature, volume=left_state.v, n=left_state.x, property_flag="R")
         # mu_res_left /= (self.temperature*functional.thermo.Rgas)
-        # print("left",mu_res_left)
         # mu_res_right, = functional.thermo.chemical_potential_tv(self.temperature, volume=right_state.v, n=right_state.x, property_flag="R")
         # mu_res_right /= (self.temperature*functional.thermo.Rgas)
-        # print("right",mu_res_right)
-        # print("Thermopack mu_res", mu_res_right, self.mu_res_scaled_beta,
-        #       mu_res_right - self.mu_res_scaled_beta)
+        # print("Thermopack mu_res", mu_res_right)
+        # print("Functional mu_res", self.mu_res_scaled_beta)
+        # print("Diff mu_res", mu_res_right - self.mu_res_scaled_beta)
 
         # volfac = NA*functional.thermo.sigma[0]**3
         # red_vol = (functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
         # f = left_state.excess_free_energy_density()/(self.temperature*self.functional.thermo.Rgas)
         # a_hs, a_hs_n, = functional.thermo.a_hard_sphere(self.temperature, volume=left_state.v, n=left_state.x, a_n=True)
         # a_disp, a_disp_n, = functional.thermo.a_dispersion(self.temperature, volume=left_state.v, n=left_state.x, a_n=True)
-        # print("left a_disp, a_hs, a", a_disp, a_hs, a_disp + a_hs, f*left_state.v)
+        # print("left a_disp, a_hs, a, a_func", a_disp, a_hs, a_disp + a_hs, f*left_state.v)
 
         # v_fac = volfac/left_state.v
-        # print(volfac, v_fac)
-        # print(left_state.v)
         # print("left density a_disp, a_hs, a", a_disp*v_fac, a_hs*v_fac, (a_disp + a_hs)*v_fac, f*volfac)
         # print("left density a_disp, a_hs, a", a_disp/left_state.v, a_hs/left_state.v, (a_disp + a_hs)/left_state.v)
         # print("functional left density", functional.bulk_excess_free_energy_density(self.reduced_density_left)*red_vol)
@@ -82,21 +79,19 @@ class Bulk(object):
         # print("left mu_disp, mu_hs", mu_disp, mu_hs)
 
         # rho = 1.0/right_state.v
-        # print(1/right_state.v)
-        # a_hs, a_hs_n, = functional.thermo.a_hard_sphere(self.temperature, volume=right_state.v, n=right_state.x, a_n=True)
-        # a_disp, a_disp_n, = functional.thermo.a_dispersion(self.temperature, volume=right_state.v, n=right_state.x, a_n=True)
-        # print("right a_disp, a_hs, a", a_disp, a_hs, a_disp + a_hs)
+        # a_hs, a_hs_v, a_hs_n, = functional.thermo.a_hard_sphere(self.temperature, volume=right_state.v, n=right_state.x, a_n=True, a_v=True)
+
+        # a_disp, a_disp_v, a_disp_n, = functional.thermo.a_dispersion(self.temperature, volume=right_state.v, n=right_state.x, a_n=True, a_v=True)
         # v_fac = volfac/right_state.v
         # print("right density a_disp, a_hs, a", a_disp*v_fac, a_hs*v_fac, (a_disp + a_hs)*v_fac)
-        # #print("right density a_disp, a_hs, a", a_disp/right_state.v, a_hs/right_state.v, (a_disp + a_hs)/right_state.v)
+        # print("right density a_disp, a_hs, a", a_disp/right_state.v, a_hs/right_state.v, (a_disp + a_hs)/right_state.v)
         # print("functional right density", functional.bulk_excess_free_energy_density(self.reduced_density_right),
-        #       functional.bulk_excess_free_energy_density(self.reduced_density_right)*red_vol)
+        #      functional.bulk_excess_free_energy_density(self.reduced_density_right)*red_vol)
         # mu_disp = a_disp + a_disp_n
         # mu_hs = a_hs + a_hs_n
-        # m = functional.thermo.m[0]
-        # mu_hs *= m
-        # print("right mu_disp, mu_hs", mu_disp, mu_hs, mu_disp + mu_hs)
+        # mu_hs *= functional.thermo.m[:]
         # print("right mu_chain", mu_res_right - mu_disp - mu_hs)
+        # sys.exit()
 
     @property
     def red_pressure_right(self):
