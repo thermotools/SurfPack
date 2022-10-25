@@ -15,8 +15,6 @@ Classical density functinal theory for thermopack
   * Implement one-dimensional cylindrical geometries
   * Extract radial distribution function and compare to simulations
   * Entropy for spherical
-  * Optimize thermopack to avoid calculating hs-diamater every time
-  * Optimize SAFT-VR Mie loops
 
 # References
 <a id="1">[1]</a>
