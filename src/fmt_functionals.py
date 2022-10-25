@@ -33,6 +33,7 @@ class bulk_weighted_densities:
         self.dndrho[1, :] = ms*R
         self.dndrho[2, :] = ms*4*np.pi*R**2
         self.dndrho[3, :] = ms*4*np.pi*R**3/3
+        self.n0b = np.sum(rho_b)
 
     def print(self):
         print("Bulk weighted densities:")
@@ -152,7 +153,7 @@ class Rosenfeld:
         phi, dphidn = self.bulk_fmt_functional_with_differentials(bd)
         beta_p_ex = - phi + np.sum(dphidn[:4] * bd.n)
         beta_p_id = bd.n[0]
-        z = (beta_p_id + beta_p_ex)/bd.n[0]
+        z = 1.0 + beta_p_ex/bd.n0b
         return z
 
     def bulk_excess_chemical_potential(self, rho_b):

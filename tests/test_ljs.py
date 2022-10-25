@@ -38,7 +38,7 @@ def test_ljs_surface_tension(inpt):
     print(f"LJs surface tension {gamma}")
 
     # Test result
-    assert(gamma == approx(inpt["gamma"], rel=1.0e-7))
+    assert(gamma == approx(inpt["gamma"], rel=1.0e-6))
 
 def test_ljs_entropy():
     """Test ljs entropy"""
@@ -119,7 +119,8 @@ def test_ljs_properties():
     s_E = interf.get_excess_entropy_density()
 
     idx = 64
+    #ar = np.array([a_E[idx], h_E[idx], u_E[idx], s_E[idx], p[idx]])
     print(f"a_E={a_E[idx]}, h_E={h_E[idx]}, u_E={u_E[idx]}, s_E={s_E[idx]}, p={p[idx]}")
     # Test result
     assert((a_E[idx], h_E[idx], u_E[idx], s_E[idx], p[idx]) ==
-           approx((-0.6300822393687519, -1.7324182766087972, -1.1989924945855779, -0.8127289360240373, -0.17852327051686853), rel=1.0e-6))
+           approx((-0.63000898, -1.7321974,  -1.1988273,  -0.8125976,  -0.17849772), rel=1.0e-5))

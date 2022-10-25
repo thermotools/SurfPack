@@ -34,4 +34,4 @@ def test_ljs_surface_tension(inpt):
     print(f"PeTS surface tension {gamma}")
 
     # Test result
-    assert(gamma == approx(inpt["gamma"], rel=1.0e-7))
+    assert(gamma == approx(inpt["gamma"], rel=1.0e-6))

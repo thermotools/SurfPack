@@ -331,13 +331,14 @@ class pc_saft(saft_dispersion):
                 for j in range(self.nc):
                     if self.chain_functional_active[j]:
                         rho_j = dens.rho.densities[j][i]
-                        lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_n=True)
+                        lng_jj, lng_jj_n, = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_n=True)
                         lng_jj_n /= (NA*self.grid_reducing_lenght**3) # Reducing unit
                         # Contribution not to be convolved:
                         self.mu_of_rho[i, j] += (self.thermo.m[j]-1.0)*(np.log(rho_j) - lng_jj - np.log(lambda_hc[j]) + 1.0)
                         # Convolved contributions:
-                        self.mu_rho_hc[i, j] = -(self.thermo.m[j]-1.0)*rho_j*lng_jj_n
                         self.mu_lambda_hc[i, j] = -(self.thermo.m[j]-1.0)*rho_j/lambda_hc[j]
+                        for k in range(self.nc):
+                            self.mu_rho_hc[i, k] = -(self.thermo.m[j]-1.0)*rho_j*lng_jj_n[k]
 
     def bulk_excess_free_energy_density(self, rho_b):
         """
@@ -356,6 +357,7 @@ class pc_saft(saft_dispersion):
             rho_thermo = np.zeros_like(rho_b)
             rho_thermo[:] = rho_b[:]
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+            rho_mix = np.sum(rho_thermo)
             V = 1.0/rho_mix
             n = rho_thermo/rho_mix
             for j in range(self.nc):
@@ -384,11 +386,12 @@ class pc_saft(saft_dispersion):
             rho_mix = np.sum(rho_thermo)
             V = 1.0/rho_mix
             n = rho_thermo/rho_mix
+            z_r = 0.0
             for j in range(self.nc):
                 if self.chain_functional_active[j]:
-                    lng_jj, lng_jj_V = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_V=True)
-                    a_V = -(self.thermo.m[j]-1.0)*rho_b[j]*(lng_jj_V - lng_jj/V)
-                    z_r = -a_V*V
+                    lng_jj, lng_jj_V, = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_v=True)
+                    a_V = -(self.thermo.m[j]-1.0)*n[j]*lng_jj_V
+                    z_r -= a_V*V
             z += z_r
         return z
 
@@ -415,7 +418,9 @@ class pc_saft(saft_dispersion):
             for j in range(self.nc):
                 if self.chain_functional_active[j]:
                     lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_n=True)
-                    a_n = -(self.thermo.m[j]-1.0)*(rho_thermo[j]*lng_jj_n + lng_jj)
+                    a_n = rho_thermo[j]*lng_jj_n
+                    a_n[j] += lng_jj
+                    a_n *= -(self.thermo.m[j]-1.0)
                     mu_ex += a_n
         return mu_ex
 
@@ -485,4 +490,15 @@ class pc_saft(saft_dispersion):
 
 
 if __name__ == "__main__":
-    pass
+    #from pyctp.thermopack_state import equilibrium
+    thermopack = pcsaft()
+    thermopack.init("C1,N2")
+    T = 111.667
+    P = 1.0e5
+    z=np.array([0.5,0.5])
+    thermopack.set_tmin(50.0)
+    v, = thermopack.specific_volume(T,P,z,thermopack.LIQPH)
+    func = pc_saft(2,
+                   thermopack,
+                   T_red=T/thermopack.eps_div_kb[0])
+    func.test_eos_differentials(V=v, n=z)

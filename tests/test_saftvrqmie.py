@@ -34,4 +34,4 @@ def test_hydrogen_surface_tension(inpt):
     print(f"Hydrogen surface tension {gamma} N/m")
 
     # Test result
-    assert(gamma == approx(inpt["gamma"], rel=1.0e-8))
+    assert(gamma == approx(inpt["gamma"], rel=1.0e-5))

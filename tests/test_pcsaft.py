@@ -32,7 +32,7 @@ def test_pcsaft_dispersion_surface_tension(inpt):
     print(f"PC-SAFT surface tension {gamma} mN/m")
 
     # Test result
-    assert(gamma == approx(inpt["gamma"], rel=1.0e-8))
+    assert(gamma == approx(inpt["gamma"], rel=1.0e-6))
 
 def test_pcsaft_dispersion_entropy():
     """Test PC-SAFT entropy"""
@@ -129,3 +129,25 @@ def test_pcsaft_chain_entropy():
     print((s - s_num)/s_num)
     # Test result
     assert(s == approx(s_num, rel=5.0e-6))
+
+def test_pcsaft_mixture_surface_tension():
+    """Test PC-SAFT mixture functional"""
+
+    thermopack = pcsaft()
+    thermopack.init("C1,N2")
+    T = 111.667
+    thermopack.set_tmin(100.0)
+    vle = equilibrium.bubble_pressure(thermopack, T, z=np.array([0.5,0.5]))
+    Tc, _, _ = thermopack.critical(np.array([0.5,0.5]))
+    # Define interface with initial tanh density profile
+    interf = PlanarInterface.from_tanh_profile(vle,
+                                               Tc,
+                                               domain_size=200.0,
+                                               n_grid=1024)
+    # Solve for equilibrium profile
+    interf.solve()
+
+    # Calculate surface tension
+    gamma = interf.surface_tension_real_units()*1.0e3
+    print(f"PC-SAFT C1-N2 surface tension {gamma} mN/m")
+    assert(gamma == approx(6.634872247359591, rel=1.0e-6))

@@ -52,7 +52,7 @@ class Bulk(object):
             self.reduced_density_right)
         self.mu_ig_scaled_beta = np.log(self.reduced_density_right)
         self.mu_scaled_beta = self.mu_ig_scaled_beta + self.mu_res_scaled_beta
-        self.real_mu = functional.thermo.chemical_potential_tv(self.temperature, volume=1.0, n=left_state.partial_density())
+        self.real_mu, = functional.thermo.chemical_potential_tv(self.temperature, volume=1.0, n=left_state.partial_density())
 
         # Test
         # mu_res_left, = functional.thermo.chemical_potential_tv(self.temperature, volume=left_state.v, n=left_state.x, property_flag="R")

@@ -162,12 +162,9 @@ class Interface(ABC):
         else:
             self.reset_cache()
             self.n_tot = self.calculate_total_moles()
-            #print("n_tot", self.n_tot)
             # Set up convolver
             self.convolver = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
             x0 = self.pack_x_vec()
-            # print("x0:", x0)
-            # sys.exit()
             x_sol, self.converged = solver.solve(
                 x0, self.residual, log_iter)
             if self.converged:
@@ -855,7 +852,6 @@ class Interface(ABC):
         plt.xlabel(x_label)
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
-        print(energy_scaling,self.bulk.left_state.excess_enthalpy_density(), self.bulk.right_state.excess_enthalpy_density())
         plt.figure()
         plt.plot(self.grid.z*len_fac, h_E,label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_enthalpy_density()]),
