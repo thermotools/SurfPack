@@ -6,6 +6,7 @@ from pyctp.pcsaft import pcsaft
 from pyctp.thermopack_state import equilibrium
 from src.interface import SphericalInterface
 from src.interface import PlanarInterface
+from src.constants import LenghtUnit
 
 # Set up thermopack and equilibrium state
 thermopack = pcsaft()
@@ -30,8 +31,11 @@ spi = SphericalInterface.from_tanh_profile(vle,
 spi.solve(log_iter=True)
 
 # Plot profile
-spi.plot_equilibrium_density_profiles(plot_actual_densities=False,
-                                      plot_equimolar_surface=True)
+spi.plot_property_profiles(plot_reduced_property=True,
+                           plot_equimolar_surface=True,
+                           plot_bulk=True,
+                           include_legend=True,
+                           grid_unit=LenghtUnit.REDUCED)
 
 # Surface tension
 print(f"Planar surface tension: {1.0e3*sigma0} mN/m")

@@ -1128,5 +1128,17 @@ class SphericalInterface(Interface):
             delta *= sigma
         return gamma_s, r_s, delta
 
+    def parallel_pressure(self, reduced=True):
+        """
+        Calculates the parallel component of the pressure tensor
+
+        Returns:
+            (float): Reduced pressure
+        """
+        print("Copied code form planar check validity")
+        _, p_parallel = self.grand_potential()
+        p_parallel = - p_parallel / self.grid.integration_weights
+        return p_parallel*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+
 if __name__ == "__main__":
     pass
