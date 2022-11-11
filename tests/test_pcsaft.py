@@ -10,7 +10,7 @@ import pytest
 @pytest.mark.parametrize('inpt', [{"T": 111.667, "gamma": 13.794488625002232},
                                   {"T": 150.0, "gamma": 6.209634295335075}])
 def test_pcsaft_dispersion_surface_tension(inpt):
-    """Test ljs functional"""
+    """Test pc-saft functional"""
 
     # Set up thermopack and equilibrium state
     thermopack = pcsaft()

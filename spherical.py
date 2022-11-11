@@ -15,8 +15,8 @@ T = 140.0
 vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
 # Define interface with initial tanh density profile
-#sigma0 = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(1), domain_size=100.0, n_grid=1024).solve().surface_tension_real_units()
-sigma0 = 0.00815622572569111
+sigma0 = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(1), domain_size=100.0, n_grid=1024).solve().surface_tension_real_units()
+#sigma0 = 0.00815622572569111
 
 # Define interface with initial tanh density profile
 spi = SphericalInterface.from_tanh_profile(vle,
