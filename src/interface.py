@@ -82,12 +82,11 @@ class Interface(ABC):
         self.specification = specification
         self.n_tot = None
         self.convolver = None
-        self.n_tot = None
         self.r_equimolar = None
         # Chache for calculated states
         self.s_E = None
 
-    def unpack_profile(self, xvec):
+    def unpack_variables(self, xvec):
         # Set profile
         n_grid = self.grid.n_grid
         n_c = self.functional.nc
@@ -97,7 +96,14 @@ class Interface(ABC):
         # Calculate weighted densities
         for ic in range(n_c):
             prof.densities[ic][:] = xvec[ic*n_grid:(ic+1)*n_grid]
-        return prof
+
+        if self.specification == Specification.NUMBER_OF_MOLES:
+            z = np.zeros(n_c)
+            n_rho = n_c * n_grid
+            z[:] = xvec[n_rho:n_rho + n_c]
+        else:
+            z = None
+        return prof, z
 
     def pack_x_vec(self):
         n_grid = self.grid.n_grid
@@ -124,7 +130,7 @@ class Interface(ABC):
         # Set profile
         n_grid = self.grid.n_grid
         n_c = self.functional.nc
-        prof = self.unpack_profile(xvec)
+        prof, z = self.unpack_variables(xvec)
 
         n_rho = n_c * n_grid
         beta_mu = np.zeros(n_c)
@@ -138,20 +144,20 @@ class Interface(ABC):
                        (1 if self.specification ==
                         Specification.NUMBER_OF_MOLES else 0))
 
-        for ic in range(n_c):
-            res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.convolver.correlation(ic)[:]
-                       + beta_mu[ic] - self.bulk.beta * self.v_ext[ic][:]) \
-                + xvec[ic * n_grid:(ic+1)*n_grid]
-
         if self.specification == Specification.NUMBER_OF_MOLES:
-            z = np.zeros(n_c)
-            z[:] = xvec[n_rho:n_rho + n_c]
             exp_beta_mu = np.exp(beta_mu)
             z_grid = np.zeros(n_c)
             integrals = self.integrate_df_vext()
             denum = np.dot(exp_beta_mu, integrals)
             z_grid[:] = self.n_tot*exp_beta_mu/integrals
             res[n_rho:] = z - z_grid
+            if not self.grid.geometry == Geometry.PLANAR:
+                beta_mu[:] = 0.5*np.log(z)
+
+        for ic in range(n_c):
+            res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.convolver.correlation(ic)[:]
+                       + beta_mu[ic] - self.bulk.beta * self.v_ext[ic][:]) \
+                + xvec[ic * n_grid:(ic+1)*n_grid]
 
         return res
 
@@ -168,8 +174,13 @@ class Interface(ABC):
             x_sol, self.converged = solver.solve(
                 x0, self.residual, log_iter)
             if self.converged:
-                self.profile = self.unpack_profile(x_sol)
+                self.profile, z = self.unpack_variables(x_sol)
                 # Update bulk properties
+                if not self.grid.geometry == Geometry.PLANAR:
+                    if self.specification == Specification.NUMBER_OF_MOLES:
+                        # Chemical potential can have changed
+                        beta_mu = 0.5*np.log(z)
+                        print("Correct MU according to specification")
                 rho_left = np.zeros_like(self.bulk.real_mu)
                 rho_right = np.zeros_like(self.bulk.real_mu)
                 for i in range(self.functional.nc):
@@ -1023,7 +1034,9 @@ class SphericalInterface(Interface):
                           domain_radius=100.0,
                           n_grid=1024,
                           calculate_bubble=True,
-                          sigma0=None):
+                          sigma0=None,
+                          specification=Specification.NUMBER_OF_MOLES,
+                          functional_kwargs={}):
         """
         Initialize tangens hyperbolicus profile
 
@@ -1036,48 +1049,74 @@ class SphericalInterface(Interface):
                                  temperature=vle.temperature,
                                  radius=radius,
                                  domain_radius=domain_radius,
-                                 n_grid=n_grid)
+                                 n_grid=n_grid,
+                                 specification=specification)
         if not sigma0:
             # Calculate planar surface tension
             sigma0 = sif.tanh_profile(vle,
                                       t_crit=t_crit,
                                       rel_pos_dividing_surface=0.5).solve().surface_tension_real_units()
         sif.sigma0 = sigma0
-        print(sigma0)
         # Extrapolate sigma 0
         phase = sif.functional.thermo.LIQPH if calculate_bubble else sif.functional.thermo.VAPPH
-        print(phase)
         real_radius = radius * sif.functional.grid_reducing_lenght
-        print(real_radius)
-        print(vle.vapor.rho,vle.liquid.rho)
+        signed_radius = real_radius * (-1.0 if calculate_bubble else 1.0)
         # Extrapolate chemical potential to first order and solve for phase densiteis
         mu, rho_l, rho_g = \
             sif.functional.thermo.extrapolate_mu_in_inverse_radius(sigma_0=sigma0,
                                                                     temp=vle.temperature,
                                                                     rho_l=vle.liquid.rho,
                                                                     rho_g=vle.vapor.rho,
-                                                                    radius=real_radius,
+                                                                    radius=signed_radius,
                                                                     geometry="SPHERICAL",
                                                                     phase=phase)
+        #print(mu)
+        #sys.exit()
         # Solve Laplace Extrapolate chemical potential to first order and solve for phase densiteis
-        mu, rho_l, rho_g = \
-            sif.functional.thermo.solve_laplace(sigma_0=sigma0,
-                                                temp=vle.temperature,
-                                                rho_l=rho_l,
-                                                rho_g=rho_g,
-                                                radius=real_radius,
-                                                geometry="SPHERICAL",
-                                                phase=phase)
+        # mu, rho_l, rho_g = \
+        #     sif.functional.thermo.solve_laplace(sigma_0=sigma0,
+        #                                         temp=vle.temperature,
+        #                                         rho_l=rho_l,
+        #                                         rho_g=rho_g,
+        #                                         radius=real_radius,
+        #                                         geometry="SPHERICAL",
+        #                                         phase=phase)
 
         rel_pos_dividing_surface = radius/domain_radius
         vapor = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
         liquid = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
-        vle_modified = equilibrium(vapor, liquid)
+        vle = equilibrium(vapor, liquid)
         # Set profile based on modefied densities
-        sif.tanh_profile(vle=vle_modified,
+        sif.tanh_profile(vle=vle,
                          t_crit=t_crit,
                          rel_pos_dividing_surface=rel_pos_dividing_surface,
                          invert_states=not calculate_bubble)
+        return sif
+
+    @staticmethod
+    def from_profile(vle,
+                     profile,
+                     domain_radius=100.0,
+                     n_grid=1024,
+                     specification=Specification.NUMBER_OF_MOLES,
+                     functional_kwargs={}):
+        """
+        Initialize from profile
+
+            functional_kwargs (dict): Optional argiments for functionals. Pass feks.: functional_kwargs={"psi_disp": 1.5}
+
+        """
+        sif = SphericalInterface(thermopack=vle.eos,
+                                 temperature=vle.temperature,
+                                 radius=0.0,
+                                 domain_radius=domain_radius,
+                                 n_grid=n_grid,
+                                 specification=specification,
+                                 functional_kwargs=functional_kwargs)
+
+        sif.set_profile(vle,
+                        profile,
+                        invert_states=False)
         return sif
 
     def surface_tension(self):
