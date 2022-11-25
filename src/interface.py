@@ -149,10 +149,10 @@ class Interface(ABC):
             z_grid = np.zeros(n_c)
             integrals = self.integrate_df_vext()
             denum = np.dot(exp_beta_mu, integrals)
-            z_grid[:] = self.n_tot*exp_beta_mu/integrals
+            z_grid[:] = self.n_tot/integrals
             res[n_rho:] = z - z_grid
             if not self.grid.geometry == Geometry.PLANAR:
-                beta_mu[:] = 0.5*np.log(z)
+                beta_mu[:] = np.log(z)
 
         for ic in range(n_c):
             res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.convolver.correlation(ic)[:]
@@ -176,17 +176,17 @@ class Interface(ABC):
             if self.converged:
                 self.profile, z = self.unpack_variables(x_sol)
                 # Update bulk properties
-                if not self.grid.geometry == Geometry.PLANAR:
-                    if self.specification == Specification.NUMBER_OF_MOLES:
+                if self.specification == Specification.NUMBER_OF_MOLES:
+                    if not self.grid.geometry == Geometry.PLANAR:
                         # Chemical potential can have changed
-                        beta_mu = 0.5*np.log(z)
-                        print("Correct MU according to specification")
-                rho_left = np.zeros_like(self.bulk.real_mu)
-                rho_right = np.zeros_like(self.bulk.real_mu)
-                for i in range(self.functional.nc):
-                    rho_left[i] = self.profile.densities[i][1]
-                    rho_right[i] = self.profile.densities[i][-2]
-                self.bulk.update_bulk_densities(rho_left, rho_right)
+                        beta_mu = np.log(z)
+                        self.bulk.update_chemical_potential(beta_mu)
+                        rho_left = np.zeros_like(self.bulk.real_mu)
+                        rho_right = np.zeros_like(self.bulk.real_mu)
+                        for i in range(self.functional.nc):
+                            rho_left[i] = self.profile.densities[i][1]
+                            rho_right[i] = self.profile.densities[i][-2]
+                        self.bulk.update_densities(rho_left, rho_right)
                 self.calculate_equimolar_dividing_surface()
             else:
                 print("Interface solver did not converge")
@@ -332,34 +332,30 @@ class Interface(ABC):
         return mu_E
 
     @abstractmethod
-    def surface_tension(self):
+    def surface_tension(self, reduced_unit=False):
+        """
+        Calculates the surface tension of the system.
+
+        Args;
+            reduced_unit (bool): Calculate using reduced units? Default False.
+
+        Returns:
+            (float): Surface tension (reduced units or J/m2)
+        """
+        pass
+
+    def surface_tension_real_units(self):
         """
         Calculates the surface tension of the system.
 
         Returns:
-            (float): Surface tension (reduced units)
+            (float): Surface tension (J/m2)
         """
-
-        if not self.converged:
-            self.print_perform_minimization_message()
-            return
-
-        _, omega_a = self.grand_potential()
-
-        print(self.bulk.red_pressure_left, self.bulk.red_pressure_right)
-
-        v_left = self.grid.get_volume(self.r_equimolar)
-        v_right = self.grid.total_volume - v_left
-        print(v_left,v_right, sum(self.grid.integration_weights)-self.grid.total_volume)
-        #gamma = np.sum(omega_a) + v_left*self.bulk.red_pressure_left + v_right*self.bulk.red_pressure_right
-
-        delta_omega = np.sum(omega_a) + self.grid.total_volume*self.bulk.red_pressure_right
-        dp = self.bulk.red_pressure_left - self.bulk.red_pressure_right
-        gamma = (3*delta_omega*dp**2/16/np.pi)**(1/3)
-        #omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
-        #gamma = np.sum(omega_a)
-        print("ratio: ",self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)
-        return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
+        gamma_star = self.surface_tension(reduced_unit=True)
+        eps = self.functional.thermo.eps_div_kb[0] * KB
+        sigma = self.functional.thermo.sigma[0]
+        gamma = gamma_star * eps / sigma ** 2
+        return gamma
 
     @abstractmethod
     def parallel_pressure(self):
@@ -371,20 +367,6 @@ class Interface(ABC):
         """
 
         return None
-
-    def surface_tension_real_units(self):
-        """
-        Calculates the surface tension of the system.
-
-        Returns:
-            (float): Surface tension (J/m2)
-        """
-        gamma_star = self.surface_tension()
-        eps = self.functional.thermo.eps_div_kb[0] * KB
-        sigma = self.functional.thermo.sigma[0]
-        gamma = gamma_star * eps / sigma ** 2
-        return gamma
-
 
     def calculate_total_moles(self):
         """
@@ -595,6 +577,98 @@ class Interface(ABC):
                          (nd_densities[:, :].T / self.cDFT.bulk_densities).T],
                    header="# r, rho, rho/rho_bulk")
 
+    def get_property_profiles(self,
+                              prop=Properties.RHO,
+                              reduced_property=True):
+        """
+        Get equilibrium profile
+        Args:
+            data_dict: Additional data to plot
+        """
+        # if not self.converged:
+        #     self.print_perform_minimization_message()
+        #     return
+
+        prop_profiles = []
+        legend = []
+        unit_scaling = 1.0
+        if prop == Properties.GRID:
+            if self.functional.grid_unit == LenghtUnit.ANGSTROM and reduced_property:
+                prop_fac = 1.0/(self.functional.thermo.sigma[0]*1e10)
+                label = r"$z^*$"
+            else:
+                prop_fac = self.functional.grid_reducing_lenght*1e10
+                label = r"$z$ (Å)"
+            prop_profiles.append(self.grid.z[:]*prop_fac)
+        elif prop == Properties.RHO:
+            if reduced_property:
+                prop_fac = (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+                label = r"$\rho^*$"
+            else:
+                prop_fac = 1.0e-3/(NA*self.functional.grid_reducing_lenght**3)
+                label = r"$\rho$ (kmol/m$^3$)"
+            for i in range(self.profile.densities.nc):
+                prop_profiles.append(self.profile.densities[i][:] * prop_fac)
+                legend.append(f"{self.functional.thermo.get_comp_name(i+1)}")
+        else:
+            legend.append("Functional")
+            if reduced_property:
+                prop_fac = 1.0
+            else:
+                eps = self.functional.thermo.eps_div_kb[0]*KB
+                sigma = self.functional.thermo.sigma[0]
+                prop_fac = eps/sigma**3
+            if prop == Properties.FREE_ENERGY:
+                prop_val = self.get_excess_free_energy_density()
+                if reduced_property:
+                    label = r"$a^*_{\rm{E}}$"
+                else:
+                    unit_scaling = 1.0e-3
+                    prop_fac = 1.0e-3
+                    label = r"$a_{\rm{E}}$ (kJ/mol)"
+            elif prop == Properties.ENERGY:
+                prop_val = self.get_excess_energy_density()
+                if reduced_property:
+                    label = r"$u^*_{\rm{E}}$"
+                else:
+                    unit_scaling = 1.0e-3
+                    prop_fac = 1.0e-3
+                    label = r"$u_{\rm{E}}$ (kJ/mol)"
+            elif prop == Properties.ENTROPY:
+                prop_val = self.get_excess_entropy_density()
+                if reduced_property:
+                    label = r"$s^*_{\rm{E}}$"
+                else:
+                    prop_fac = NA*KB
+                    label = r"$s_{\rm{E}}$ (J/mol/K)"
+            elif prop == Properties.ENTHALPY:
+                prop_val = self.get_excess_enthalpy_density()
+                if reduced_property:
+                    label = r"$h^*_{\rm{E}}$"
+                else:
+                    unit_scaling = 1.0e-3
+                    prop_fac = 1.0e-3
+                    label = r"$h_{\rm{E}}$ (kJ/mol)"
+            elif prop == Properties.CHEMPOT_SUM:
+                prop_val = self.get_excess_chemical_potential_density_sum()
+                if reduced_property:
+                    label = r"$\mu^*_{\rm{E}}$"
+                else:
+                    unit_scaling = 1.0e-3
+                    prop_fac = 1.0e-3
+                    label = r"$\mu_{\rm{E}}$ (kJ/mol)"
+            elif prop == Properties.PARALLEL_PRESSURE:
+                prop_val = self.parallel_pressure()
+                if reduced_property:
+                    label = r"$p^*_{\parallel}$"
+                else:
+                    unit_scaling = 1.0e-6
+                    prop_fac = 1.0e-6
+                    label = r"$p_{\parallel}$ (MPa)"
+            prop_profiles.append(prop_val * prop_fac)
+
+        return prop_profiles, legend, label, unit_scaling
+
     def plot_property_profiles(self,
                                prop=Properties.RHO,
                                xlim=None,
@@ -603,7 +677,7 @@ class Interface(ABC):
                                plot_equimolar_surface=False,
                                plot_bulk=False,
                                include_legend=False,
-                               grid_unit=None):
+                               continue_after_plotting=False):
         """
         Plot equilibrium profiles
         Args:
@@ -612,101 +686,114 @@ class Interface(ABC):
         # if not self.converged:
         #     self.print_perform_minimization_message()
         #     return
-        prop_b_scaling = 1.0
-        if not grid_unit:
-            grid_unit = self.functional.grid_unit
+        z, _, xlabel, _ = self.get_property_profiles(prop=Properties.GRID,
+                                                     reduced_property=plot_reduced_property)
+        z = z[0]
+        prop_profiles, legend, ylabel, unit_scaling = self.get_property_profiles(prop=prop,
+                                                                                 reduced_property=plot_reduced_property)
+        # prop_b_scaling = 1.0
+        # if not grid_unit:
+        #     grid_unit = self.functional.grid_unit
+        # fig, ax = plt.subplots(1, 1)
+        # if grid_unit==LenghtUnit.REDUCED:
+        #     ax.set_xlabel(r"$z/\sigma_{11}$")
+        # elif grid_unit==LenghtUnit.ANGSTROM:
+        #     ax.set_xlabel(r"$z$ (Å)")
+        # if self.functional.grid_unit == LenghtUnit.ANGSTROM and grid_unit == LenghtUnit.REDUCED:
+        #     len_fac = 1.0/(self.functional.thermo.sigma[0]*1e10)
+        # else:
+        #     len_fac = self.functional.grid_reducing_lenght*1e10
+
+        # if prop == Properties.RHO:
+        #     dens_fac = np.ones(self.profile.densities.nc)
+        #     if plot_reduced_property:
+        #         dens_fac *= (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+        #         ax.set_ylabel(r"$\rho^*$")
+        #     else:
+        #         prop_b_scaling = 1.0e-3
+        #         dens_fac *= 1.0e-3/(NA*self.functional.grid_reducing_lenght**3)
+        #         ax.set_ylabel(r"$\rho$ (kmol/m$^3$)")
+        #     for i in range(self.profile.densities.nc):
+        #         ax.plot(self.grid.z[:]*len_fac,
+        #                 self.profile.densities[i][:] * dens_fac[i],
+        #                 lw=2, color=LCOLORS[i],
+        #                 label=f"{self.functional.thermo.get_comp_name(i+1)}")
+        # else:
+        #     label = "Functional"
+        #     if plot_reduced_property:
+        #         prop_scaling = 1.0
+        #     else:
+        #         eps = self.functional.thermo.eps_div_kb[0]*KB
+        #         sigma = self.functional.thermo.sigma[0]
+        #         prop_scaling = eps/sigma**3
+        #     if prop == Properties.FREE_ENERGY:
+        #         prop_val = self.get_excess_free_energy_density()
+        #         if plot_reduced_property:
+        #             ax.set_ylabel(r"$a^*_{\rm{E}}$")
+        #         else:
+        #             prop_b_scaling = 1.0e-3
+        #             prop_scaling *= prop_b_scaling
+        #             ax.set_ylabel(r"$a_{\rm{E}}$ (kJ/mol)")
+        #     elif prop == Properties.ENERGY:
+        #         prop_val = self.get_excess_energy_density()
+        #         if plot_reduced_property:
+        #             ax.set_ylabel(r"$u^*_{\rm{E}}$")
+        #         else:
+        #             prop_b_scaling = 1.0e-3
+        #             prop_scaling *= prop_b_scaling
+        #             ax.set_ylabel(r"$u_{\rm{E}}$ (kJ/mol)")
+        #     elif prop == Properties.ENTROPY:
+        #         prop_val = self.get_excess_entropy_density()
+        #         if plot_reduced_property:
+        #             ax.set_ylabel(r"$s^*_{\rm{E}}$")
+        #         else:
+        #             prop_scaling = NA*KB
+        #             ax.set_ylabel(r"$s_{\rm{E}}$ (J/mol/K)")
+        #     elif prop == Properties.ENTHALPY:
+        #         prop_val = self.get_excess_enthalpy_density()
+        #         if plot_reduced_property:
+        #             ax.set_ylabel(r"$h^*_{\rm{E}}$")
+        #         else:
+        #             prop_b_scaling = 1.0e-3
+        #             prop_scaling *= prop_b_scaling
+        #             ax.set_ylabel(r"$h_{\rm{E}}$ (kJ/mol)")
+        #     elif prop == Properties.CHEMPOT_SUM:
+        #         prop_val = self.get_excess_chemical_potential_density_sum()
+        #         if plot_reduced_property:
+        #             ax.set_ylabel(r"$\mu^*_{\rm{E}}$")
+        #         else:
+        #             prop_scaling *= prop_b_scaling
+        #             ax.set_ylabel(r"$\mu_{\rm{E}}$ (kJ/mol)")
+        #     elif prop == Properties.PARALLEL_PRESSURE:
+        #         prop_val = self.parallel_pressure()
+        #         if plot_reduced_property:
+        #             ax.set_ylabel(r"$p^*_{\parallel}$")
+        #         else:
+        #             prop_b_scaling = 1.0e-6
+        #             prop_scaling *= prop_b_scaling
+        #             ax.set_ylabel(r"$p_{\parallel}$ (MPa)")
+
+        #     ax.plot(self.grid.z[:]*len_fac,
+        #             prop_val*prop_scaling,
+        #             label=label,
+        #             lw=2, color=LCOLORS[0])
+
         fig, ax = plt.subplots(1, 1)
-        if grid_unit==LenghtUnit.REDUCED:
-            ax.set_xlabel(r"$z/\sigma_{11}$")
-        elif grid_unit==LenghtUnit.ANGSTROM:
-            ax.set_xlabel(r"$z$ (Å)")
-        if self.functional.grid_unit == LenghtUnit.ANGSTROM and grid_unit == LenghtUnit.REDUCED:
-            len_fac = 1.0/(self.functional.thermo.sigma[0]*1e10)
-        else:
-            len_fac = self.functional.grid_reducing_lenght*1e10
-
-        if prop == Properties.RHO:
-            dens_fac = np.ones(self.profile.densities.nc)
-            if plot_reduced_property:
-                dens_fac *= (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
-                ax.set_ylabel(r"$\rho^*$")
-            else:
-                prop_b_scaling = 1.0e-3
-                dens_fac *= 1.0e-3/(NA*self.functional.grid_reducing_lenght**3)
-                ax.set_ylabel(r"$\rho$ (kmol/m$^3$)")
-            for i in range(self.profile.densities.nc):
-                ax.plot(self.grid.z[:]*len_fac,
-                        self.profile.densities[i][:] * dens_fac[i],
-                        lw=2, color=LCOLORS[i],
-                        label=f"{self.functional.thermo.get_comp_name(i+1)}")
-        else:
-            label = "Functional"
-            if plot_reduced_property:
-                prop_scaling = 1.0
-            else:
-                eps = self.functional.thermo.eps_div_kb[0]*KB
-                sigma = self.functional.thermo.sigma[0]
-                prop_scaling = eps/sigma**3
-            if prop == Properties.FREE_ENERGY:
-                prop_val = self.get_excess_free_energy_density()
-                if plot_reduced_property:
-                    ax.set_ylabel(r"$a^*_{\rm{E}}$")
-                else:
-                    prop_b_scaling = 1.0e-3
-                    prop_scaling *= prop_b_scaling
-                    ax.set_ylabel(r"$a_{\rm{E}}$ (kJ/mol)")
-            elif prop == Properties.ENERGY:
-                prop_val = self.get_excess_energy_density()
-                if plot_reduced_property:
-                    ax.set_ylabel(r"$u^*_{\rm{E}}$")
-                else:
-                    prop_b_scaling = 1.0e-3
-                    prop_scaling *= prop_b_scaling
-                    ax.set_ylabel(r"$u_{\rm{E}}$ (kJ/mol)")
-            elif prop == Properties.ENTROPY:
-                prop_val = self.get_excess_entropy_density()
-                if plot_reduced_property:
-                    ax.set_ylabel(r"$s^*_{\rm{E}}$")
-                else:
-                    prop_scaling = NA*KB
-                    ax.set_ylabel(r"$s_{\rm{E}}$ (J/mol/K)")
-            elif prop == Properties.ENTHALPY:
-                prop_val = self.get_excess_enthalpy_density()
-                if plot_reduced_property:
-                    ax.set_ylabel(r"$h^*_{\rm{E}}$")
-                else:
-                    prop_b_scaling = 1.0e-3
-                    prop_scaling *= prop_b_scaling
-                    ax.set_ylabel(r"$h_{\rm{E}}$ (kJ/mol)")
-            elif prop == Properties.CHEMPOT_SUM:
-                prop_val = self.get_excess_chemical_potential_density_sum()
-                if plot_reduced_property:
-                    ax.set_ylabel(r"$\mu^*_{\rm{E}}$")
-                else:
-                    prop_scaling *= prop_b_scaling
-                    ax.set_ylabel(r"$\mu_{\rm{E}}$ (kJ/mol)")
-            elif prop == Properties.PARALLEL_PRESSURE:
-                prop_val = self.parallel_pressure()
-                if plot_reduced_property:
-                    ax.set_ylabel(r"$p^*_{\parallel}$")
-                else:
-                    prop_b_scaling = 1.0e-6
-                    prop_scaling *= prop_b_scaling
-                    ax.set_ylabel(r"$p_{\parallel}$ (MPa)")
-
-            ax.plot(self.grid.z[:]*len_fac,
-                    prop_val*prop_scaling,
-                    label=label,
-                    lw=2, color=LCOLORS[0])
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        for i in range(len(prop_profiles)):
+            ax.plot(z, prop_profiles[i],
+                    lw=2, color=LCOLORS[i],
+                    label=legend[i])
 
         if plot_bulk:
-            z_b = np.array([self.grid.z[0], self.grid.z[-1]])*len_fac
+            z_b = np.array([z[0], z[-1]])
             prop_b = self.bulk.get_property(prop, reduced_property=plot_reduced_property)
             if prop == Properties.RHO:
                 for i in range(self.profile.densities.nc):
-                    ax.plot(z_b, prop_b[i,:]*prop_b_scaling, color=LCOLORS[i], marker="o", linestyle="None")
+                    ax.plot(z_b, prop_b[i,:]*unit_scaling, color=LCOLORS[i], marker="o", linestyle="None")
             else:
-                ax.plot(z_b, prop_b*prop_b_scaling, label="Bulk", color=LCOLORS[0], marker="o", linestyle="None")
+                ax.plot(z_b, prop_b*unit_scaling, color=LCOLORS[0], marker="o", linestyle="None")
 
         if xlim is not None:
             plt.xlim(xlim)
@@ -716,7 +803,8 @@ class Interface(ABC):
         if plot_equimolar_surface:
             # Plot equimolar dividing surface
             yl = ax.get_ylim()
-            ax.plot([len_fac*self.r_equimolar, len_fac*self.r_equimolar],
+            r_equimolar = self.r_equimolar*z[-1]/self.grid.z[-1]
+            ax.plot([r_equimolar, r_equimolar],
                     yl,
                     lw=1, color="k",
                     linestyle="--",
@@ -727,7 +815,11 @@ class Interface(ABC):
 
         filename = self.generate_case_name() + "_" + prop.name + ".pdf"
         plt.savefig(filename)
-        plt.show()
+
+        if continue_after_plotting:
+            plt.draw()
+        else:
+            plt.show()
 
     def test_grand_potential_bulk(self):
         """
@@ -964,12 +1056,15 @@ class PlanarInterface(Interface):
                         invert_states=invert_states)
         return pif
 
-    def surface_tension(self):
+    def surface_tension(self, reduced_unit=False):
         """
         Calculates the surface tension of the system.
 
+        Args;
+            reduced_unit (bool): Calculate using reduced units? Default False.
+
         Returns:
-            (float): Surface tension (reduced units)
+            (float): Surface tension (reduced units or J/m2)
         """
 
         if not self.converged:
@@ -979,7 +1074,12 @@ class PlanarInterface(Interface):
         _, omega_a = self.grand_potential()
         omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
         gamma = np.sum(omega_a)
-        return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
+        sigma = self.functional.thermo.sigma[0]
+        gamma *= (sigma/self.functional.grid_reducing_lenght)**2
+        if not reduced_unit:
+            eps = self.functional.thermo.eps_div_kb[0] * KB
+            gamma *= eps / sigma ** 2
+        return gamma
 
     def parallel_pressure(self, reduced=True):
         """
@@ -1055,7 +1155,7 @@ class SphericalInterface(Interface):
             # Calculate planar surface tension
             sigma0 = sif.tanh_profile(vle,
                                       t_crit=t_crit,
-                                      rel_pos_dividing_surface=0.5).solve().surface_tension_real_units()
+                                      rel_pos_dividing_surface=0.5).solve().surface_tension()
         sif.sigma0 = sigma0
         # Extrapolate sigma 0
         phase = sif.functional.thermo.LIQPH if calculate_bubble else sif.functional.thermo.VAPPH
@@ -1098,6 +1198,7 @@ class SphericalInterface(Interface):
                      profile,
                      domain_radius=100.0,
                      n_grid=1024,
+                     invert_states=False,
                      specification=Specification.NUMBER_OF_MOLES,
                      functional_kwargs={}):
         """
@@ -1116,12 +1217,15 @@ class SphericalInterface(Interface):
 
         sif.set_profile(vle,
                         profile,
-                        invert_states=False)
+                        invert_states=invert_states)
         return sif
 
-    def surface_tension(self):
+    def surface_tension(self, reduced_unit=False):
         """
         Calculates the surface tension of the system.
+
+        Args;
+            reduced_unit (bool): Calculate using reduced units? Default False.
 
         Returns:
             (float): Surface tension (reduced units)
@@ -1137,7 +1241,43 @@ class SphericalInterface(Interface):
         v_right = self.grid.total_volume - v_left
         omega = np.sum(omega_a) + v_left*self.bulk.red_pressure_left + v_right*self.bulk.red_pressure_right
         gamma = omega / (4 * np.pi * self.r_equimolar**2)
-        return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
+        sigma = self.functional.thermo.sigma[0]
+        gamma *= (sigma/self.functional.grid_reducing_lenght)**2
+        if not reduced_unit:
+            eps = self.functional.thermo.eps_div_kb[0] * KB
+            gamma *= eps / sigma ** 2
+        return gamma
+
+    def work_of_formation(self):
+        """
+        Calculates the work of formation divided by kBT
+
+        Returns:
+            (float): Work of formation
+        """
+
+        if not self.converged:
+            self.print_perform_minimization_message()
+            return
+
+        omega, _ = self.grand_potential()
+        delta_omega = omega + self.grid.total_volume*self.bulk.red_pressure_right
+        return delta_omega/self.bulk.reduced_temperature
+
+    def n_excess(self):
+        """
+        Calculates the excess number of particles
+
+        Returns:
+            (float): Excess number of particles (mol)
+        """
+
+        if not self.profile:
+            print("Need profile to calculate excess number of particles")
+            return None
+
+        n_excess = self.calculate_total_moles() - self.grid.total_volume*self.bulk.reduced_density_right
+        return n_excess
 
     def surface_of_tension(self, reduced=False):
         """
@@ -1159,12 +1299,16 @@ class SphericalInterface(Interface):
         gamma_s = (3*delta_omega*dp**2/16/np.pi)**(1/3)
         r_s = 2*gamma_s/dp
         delta = self.r_equimolar - r_s
-        if not reduced:
+        if reduced:
+            sigma = self.functional.thermo.sigma[0]
+            delta *= self.functional.grid_reducing_lenght/sigma
+            r_s *= self.functional.grid_reducing_lenght/sigma
+            gamma_s *= (sigma/self.functional.grid_reducing_lenght)**2
+        else:
             eps = self.functional.thermo.eps_div_kb[0] * KB
-            sigma = self.functional.grid_reducing_lenght
-            gamma_s *= eps / sigma ** 2
-            r_s *= sigma
-            delta *= sigma
+            gamma_s *= eps / self.functional.grid_reducing_lenght ** 2
+            r_s *= self.functional.grid_reducing_lenght
+            delta *= self.functional.grid_reducing_lenght
         return gamma_s, r_s, delta
 
     def parallel_pressure(self, reduced=True):

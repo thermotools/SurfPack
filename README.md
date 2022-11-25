@@ -15,6 +15,13 @@ Classical density functinal theory for thermopack
   * Implement one-dimensional cylindrical geometries
   * Extract radial distribution function and compare to simulations
   * Entropy for spherical
+  * Plot inital profile on top of result
+  * Spherical:
+    * Extend and shorten profiles
+    * Step on Ntot?
+    * Droplets correct initial profiles based on dP and sigma0
+    * Test gradient at bulk boundary
+    * Test grid size and width effect
 
 # References
 <a id="1">[1]</a>

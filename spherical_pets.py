@@ -11,18 +11,40 @@ from pets_functional import surface_tension_LJTS
 from src.dft_numerics import dft_solver
 from src.surface_tension_diagram import SphericalDiagram
 
+bubble = False
+
 #Set up thermopack and equilibrium curve
 thermopack = pets()
 thermopack.init()
 T_star = 0.741
+#T_star = 0.625
+
 T = T_star*thermopack.eps_div_kb[0]
 thermopack.set_tmin(0.3*thermopack.eps_div_kb)
 vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
+if bubble:
+    base_file_name = f"pets_{T_star:.3f}_bubble"
+else:
+    base_file_name = f"pets_{T_star:.3f}_droplet"
+
 spdia = SphericalDiagram(vle,
                          initial_radius=40.0,
+                         n_steps=1500,
                          n_grid=1024,
-                         calculate_bubble=True)
+                         calculate_bubble=bubble,
+                         log_iter=False)
+
+spdia.plot(base_file_name, reduced_unit=True)
+
+spdia.animate(z_max = 80.0,
+              prop=Properties.RHO,
+              plot_reduced_property=True,
+              plot_equimolar_surface=True,
+              plot_bulk=True,
+              include_legend=True,
+              y_lim=[-0.02, 0.95],
+              filename=base_file_name)
 
 sys.exit()
 # interf = PlanarInterface.from_tanh_profile(vle,

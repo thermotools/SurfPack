@@ -51,6 +51,7 @@ class Properties(DftEnum):
     CHEMPOT = 18
     CHEMPOT_ID = 19
     CHEMPOT_EX = 21
+    GRID = 22
 
 # Plot utility
 LINE_STYLES = OrderedDict(

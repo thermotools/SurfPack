@@ -2,8 +2,10 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import NA, KB, Geometry
+from constants import NA, KB, Geometry, LCOLORS, LINE_STYLES
 import numpy as np
+from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
 
 class Densities():
     """
@@ -247,6 +249,88 @@ class Profile(object):
         for i in range(self.densities.nc):
             rho_mix[:] += self.densities[i][:]
         return rho_mix
+
+    def shift_and_scale(self,
+                        shift,
+                        grid,
+                        n_grid=None,
+                        interpolation="cubic",
+                        rho_left=None,
+                        rho_right=None):
+        """Shift density profile assuming same grid size. Domain will be increased or decreased by shift.
+
+        Args:
+            shift (float): Shift profile
+            grid (Grid): Current grid
+            interpolation (str): Interpolation option: ‘zero’, ‘slinear’, ‘quadratic’, ‘cubic’
+            rho_left (np.array): New density left
+            rho_right (np.array): New density right
+        Returns:
+            None
+        """
+        l = grid.domain_size
+        new_l = l + shift
+        if n_grid is None:
+            n_grid = grid.n_grid
+        dz = l/n_grid
+        z_new = np.linspace(0.5*dz, new_l - 0.5*dz, n_grid)
+        d_new = np.zeros(grid.n_grid)
+        self.densities.N = n_grid
+        dens = self.densities
+        for ic in range(self.densities.nc):
+            r_left = rho_left[ic] if rho_left is not None else dens[ic][0]
+            r_right = rho_right[ic] if rho_right is not None else dens[ic][-1]
+            d_new[:] = r_left + (dens[ic][:] - dens[ic][0])*(r_right - r_left)/(dens[ic][-1] - dens[ic][0])
+            interplator = interp1d(grid.z, d_new,
+                                   kind=interpolation,
+                                   bounds_error=False,
+                                   fill_value=(d_new[0], d_new[-1]),
+                                   assume_sorted=True)
+            self.densities.densities[ic] = interplator(z_new-shift)
+            return z_new, new_l
+
+class ProfilePlotter(object):
+    """
+    Plot multiple profiles
+    """
+
+    def __init__(self,
+                 profile_list,
+                 z):
+        """Class holding density profiles
+
+        Args:
+            profile_list (list of Profile): Profiles to be plotted
+            z (np.ndarray): Grid positions
+
+        Returns:
+            None
+        """
+        self.profile_list = profile_list
+        self.z = z
+
+    def plot(self):
+        """Plot density profiles
+
+        Args:
+            profile_list (list of Profile): Profiles to be plotted
+
+        Returns:
+            None
+        """
+        for ip, profile in enumerate(self.profile_list):
+            for ic in range(profile.densities.nc):
+                label = "p" + str(ip) + "_c" + str(ic)
+                plt.plot(self.z,
+                         profile.densities[ic],
+                         label=label,
+                         color=LCOLORS[ic],
+                         linestyle=LINE_STYLES[str(ic)])
+
+        plt.xlabel(r"$z$")
+        plt.ylabel(r"$\rho$")
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        plt.show()
 
 if __name__ == "__main__":
     pass

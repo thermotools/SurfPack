@@ -44,24 +44,38 @@ class Bulk(object):
         # Bulk density
         self.reduced_density_left = self.get_reduced_density(left_state.partial_density())
         self.reduced_density_right = self.get_reduced_density(right_state.partial_density())
-        # Bulk fractions
-        self.bulk_fractions = self.reduced_density_left/np.sum(self.reduced_density_left)
 
         # Extract normalized chemical potential (multiplied by beta) (mu/kbT)
-        self.mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(
+        mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(
             self.reduced_density_right)
-        self.mu_ig_scaled_beta = np.log(self.reduced_density_right)
-        self.mu_scaled_beta = self.mu_ig_scaled_beta + self.mu_res_scaled_beta
+        mu_ig_scaled_beta = np.log(self.reduced_density_right)
+        self.mu_scaled_beta = mu_ig_scaled_beta + mu_res_scaled_beta
         self.real_mu, = functional.thermo.chemical_potential_tv(self.temperature, volume=1.0, n=left_state.partial_density())
-        self.real_mu_offset = 0.0
+        #real_mu_simple, = functional.thermo.chemical_potential_tv(self.temperature,
+        #                                                               volume=1.0,
+        #                                                               n=left_state.partial_density(),
+        #                                                               property_flag="R")
+        # Calculate temperature dependent part of chemical potential as well as constant offset du to density conversion
+        #real_mu_simple[:] += self.temperature*functional.thermo.Rgas*np.log(left_state.partial_density())
+        self.real_mu_offset = np.zeros(self.functional.nc)
+        #print(self.real_mu,real_mu_simple, self.real_mu_offset)
+        #self.real_mu_offset[:] = self.real_mu[:] - real_mu_simple[:]
+        self.real_mu_offset[:] = self.real_mu - self.temperature*functional.thermo.Rgas*self.mu_scaled_beta
+        #offset = np.log(NA*self.functional.grid_reducing_lenght**3)
         # Test
         # mu_res_left, = functional.thermo.chemical_potential_tv(self.temperature, volume=left_state.v, n=left_state.x, property_flag="R")
         # mu_res_left /= (self.temperature*functional.thermo.Rgas)
         # mu_res_right, = functional.thermo.chemical_potential_tv(self.temperature, volume=right_state.v, n=right_state.x, property_flag="R")
         # mu_res_right /= (self.temperature*functional.thermo.Rgas)
         # print("Thermopack mu_res", mu_res_right)
-        # print("Functional mu_res", self.mu_res_scaled_beta)
-        # print("Diff mu_res", mu_res_right - self.mu_res_scaled_beta)
+        # print("Functional mu_res", mu_res_scaled_beta)
+        # print("mu_simple",real_mu_simple/(self.temperature*functional.thermo.Rgas))
+        # print("mu_scaledbeta",self.mu_scaled_beta - offset)
+        # print("mu_offset",(self.real_mu_offset + self.temperature*functional.thermo.Rgas*self.mu_scaled_beta)/self.real_mu)
+        # #print("mu_offset 2", self.real_mu - self.temperature*functional.thermo.Rgas*self.mu_scaled_beta)
+        # #print("offset",self.temperature*functional.thermo.Rgas*offset)
+        # sys.exit()
+        # # print("Diff mu_res", mu_res_right - self.mu_res_scaled_beta)
 
         # volfac = NA*functional.thermo.sigma[0]**3
         # red_vol = (functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
@@ -129,20 +143,24 @@ class Bulk(object):
         partial_density[:] = reduced_density/(NA*self.functional.grid_reducing_lenght**3)
         return partial_density
 
+    def update_chemical_potential(self, beta_mu_simple):
+        """ Update the chemical potential after solving for a specified number of moles
+        """
+        self.mu_scaled_beta[:] = beta_mu_simple[:]
+        # Constant offset due to density scaling and tempearure dependency
+        self.real_mu[:] = self.temperature*self.functional.thermo.Rgas*beta_mu_simple[:] + self.real_mu_offset[:]
 
-    def update_bulk_densities(self, rho_left, rho_right):
+    def update_densities(self, rho_left, rho_right):
         """
         Calculate bulk states from chemical potential and initial guess for densities
         """
         rho_left_real = self.get_real_density(rho_left)
-        rho_left_real = self.functional.thermo.solve_mu_t(self.temperature, self.real_mu, rho_initial=rho_left_real)
-        self.reduced_density_left[:] = self.get_reduced_density(rho_left_real)
-
+        self.left_state = state.new_mut(self.functional.thermo, self.real_mu, self.temperature, rho0=rho_left_real)
         rho_right_real = self.get_real_density(rho_right)
-        rho_right_real = self.functional.thermo.solve_mu_t(self.temperature, self.real_mu, rho_initial=rho_right_real)
-        self.reduced_density_right[:] = self.get_reduced_density(rho_right_real)
+        self.right_state = state.new_mut(self.functional.thermo, self.real_mu, self.temperature, rho0=rho_right_real)
 
-        self.bulk_fractions = self.reduced_density_left/np.sum(self.reduced_density_left)
+        self.reduced_density_left = self.get_reduced_density(self.left_state.partial_density())
+        self.reduced_density_right = self.get_reduced_density(self.right_state.partial_density())
 
     def get_property(self, prop, reduced_property=True):
         if not reduced_property:
