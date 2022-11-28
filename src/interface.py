@@ -122,7 +122,7 @@ class Interface(ABC):
             integrals = self.integrate_df_vext()
             exp_beta_mu = np.exp(self.bulk.mu_scaled_beta)
             denum = np.dot(exp_beta_mu, integrals)
-            z = exp_beta_mu * self.n_tot / integrals
+            z = self.n_tot / integrals
             xvec[n_rho:n_rho + n_c] = z
         return xvec
 
