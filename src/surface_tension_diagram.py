@@ -12,6 +12,7 @@ from density_profile import Profile, ProfilePlotter
 from matplotlib.animation import FuncAnimation
 from abc import ABC, abstractmethod
 from tqdm import tqdm
+from scipy.interpolate import interp1d
 
 class InterfaceList(ABC):
     """
@@ -197,7 +198,7 @@ class SphericalDiagram(InterfaceList):
         states = meta_curve.isothermal(eos, vle.temperature, self.z, n_steps, self.phase)
 
         # Loop large spheres specifiyng particle numbers
-        radius_list = np.linspace(50.0, 1000.0, 20)
+        radius_list = np.linspace(50.0, 1000.0, 39)
         real_radius = -1000E-10
 
         n_grid_large = n_grid*4
@@ -205,7 +206,7 @@ class SphericalDiagram(InterfaceList):
         grid = self.planar_interf.grid
         bulk = self.planar_interf.bulk
         spi = self.planar_interf
-        for r in tqdm(reversed(radius_list), desc="Looping large radius spheres"):
+        for r in tqdm(reversed(radius_list), desc="Looping large radius spheres", total=np.shape(radius_list)[0]):
             sr = r * (-1.0 if calculate_bubble else 1.0)*1e-10
             # Extrapolate chemical potential to first order and solve for phase densiteis
             mu, rho_l, rho_g = \
@@ -237,7 +238,7 @@ class SphericalDiagram(InterfaceList):
                                                   invert_states=False,
                                                   specification=Specification.NUMBER_OF_MOLES)
             spi.solve(solver=solver,log_iter=log_iter)
-            shift=-50.0
+            shift=-25.0
             grid = spi.grid
 
             if spi.converged:
@@ -257,9 +258,8 @@ class SphericalDiagram(InterfaceList):
                                               invert_states=False,
                                               specification=Specification.NUMBER_OF_MOLES)
         #print("Grid reduction")
-        spi.solve(solver=solver,log_iter=log_iter) #log_iter
+        spi.solve(solver=solver,log_iter=log_iter)
         #print(spi.r_equimolar)
-        rd = r_domain
 
 
         # Locate meta-state with reduced bubble/droplet size
@@ -278,14 +278,32 @@ class SphericalDiagram(InterfaceList):
         for meta in tqdm(loop_meta_states, desc="Looping meta-stable states"):
             profile = Profile()
             profile.copy_profile(spi.profile)
+            r_ext = self.extrapolate_r_equimolar(meta, n_points=10, interpolation="cubic")
+
+            #left_state = vapor if calculate_bubble else liquid
+            #right_state = liquid if calculate_bubble else vapor
+            #meta = equilibrium(left_state, right_state)
+            profile = Profile()
+            profile.copy_profile(spi.profile)
+            shift = r_ext - spi.r_equimolar
+            print("shift",shift)
+            z_new, r_d = profile.shift_and_scale(shift=shift,
+                                                 grid=spi.grid,
+                                                 n_grid=n_grid,
+                                                 interpolation="cubic")
+#                                                      rho_left=bulk.get_reduced_density(left_state.partial_density()),
+#                                                      rho_right=bulk.get_reduced_density(right_state.partial_density()))
+
             spi = SphericalInterface.from_profile(meta,
                                                   profile,
-                                                  domain_radius=rd,
+                                                  domain_radius=r_domain,
                                                   n_grid=n_grid,
                                                   invert_states=invert_states,
                                                   specification=Specification.CHEMICHAL_POTENTIAL,
                                                   functional_kwargs=functional_kwargs)
-            spi.solve(solver=solver, log_iter=log_iter) #
+            spi.solve(solver=solver, log_iter=log_iter)
+            print("N", spi.n_iter)
+            print("r: ",r_ext, spi.r_equimolar,r_ext-spi.r_equimolar)
             #spi.plot_property_profiles(plot_equimolar_surface=True,
             #                           plot_bulk=True)
 
@@ -297,6 +315,43 @@ class SphericalDiagram(InterfaceList):
                 self.interfaces.append(spi)
                 if spi.work_of_formation() < terminate_betawf:
                     break
+
+    def extrapolate_r_equimolar(self, meta, n_points=10, interpolation="cubic"):
+        """Class for extrapolating equimolar radius
+
+        Args:
+            meta (Equilibrium): Meta-stable state at same chemical potential
+            n_points (int, optional): Number of points used for extrapolation. Defaults to 10.
+            interpolation (str): Interpolation option: ‘zero’, ‘slinear’, ‘quadratic’, ‘cubic’
+        Returns:
+            (float): Extrapolated equimolar radius
+        """
+        left_state = meta.vapor if self.phase == meta.eos.LIQPH else meta.liquid
+        right_state = meta.liquid if self.phase == meta.eos.LIQPH else meta.vapor
+        sigma = self.interfaces[0].functional.thermo.sigma[0]
+        eps = self.interfaces[0].functional.thermo.eps_div_kb[0] * KB
+        temperature = self.interfaces[0].bulk.temperature
+        fac = 1.0 if self.phase == self.interfaces[0].functional.thermo.LIQPH else -1.0
+        n_if = len(self.interfaces)
+        n = min(n_points, n_if)
+        dP = np.full(n, np.NaN)
+        r_e = np.full(n, np.NaN)
+        for i in range(n):
+            dP[i] = self.interfaces[n_if-n+i].bulk.left_state.pressure() - self.interfaces[n_if-n+i].bulk.right_state.pressure()
+            r_e[i] = self.interfaces[n_if-n+i].r_equimolar #*self.interfaces[i].functional.grid_reducing_lenght/sigma
+        dP *= fac*sigma**3/eps
+        interplator = interp1d(dP, r_e,
+                               kind=interpolation,
+                               bounds_error=False,
+                               fill_value="extrapolate",
+                               assume_sorted=True)
+        dP_new = (left_state.pressure() - right_state.pressure())*fac*sigma**3/eps
+        r_new = interplator(np.array([dP_new]))[0]
+        print("r*",r_new*self.interfaces[i].functional.grid_reducing_lenght/sigma)
+        plt.plot(dP, r_e)
+        plt.plot([dP_new], [r_new], linestyle="None", marker="o")
+        plt.show()
+        return r_new
 
     def plot(self, base_file_name, reduced_unit=False):
         """Class for calculating surface tension along saturation curve

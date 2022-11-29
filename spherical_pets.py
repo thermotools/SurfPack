@@ -11,7 +11,7 @@ from pets_functional import surface_tension_LJTS
 from src.dft_numerics import dft_solver
 from src.surface_tension_diagram import SphericalDiagram
 
-bubble = False
+bubble = True
 
 #Set up thermopack and equilibrium curve
 thermopack = pets()
@@ -29,11 +29,11 @@ else:
     base_file_name = f"pets_{T_star:.3f}_droplet"
 
 spdia = SphericalDiagram(vle,
-                         initial_radius=40.0,
-                         n_steps=1500,
+                         n_steps=500,
                          n_grid=1024,
                          calculate_bubble=bubble,
-                         log_iter=False)
+                         log_iter=False,
+                         terminate_betawf=0.01)
 
 spdia.plot(base_file_name, reduced_unit=True)
 

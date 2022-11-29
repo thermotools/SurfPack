@@ -76,6 +76,7 @@ class Interface(ABC):
         self.grid = Grid(geometry, domain_size, n_grid)
         # Set defaults
         self.profile = None
+        self.n_iter = None
         self.converged = False
         self.v_ext = np.zeros((self.functional.nc, self.grid.n_grid))
         self.bulk = None
@@ -171,7 +172,7 @@ class Interface(ABC):
             # Set up convolver
             self.convolver = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
             x0 = self.pack_x_vec()
-            x_sol, self.converged = solver.solve(
+            x_sol, self.converged, self.n_iter = solver.solve(
                 x0, self.residual, log_iter)
             if self.converged:
                 self.profile, z = self.unpack_variables(x_sol)

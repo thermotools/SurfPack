@@ -195,6 +195,13 @@ class WeightedDensities():
                          self.n1v[index],
                          self.n2v[index]])
 
+    def get_fmt_densities_grid(self):
+        """
+        Returns:
+            np.ndarray: 2D Array of FMT weighted densities
+        """
+        return np.c_[self.n0, self.n1, self.n2, self.n3, self.n1v, self.n2v]
+
 class WeightedDensitiesMaster(WeightedDensities):
     """
     """

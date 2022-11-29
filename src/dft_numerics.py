@@ -56,6 +56,11 @@ class dft_solver():
             x0 (np.ndarray): Variable vector
             residual (function): Function taking x as input and returining residual
             log_iter (bool, optional): Print iterations. Defaults to False.
+
+        Returns:
+            x_sol (np.ndarray): Current solution
+            converged (bool): Did the solver converge?
+            iteratrions (int): Number of iterations
         """
 
         # Add default solver if none specified
@@ -64,18 +69,20 @@ class dft_solver():
 
         x_sol = np.zeros_like(x0)
         x_sol[:] = x0[:]
+        iterations = 0
         for sp in self.dft_solver_params:
             if sp.algorithm == DftSolver.PICARD:
-                x_sol[:], converged = picard_iteration(residual, x_sol, max_rel_change=sp.max_rel_change,
-                                                       tolerance=sp.tolerance, max_iter=sp.max_iter, beta=sp.beta,
-                                                       log_iter=log_iter, ensure_positive_x=sp.ensure_positive_x,
-                                                       ng_frequency=sp.ng_frequency)
+                x_sol[:], converged, k = picard_iteration(residual, x_sol, max_rel_change=sp.max_rel_change,
+                                                          tolerance=sp.tolerance, max_iter=sp.max_iter, beta=sp.beta,
+                                                          log_iter=log_iter, ensure_positive_x=sp.ensure_positive_x,
+                                                          ng_frequency=sp.ng_frequency)
             elif sp.algorithm == DftSolver.ANDERSON:
-                x_sol[:], converged = anderson_acceleration(residual, x_sol, mmax=sp.mmax, beta=sp.beta,
-                                                            tolerance=sp.tolerance, max_iter=sp.max_iter,
-                                                            log_iter=log_iter, ensure_positive_x=sp.ensure_positive_x)
+                x_sol[:], converged, k = anderson_acceleration(residual, x_sol, mmax=sp.mmax, beta=sp.beta,
+                                                               tolerance=sp.tolerance, max_iter=sp.max_iter,
+                                                               log_iter=log_iter, ensure_positive_x=sp.ensure_positive_x)
+            iterations += k
 
-        return x_sol, converged
+        return x_sol, converged, iterations
 
     def picard(self,
                tolerance=1.0e-10,
@@ -142,6 +149,7 @@ def anderson_acceleration(residual, x0, mmax=50, beta=0.05,
     Returns:
         x_sol (np.ndarray): Current solution
         converged (bool): Did the solver converge?
+        k (int): Number of iterations
     """
     if log_iter:
         print(f"Anderson mixing: iter | res | alpha")
@@ -196,13 +204,14 @@ def anderson_acceleration(residual, x0, mmax=50, beta=0.05,
                 k, res, alpha[m-1]))
 
         if np.isnan(res):
-            print("Anderson Mixing failed")
+            if log_iter:
+                print("Anderson Mixing failed")
             break
 
         if res < tolerance:
             converged = True
             break
-    return x_sol, converged
+    return x_sol, converged, k
 
 
 class ng_extrapolation():
@@ -315,6 +324,7 @@ def picard_iteration(residual, x0, max_rel_change=1.0,
     Returns:
         x_sol (np.ndarray): Current solution
         converged (bool): Did the solver converge?
+        k (int): Number of iterations
     """
     if log_iter:
         print(f"solver           iter | residual | beta")
@@ -362,13 +372,14 @@ def picard_iteration(residual, x0, max_rel_change=1.0,
                 k, res_avg, np.min(beta_vec)))
 
         if np.isnan(res_avg):
-            print("Picard iteration failed")
+            if log_iter:
+                print("Picard iteration failed")
             break
 
         if res_avg < tolerance:
             converged = True
             break
-    return x_sol, converged
+    return x_sol, converged, k
 
 
 if __name__ == "__main__":

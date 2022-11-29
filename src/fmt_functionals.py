@@ -566,4 +566,31 @@ class WhitebearMarkII(Whitebear):
 
 
 if __name__ == "__main__":
-    pass
+
+
+    class dummy_dens():
+        def __init__(self):
+            self.n_grid = 1
+            self.n0 = np.array([0.013023390121386327])
+            self.n1 = np.array([0.0222485871456107])
+            self.n2 = np.array([0.4776290003040184])
+            self.n3 = np.array([0.2797390690655379])
+            self.n1v = np.array([0.0035959306386384605])
+            self.n2v = np.array([0.07719684602239196])
+            self.n3neg = np.zeros(1)
+            self.n3neg2 = np.zeros(1)
+            self.n2v2 = np.zeros(1)
+            self.logn3neg = np.zeros(1)
+            self.n32 = np.zeros(1)
+            self.n3neg[:] = 1.0 - self.n3[:]
+            self.n3neg2[:] = self.n3neg[:] ** 2
+            self.n2v2[:] = self.n2v[:] ** 2
+            self.logn3neg[:] = np.log(self.n3neg[:])
+            self.n32[:] = self.n3[:] ** 2
+    dens = dummy_dens()
+    R = Rosenfeld(1)
+    WB = Whitebear(1)
+    WBII = WhitebearMarkII(1)
+    print(R.excess_free_energy(dens)[0])
+    print(WB.excess_free_energy(dens)[0])
+    print(WBII.excess_free_energy(dens)[0])
