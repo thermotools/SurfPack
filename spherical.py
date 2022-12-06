@@ -3,7 +3,7 @@
 import numpy as np
 import sys
 from pyctp.pcsaft import pcsaft
-from pyctp.thermopack_state import equilibrium
+from pyctp.thermopack_state import Equilibrium
 from src.interface import SphericalInterface
 from src.interface import PlanarInterface
 from src.constants import LenghtUnit
@@ -12,7 +12,7 @@ from src.constants import LenghtUnit
 thermopack = pcsaft()
 thermopack.init("C1")
 T = 140.0
-vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
 # Define interface with initial tanh density profile
 sigma0 = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(1), domain_size=100.0, n_grid=1024).solve().surface_tension_real_units()

@@ -140,6 +140,27 @@ class Grid(object):
             w_left = None
         return w_left
 
+    def get_domain_weights(self, position):
+        """
+        Calculate left and right side weights, given position
+        Args:
+            rel_pos_dividing_surface (float, optional): Relative location of initial dividing surface.
+        Return:
+            w_left (np.ndarray): Left domain weights
+            w_left (np.ndarray): Right domain weights
+            idx (int): Grid positions
+        """
+        idx = self.get_index_of_rel_pos(position/self.domain_size)
+        wl = self.get_left_weight(position)
+        wr = self.integration_weights[idx] - wl
+        w_left = np.zeros_like(self.integration_weights)
+        w_right = np.zeros_like(self.integration_weights)
+        w_left[:idx] = self.integration_weights[:idx]
+        w_right[idx+1:] = self.integration_weights[idx+1:]
+        w_left[idx] = wl
+        w_right[idx] = wr
+        return w_left, w_right, idx
+
     def get_volume(self, position):
         """
         Calculate "volume", given position

@@ -14,7 +14,7 @@ from pyctp.saftvrqmie import saftvrqmie
 from pyctp.ljs_bh import ljs_bh
 from pyctp.ljs_wca import ljs_wca, ljs_uv
 from pyctp.pets import pets
-from pyctp.thermopack_state import state, equilibrium
+from pyctp.thermopack_state import State, Equilibrium
 from pcsaft_functional import pc_saft
 from pets_functional import PeTS_functional
 from ljs_functional import ljs_bh_functional, ljs_wca_functional, ljs_uv_functional
@@ -1093,6 +1093,55 @@ class PlanarInterface(Interface):
         p_parallel = - p_parallel / self.grid.integration_weights
         return p_parallel*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
 
+    def get_surface_of_tension(self, reduced_unit=False):
+        """
+        Calculate postion of dividing surface "surface of tension"
+        """
+        if not self.converged:
+            self.print_perform_minimization_message()
+            return
+
+        # Get sigma_0
+        _, omega_a = self.grand_potential()
+        omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
+        sigma_0 = np.sum(omega_a)
+
+        # Ignore first term for now.....
+
+        #w_left, w_right, idx = self.grid.get_domain_weights(self.r_equimolar)
+        z = np.zeros_like(self.grid.z)
+        #zr = np.zeros_like(self.grid.z)
+        z[:] = self.grid.z[:] - self.r_equimolar
+        #zr[:] = zl[:]
+        # zr[idx] = 0.5*(self.grid.z_edge[idx+1] - self.r_equimolar)
+        # zl[idx] = 0.5*(self.grid.z_edge[idx] - self.r_equimolar)
+        # print(idx)
+        # print((self.grid.z_edge[:]))
+        # print((self.grid.z[:]))
+        # print((self.grid.z_edge[:] - self.r_equimolar))
+        # print((self.grid.z_edge[:] - self.r_equimolar)[idx-1:idx+2])
+        # print((self.grid.z[:] - self.r_equimolar)[idx-1:idx+2])
+        # print(zl[idx-1:idx+2])
+        # print(zr[idx-1:idx+2])
+        #omega_a /= self.grid.integration_weights
+        #sigma_1 = np.sum(omega_a*zl*w_left) + np.sum(omega_a*zr*w_right)
+        sgn = 1.0 if self.bulk.liquid_is_right() else -1.0
+        sigma_1 = sgn*np.sum(omega_a*z)
+        d_tolman_sphere = -0.5*sigma_1/sigma_0
+
+        # Convert to real units
+        eps = self.functional.thermo.eps_div_kb[0] * KB
+        sigma_1 *= eps / self.functional.grid_reducing_lenght
+        d_tolman_sphere *= self.functional.grid_reducing_lenght
+
+        if reduced_unit:
+            sigma = self.functional.thermo.sigma[0]
+            sigma_1 *= sigma/eps
+            d_tolman_sphere /= sigma
+
+        return sigma_1, d_tolman_sphere
+
+
 class SphericalInterface(Interface):
     """
     Utility class for simplifying specification of SPHERICAL interface
@@ -1184,8 +1233,8 @@ class SphericalInterface(Interface):
         #                                         phase=phase)
 
         rel_pos_dividing_surface = radius/domain_radius
-        vapor = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
-        liquid = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
+        vapor = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
+        liquid = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
         vle = equilibrium(vapor, liquid)
         # Set profile based on modefied densities
         sif.tanh_profile(vle=vle,

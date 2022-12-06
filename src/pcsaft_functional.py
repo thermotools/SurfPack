@@ -33,7 +33,7 @@ class saft_dispersion(Whitebear):
             self.grid_reducing_lenght = thermo.sigma[0]
         R = np.zeros(thermo.nc)
         R[:] = 0.5*self.d_hs[:]/self.grid_reducing_lenght
-        Whitebear.__init__(self, N, R, thermo.m, grid_unit)
+        Whitebear.__init__(self, thermo, N, R, thermo.m, grid_unit)
         self.name = "Generic-SAFT"
         self.short_name = "GS"
         # Add normalized theta weight

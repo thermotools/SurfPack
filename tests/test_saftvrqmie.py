@@ -1,7 +1,7 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
 from pyctp.saftvrqmie import saftvrqmie
-from pyctp.thermopack_state import equilibrium
+from pyctp.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 #from src.constants import LenghtUnit, NA, KB, Properties
 from pytest import approx
@@ -19,7 +19,7 @@ def test_hydrogen_surface_tension(inpt):
     thermopack.init("H2")
     T = inpt["T"]
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
                                                thermopack.critical_temperature(1),
@@ -45,7 +45,7 @@ def test_saftvrqmie_mixture_surface_tension():
     T = 24.59
     thermopack.set_tmin(5.0)
     z=np.array([0.0144,1.0-0.0144])
-    vle = equilibrium.bubble_pressure(thermopack, T, z)
+    vle = Equilibrium.bubble_pressure(thermopack, T, z)
     Tc, _, _ = thermopack.critical(z)
     n_grid = 512
     domain_size=200.0

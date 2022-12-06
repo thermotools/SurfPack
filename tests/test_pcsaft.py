@@ -1,7 +1,7 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
 from pyctp.pcsaft import pcsaft
-from pyctp.thermopack_state import equilibrium
+from pyctp.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 #from src.constants import LenghtUnit, NA, KB, Properties
 from pytest import approx
@@ -17,7 +17,7 @@ def test_pcsaft_dispersion_surface_tension(inpt):
     thermopack.init("C1")
     T = inpt["T"]
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
                                                thermopack.critical_temperature(1),
@@ -45,7 +45,7 @@ def test_pcsaft_dispersion_entropy():
     thermopack.init("C1")
     T = 130.0
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
                                                thermopack.critical_temperature(1),
@@ -58,7 +58,7 @@ def test_pcsaft_dispersion_entropy():
     # Perturbate in temperature using density profile from solution
     eps_T = 1.0e-5
     T_p = T + eps_T
-    vle_p = equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
+    vle_p = Equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
     interf_p = PlanarInterface.from_profile(vle_p,
                                             interf.profile,
                                             domain_size=domain_size,
@@ -67,7 +67,7 @@ def test_pcsaft_dispersion_entropy():
     interf_p.single_convolution()
     F_p = interf_p.get_excess_free_energy_density()
     T_m = T - eps_T
-    vle_m = equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
+    vle_m = Equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
     interf_m = PlanarInterface.from_profile(vle_m,
                                             interf.profile,
                                             domain_size=domain_size,
@@ -93,7 +93,7 @@ def test_pcsaft_chain_entropy():
     thermopack.init("C3")
     T = 231.036 # NBP
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
                                                thermopack.critical_temperature(1),
@@ -106,7 +106,7 @@ def test_pcsaft_chain_entropy():
     # Perturbate in temperature using density profile from solution
     eps_T = 1.0e-3
     T_p = T + eps_T
-    vle_p = equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
+    vle_p = Equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
     interf_p = PlanarInterface.from_profile(vle_p,
                                             interf.profile,
                                             domain_size=domain_size,
@@ -115,7 +115,7 @@ def test_pcsaft_chain_entropy():
     interf_p.single_convolution()
     F_p = interf_p.get_excess_free_energy_density()
     T_m = T - eps_T
-    vle_m = equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
+    vle_m = Equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
     interf_m = PlanarInterface.from_profile(vle_m,
                                             interf.profile,
                                             domain_size=domain_size,
@@ -137,7 +137,7 @@ def test_pcsaft_mixture_surface_tension():
     thermopack.init("C1,N2")
     T = 111.667
     thermopack.set_tmin(100.0)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.array([0.5,0.5]))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.array([0.5,0.5]))
     Tc, _, _ = thermopack.critical(np.array([0.5,0.5]))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,

@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from constants import NA, KB, Properties
 import numpy as np
 from pyctp.saftvrqmie import saftvrqmie
-from pyctp.thermopack_state import state
+from pyctp.thermopack_state import State
 
 class Bulk(object):
     """
@@ -155,12 +155,18 @@ class Bulk(object):
         Calculate bulk states from chemical potential and initial guess for densities
         """
         rho_left_real = self.get_real_density(rho_left)
-        self.left_state = state.new_mut(self.functional.thermo, self.real_mu, self.temperature, rho0=rho_left_real)
+        self.left_state = State.new_mut(self.functional.thermo, self.real_mu, self.temperature, rho0=rho_left_real)
         rho_right_real = self.get_real_density(rho_right)
-        self.right_state = state.new_mut(self.functional.thermo, self.real_mu, self.temperature, rho0=rho_right_real)
+        self.right_state = State.new_mut(self.functional.thermo, self.real_mu, self.temperature, rho0=rho_right_real)
 
         self.reduced_density_left = self.get_reduced_density(self.left_state.partial_density())
         self.reduced_density_right = self.get_reduced_density(self.right_state.partial_density())
+
+    def liquid_is_right(self):
+        """
+        Calculate bulk states from chemical potential and initial guess for densities
+        """
+        return (np.sum(self.reduced_density_right) - np.sum(self.reduced_density_left) > 0.0)
 
     def get_property(self, prop, reduced_property=True):
         if not reduced_property:

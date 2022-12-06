@@ -7,7 +7,7 @@ from constants import Geometry, ProfileInit, LenghtUnit, Specification, Properti
 from interface import PlanarInterface, SphericalInterface
 import numpy as np
 import matplotlib.pyplot as plt
-from pyctp.thermopack_state import meta_curve, equilibrium, state
+from pyctp.thermopack_state import MetaCurve, Equilibrium, State
 from density_profile import Profile, ProfilePlotter
 from matplotlib.animation import FuncAnimation
 from abc import ABC, abstractmethod
@@ -23,7 +23,7 @@ class InterfaceList(ABC):
         """Class for calculating surface tension along saturation curve
 
         Args:
-            curve (phase_diagram): List of states to calculate surface tension
+            curve (PhaseDiagram): List of states to calculate surface tension
             geometry (int): PLANAR/POLAR/SPHERICAL
             domain_size (float, optional): Sisze of domain. Defaults to 100.0.
             n_grid (int, optional): Number of grid points. Defaults to 1024.
@@ -92,7 +92,7 @@ class SurfaceTensionDiagram(InterfaceList):
         """Class for calculating surface tension along saturation curve
 
         Args:
-            curve (phase_diagram): List of states to calculate surface tension
+            curve (PhaseDiagram): List of states to calculate surface tension
             geometry (int): PLANAR/POLAR/SPHERICAL
             domain_size (float, optional): Sisze of domain. Defaults to 100.0.
             n_grid (int, optional): Number of grid points. Defaults to 1024.
@@ -121,7 +121,7 @@ class SurfaceTensionDiagram(InterfaceList):
                 # interf.plot_equilibrium_density_profiles(plot_reduced_densities=True,
                 #                                          plot_equimolar_surface=True,
                 #                                          grid_unit=LenghtUnit.REDUCED)
-                st = interf.surface_tension()
+                st = interf.surface_tension(reduced_unit=True)
                 st_r = interf.surface_tension_real_units()
                 self.interfaces.append(interf)
             else:
@@ -195,7 +195,7 @@ class SphericalDiagram(InterfaceList):
         self.phase = eos.LIQPH if calculate_bubble else eos.VAPPH
         self.is_liquid_bulk = calculate_bubble
         self.z = vle.liquid.x if calculate_bubble else vle.vapor.x
-        states = meta_curve.isothermal(eos, vle.temperature, self.z, n_steps, self.phase)
+        states = MetaCurve.isothermal(eos, vle.temperature, self.z, n_steps, self.phase)
 
         # Loop large spheres specifiyng particle numbers
         radius_list = np.linspace(50.0, 1000.0, 39)
@@ -217,8 +217,8 @@ class SphericalDiagram(InterfaceList):
                                                      radius=sr,
                                                      geometry="SPHERICAL",
                                                      phase=self.phase)
-            vapor = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
-            liquid = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
+            vapor = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
+            liquid = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
             left_state = vapor if calculate_bubble else liquid
             right_state = liquid if calculate_bubble else vapor
             meta = equilibrium(left_state, right_state)
@@ -357,7 +357,7 @@ class SphericalDiagram(InterfaceList):
         """Class for calculating surface tension along saturation curve
 
         Args:
-            curve (phase_diagram): List of states to calculate surface tension
+            curve (PhaseDiagram): List of states to calculate surface tension
             geometry (int): PLANAR/POLAR/SPHERICAL
             domain_size (float, optional): Sisze of domain. Defaults to 100.0.
             n_grid (int, optional): Number of grid points. Defaults to 1024.

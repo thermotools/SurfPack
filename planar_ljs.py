@@ -4,7 +4,7 @@ import numpy as np
 import sys
 from pyctp.ljs_wca import ljs_uv, ljs_wca
 from pyctp.ljs_bh import ljs_bh
-from pyctp.thermopack_state import equilibrium
+from pyctp.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 from src.constants import LenghtUnit, NA, KB, Properties
 from src.dft_numerics import dft_solver
@@ -21,7 +21,7 @@ thermopack.init("Ar")
 T_star = 0.75
 T = T_star*thermopack.eps_div_kb[0]
 thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
 # Define interface with initial tanh density profile
 interf = PlanarInterface.from_tanh_profile(vle,

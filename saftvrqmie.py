@@ -1,7 +1,7 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
 from pyctp.saftvrqmie import saftvrqmie
-from pyctp.thermopack_state import equilibrium
+from pyctp.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 from src.constants import LenghtUnit, Properties
 import sys
@@ -19,7 +19,7 @@ def test_saftvrqmie_surface_tension():
     T = 24.59
     thermopack.set_tmin(5.0)
     z=np.array([0.0144,1.0-0.0144])
-    vle = equilibrium.bubble_pressure(thermopack, T, z)
+    vle = Equilibrium.bubble_pressure(thermopack, T, z)
     Tc, _, _ = thermopack.critical(z)
     n_grid = 512
     domain_size=200.0

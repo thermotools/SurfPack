@@ -1,7 +1,7 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
 from pyctp.pcsaft import pcsaft
-from pyctp.thermopack_state import equilibrium
+from pyctp.thermopack_state import Equilibrium
 from src.interface import PlanarInterface, SphericalInterface
 #from src.constants import LenghtUnit, NA, KB, Properties
 from pytest import approx
@@ -13,7 +13,7 @@ def test_pcsaft_dispersion_surface_tension(inpt):
     thermopack = pcsaft()
     thermopack.init("C1")
     T = inpt["T"]
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
     sigma0 = PlanarInterface.from_tanh_profile(vle,
                                                thermopack.critical_temperature(1),

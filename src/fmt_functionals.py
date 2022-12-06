@@ -56,7 +56,7 @@ class Rosenfeld:
     doi:10.1103/PhysRevLett.63.980
     """
 
-    def __init__(self, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, thermo, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
@@ -65,8 +65,10 @@ class Rosenfeld:
             ms (ndarray): Segment number for all components
             grid_unit (LenghtUnit): Information on how lenght is reduced (Deafult: ANGSTROM)
         """
+        self.thermo = thermo
         self.name = "Rosenfeld"
         self.short_name = "RF"
+        self.fmt_name = "RF"
         self.R = R
         self.ms = ms
         self.nc = np.shape(R)[0]
@@ -254,6 +256,25 @@ class Rosenfeld:
         """
         print("No EOS.")
 
+    def second_order_differentials(self, dens):
+        """
+        Calculates the second order functional differentials wrpt. the weighted densities
+
+        Args:
+        dens (array_like): weighted densities
+
+        """
+
+        n_alpha = dens.get_fmt_densities_grid()
+        phi, self.phi_nn, = self.thermo.fmt_energy_density(n_alpha, phi_n=False, phi_nn=True, fmt_model=self.fmt_name)
+
+        print(self.phi_nn[512,0,:])
+        print(self.phi_nn[512,1,:])
+        print(self.phi_nn[512,2,:])
+        print(self.phi_nn[512,3,:])
+        print(self.phi_nn[512,4,:])
+        print(self.phi_nn[512,5,:])
+        sys.exit()
 
 class Whitebear(Rosenfeld):
     """
@@ -270,7 +291,7 @@ class Whitebear(Rosenfeld):
 
     """
 
-    def __init__(self, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, thermo, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
@@ -279,9 +300,10 @@ class Whitebear(Rosenfeld):
             ms (ndarray): Segment number for all components
             grid_unit (LenghtUnit): Information on how lenght is reduced (Deafult: ANGSTROM)
         """
-        Rosenfeld.__init__(self, N, R, ms, grid_unit=grid_unit)
+        Rosenfeld.__init__(self, thermo, N, R, ms, grid_unit=grid_unit)
         self.name = "White Bear"
         self.short_name = "WB"
+        self.fmt_name = "WB"
         self.numerator = None
         self.denumerator = None
 
@@ -376,8 +398,25 @@ class Whitebear(Rosenfeld):
         self.d1v[non_pn3m, 0] = 0.0
         self.d2v[non_pn3m, 0] = 0.0
 
+        # n_alpha = dens.get_fmt_densities_grid()
+        # phi, phi_n, = self.thermo.fmt_energy_density(n_alpha, phi_n=True, phi_nn=False, fmt_model=self.fmt_name)
+
+        # self.d0[:,0] = phi_n[:,0]
+        # self.d1[:,0] = phi_n[:,1]
+        # self.d2[:,0] = phi_n[:,2]
+        # self.d3[:,0] = phi_n[:,3]
+        # self.d1v[:,0] = phi_n[:,4]
+        # self.d2v[:,0] = phi_n[:,5]
+        # #print(self.d0[:,0]-phi_n[:,0])
+        # #print(phi_n[:,0])
+        # #print(f)
+        # #sys.exit()
+
+        # self.second_order_differentials(dens)
+        
         # Distribute differentials
         self.distribute_component_differentials()
+
 
 class WhitebearMarkII(Whitebear):
     """
@@ -389,7 +428,7 @@ class WhitebearMarkII(Whitebear):
     doi: 10.1088/0953-8984/18/37/002
     """
 
-    def __init__(self, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
+    def __init__(self, thermo, N, R=np.array([0.5]), ms=np.array([1.0]), grid_unit=LenghtUnit.ANGSTROM):
         """
 
         Args:
@@ -398,9 +437,10 @@ class WhitebearMarkII(Whitebear):
             ms (ndarray): Segment number for all components
             grid_unit (LenghtUnit): Information on how lenght is reduced (Deafult: ANGSTROM)
         """
-        Whitebear.__init__(self, N, R, ms, grid_unit)
+        Whitebear.__init__(self, thermo, N, R, ms, grid_unit)
         self.name = "White Bear Mark II"
         self.short_name = "WBII"
+        self.fmt_name = "WBII"
         self.phi2_div3 = None
         self.dphi2dn3_div3 = None
         self.phi3_div3 = None

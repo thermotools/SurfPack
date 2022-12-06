@@ -2,7 +2,7 @@
 import numpy as np
 from pyctp.ljs_wca import ljs_uv, ljs_wca
 from pyctp.ljs_bh import ljs_bh
-from pyctp.thermopack_state import equilibrium
+from pyctp.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 #from src.constants import LenghtUnit, NA, KB, Properties
 from pytest import approx
@@ -21,7 +21,7 @@ def test_ljs_surface_tension(inpt):
     T_star = 0.7
     T = T_star*thermopack.eps_div_kb[0]
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
                                                thermopack.critical_temperature(1),
@@ -52,7 +52,7 @@ def test_ljs_entropy():
     T_star = 0.7
     T = T_star*thermopack.eps_div_kb[0]
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
                                                thermopack.critical_temperature(1),
@@ -65,7 +65,7 @@ def test_ljs_entropy():
     # Perturbate in temperature using density profile from solution
     eps_T = 1.0e-5
     T_p = T + eps_T
-    vle_p = equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
+    vle_p = Equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
     interf_p = PlanarInterface.from_profile(vle_p,
                                             interf.profile,
                                             domain_size=domain_size,
@@ -74,7 +74,7 @@ def test_ljs_entropy():
     interf_p.single_convolution()
     F_p = interf_p.get_excess_free_energy_density()
     T_m = T - eps_T
-    vle_m = equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
+    vle_m = Equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
     interf_m = PlanarInterface.from_profile(vle_m,
                                             interf.profile,
                                             domain_size=domain_size,
@@ -101,7 +101,7 @@ def test_ljs_properties():
     T_star = 0.7
     T = T_star*thermopack.eps_div_kb[0]
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
                                                thermopack.critical_temperature(1),

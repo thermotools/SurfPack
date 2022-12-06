@@ -3,7 +3,7 @@
 import numpy as np
 import sys
 from pyctp.pets import pets
-from pyctp.thermopack_state import phase_diagram, equilibrium, state
+from pyctp.thermopack_state import PhaseDiagram, Equilibrium, State
 from src.constants import LenghtUnit, NA, KB, Properties, Specification
 from src.interface import PlanarInterface, SphericalInterface
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ T_star = 0.741
 
 T = T_star*thermopack.eps_div_kb[0]
 thermopack.set_tmin(0.3*thermopack.eps_div_kb)
-vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
 if bubble:
     base_file_name = f"pets_{T_star:.3f}_bubble"
@@ -74,10 +74,10 @@ spi = SphericalInterface.from_tanh_profile(vle,
 
 spi.plot_property_profiles()
 
-ls = state.new_nvt(spi.bulk.left_state.eos, spi.bulk.left_state.T, spi.bulk.left_state.V, spi.bulk.left_state.x)
-rs = state.new_nvt(spi.bulk.right_state.eos, spi.bulk.right_state.T, spi.bulk.right_state.V, spi.bulk.right_state.x)
-vle_modified = equilibrium(spi.bulk.left_state, spi.bulk.right_state)
-vle_modified = equilibrium(ls, rs)
+ls = State.new_nvt(spi.bulk.left_state.eos, spi.bulk.left_state.T, spi.bulk.left_state.V, spi.bulk.left_state.x)
+rs = State.new_nvt(spi.bulk.right_state.eos, spi.bulk.right_state.T, spi.bulk.right_state.V, spi.bulk.right_state.x)
+vle_modified = Equilibrium(spi.bulk.left_state, spi.bulk.right_state)
+vle_modified = Equilibrium(ls, rs)
 #solver=dft_solver().picard(tolerance=1.0e-5,max_iter=200,beta=0.05,ng_frequency=100).anderson(mmax=50, beta=0.05, tolerance=1.0e-10,
 #                                                                                                max_iter=200)
 solver=dft_solver().anderson(mmax=50, beta=0.05, tolerance=1.0e-10, max_iter=200)
@@ -88,7 +88,7 @@ spi.plot_property_profiles()
 
 sys.exit()
 
-vle_modified = equilibrium(spi.bulk.left_state, spi.bulk.right_state)
+vle_modified = Equilibrium(spi.bulk.left_state, spi.bulk.right_state)
 spi_profile = SphericalInterface.from_profile(vle_modified,
                                               spi.profile,
                                               domain_radius=100.0,
