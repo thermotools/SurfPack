@@ -87,6 +87,32 @@ class WeightedDensities():
         # print("nv2",self.n["wv2"])
         # print("n_disp",self.n["w_disp"])
 
+    def convolve_densities_by_type(self, rho: np.ndarray, conv_type=ConvType.REGULAR):
+        """
+        Args:
+            rho (np.ndarray): Density profile
+            conv_type (ConvType): How to convolve
+        """
+        if conv_type==ConvType.REGULAR or conv_type==ConvType.REGULAR_T:
+            rho_delta = np.zeros(self.grid.n_grid)
+            rho_inf = rho[-1]
+            rho_delta[:] = rho[:] - rho_inf
+            if self.grid.geometry == Geometry.PLANAR:
+                frho_delta = dct(rho_delta, type=2)
+            elif self.grid.geometry == Geometry.SPHERICAL:
+                frho_delta = dst(rho_delta*self.grid.z, type=2)
+            elif self.grid.geometry == Geometry.POLAR:
+                pass
+            self.convolve_densities(rho_inf, frho_delta, conv_type==ConvType.REGULAR_T)
+        else:
+            # Loop all weight functions
+            for wf in self.wfs:
+                self.wfs[wf].convolve_densities_complex(rho, self.n[wf], conv_type)
+            for wf in self.wfs:
+                self.wfs[wf].update_dependencies(self)
+
+            self.update_after_convolution()
+
     def update_after_convolution(self):
         """
         """
@@ -248,6 +274,21 @@ class WeightedDensitiesMaster(WeightedDensities):
             temperature_diff_convolution (bool): Convolve for temperature differentials? Default False
         """
         self.comp_weighted_densities[i].convolve_densities(rho_inf, frho_delta, temperature_diff_convolution)
+        # Add component contribution to overall density
+        self += self.comp_weighted_densities[i]
+        for wf in self.wfs_list[i]:
+            alias = self.wfs_list[i].wfs[wf].alias
+            if alias not in self.wfs_list[i].fmt_aliases:
+                self.n[alias][i, :] = \
+                    self.comp_weighted_densities[i].n[alias][:]
+
+    def convolve_densities_by_type(self, rho: np.ndarray, i: int, conv_type=ConvType.REGULAR):
+        """
+        Args:
+            rho (np.ndarray): Density profile
+            i (int): Component index
+        """
+        self.comp_weighted_densities[i].convolve_densities_by_type(rho, conv_type)
         # Add component contribution to overall density
         self += self.comp_weighted_densities[i]
         for wf in self.wfs_list[i]:
@@ -644,6 +685,31 @@ class Convolver(object):
         Access to one particle correlation
         """
         return self.comp_differentials[i].corr
+
+
+    def convolve_for_tolman(self, rho):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        self.weighted_densities.reset(rho)
+        for i in range(self.functional.thermo.nc):
+            self.weighted_densities.convolve_densities_by_type(rho.rho.densities[i], i, ConvType.ZW)
+
+        self.weighted_densities.update_utility_variables()
+
+        # Calculate differentials
+        self.update_functional_differentials()
+        for i in range(self.functional.nc):
+            # Loop all weight functions
+            for wf in self.comp_wfs[i]:
+                if self.comp_wfs[i][wf].convolve:
+                    self.comp_wfs[i][wf].convolve_differentials(self.comp_differentials[i].d_effective(wf),
+                                                                self.comp_differentials[i].d_conv[wf])
+            # Calculate one-particle correlation
+            self.comp_differentials[i].update_after_convolution()
 
 if __name__ == "__main__":
     pass

@@ -4,7 +4,7 @@ import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from constants import NA, RGAS, Geometry, DftEnum
 from scipy.fft import dct, idct, dst, idst, fft, ifft
 from scipy.special import spherical_jn
-from sympy import sympify, lambdify, Symbol
+from sympy import sympify, lambdify, Symbol, jn
 
 class WeightFunctionType(DftEnum):
     # Heaviside step function
@@ -15,6 +15,20 @@ class WeightFunctionType(DftEnum):
     DELTAVEC = 3
     # Normalized Heaviside step function
     NORMTHETA = 4
+
+class ConvType(DftEnum):
+    # Use cosine and sine transforms
+    REGULAR = 1
+    # Use full fft transform
+    REGULAR_COMPLEX = 2
+    # Convolve with F(zw)
+    ZW = 3
+    # Convolve with F(\tilde{w})
+    TILDEPLUSS = 4
+    # Convolve with F(\tilde{w})
+    TILDEMINUS = 5
+    # Use cosine and sine transforms and convolve for temperature differentials
+    REGULAR_T = 6
 
 class WeightFunction(object):
 
@@ -35,22 +49,24 @@ class WeightFunction(object):
         self.kernel_radius = kernel_radius
         self.alias = alias
         self.accuracy = 17
-        self.Rs = Symbol("R")
-        self.Psi = Symbol("Psi")
+        self.Rs = Symbol("R", real=True)
+        self.Rk = Symbol("Rk", real=True)
+        self.Psi = Symbol("Psi", real=True)
+        self.k = Symbol("k", real=True)
         self.prefactor_str = prefactor
         self.prefactor = sympify(prefactor, locals={'R': self.Rs, 'Psi': self.Psi})
         self.prefactor_R = sympify(prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff("R")
         if wf_type == WeightFunctionType.DELTA:
-            integral = "4.0*pi*R**2*Psi**2"
+            self.integral = "4.0*pi*R**2*Psi**2"
         elif wf_type == WeightFunctionType.THETA:
-            integral = "4.0*pi*R**3*Psi**3/3.0"
+            self.integral = "4.0*pi*R**3*Psi**3/3.0"
         elif wf_type == WeightFunctionType.NORMTHETA:
-            integral = "1.0"
+            self.integral = "1.0"
         elif wf_type == WeightFunctionType.DELTAVEC:
-            integral = "2*pi" # Dummy
-        self.lamb = sympify(integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi})
-        self.lamb_R = sympify(integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff("R")
-        self.lamb_RR = sympify(integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff("R", 2)
+            self.integral = "2*pi" # Dummy
+        self.lamb = sympify(self.integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi})
+        self.lamb_R = sympify(self.integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff("R")
+        self.lamb_RR = sympify(self.integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff("R", 2)
         self.convolve = convolve
         self.calc_from = calc_from
         # For transformations
@@ -137,6 +153,76 @@ class WeightFunction(object):
                 #     print("Setting vw1")
                 #     self.fw[:] = - (1.0/(4*np.pi*R_kernel))*self.k_sin * \
                 #         (4.0/3.0 * np.pi * R_kernel**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
+
+    def generate_planar_rigidity_fourier_weights(self, grid, R, L_pad):
+        """
+        """
+        dz = grid.domain_size/grid.n_grid
+        L = grid.domain_size + 2*L_pad
+        self.N = int(L/dz) + 1
+        self.N_pad = int((N - grid.n_grid)/2)
+        print("N",N)
+        print("N_pad",N_pad)
+        sys.exit()
+        R_kernel = R*self.kernel_radius
+
+        self.fw_complex = np.zeros(N, dtype=np.cdouble)
+        self.fw_signed = np.zeros(N, dtype=np.cdouble)
+        self.fw_tilde_pluss = np.zeros(N, dtype=np.cdouble)
+        self.fw_tilde_minus = np.zeros(N, dtype=np.cdouble)
+        self.fzw_pluss = np.zeros(N, dtype=np.cdouble)
+        self.fzw_mimus = np.zeros(N, dtype=np.cdouble)
+        self.fzn = np.zeros(N, dtype=np.cdouble)
+        self.k_grid = np.zeros(N)
+        # Fourier space variables
+        for k in range(int(N/2)):
+            self.k_grid[k] = k
+            self.k_grid[N - k - 1] = -k - 1
+        self.k_grid *= 2*np.pi/L
+
+        if self.convolve:
+            is_imaginary = False
+            if self.wf_type == WeightFunctionType.THETA:
+                weight_str = "jn(0, Rk*Abs(k)) + jn(2, Rk*Abs(k))"
+            elif self.wf_type == WeightFunctionType.NORMTHETA:
+                weight_str = "jn(0, Rk*Abs(k)) + jn(2, Rk*Abs(k))"
+            elif self.wf_type == WeightFunctionType.DELTA:
+                weight_str = "jn(0, Rk*Abs(k))"
+            elif self.wf_type == WeightFunctionType.DELTAVEC:
+                is_imaginary = True
+                weight_str = "(4.0/3.0*pi*Rk**3*k*(jn(0, Rk*Abs(k)) + jn(2, Rk*Abs(k)))"
+
+            wzk = sympify(weight_str, locals={'Rk': self.Rk, 'k': self.k}).diff("k")
+            wzkk = sympify(weight_str, locals={'Rk': self.Rk, 'k': self.k}).diff("k").diff("k")
+
+            self.fw_complex.real[:] = self.fw[:]
+            if is_imaginary:
+                self.fw_signed.real[:] = -self.fw[:]
+            else:
+                self.fw_signed[:] = self.fw[:]
+
+            for i in range(N):
+                wzk_i = float(wzk.evalf(self.accuracy, subs={self.Rk:R_kernel, self.k:k_vec[i]}))
+                wzkk_i = float(wzkk.evalf(self.accuracy, subs={self.Rk:R_kernel, self.k:k_vec[i]}))
+                k = self.k_grid[i]
+                if k == 0.0:
+                    k = 1.0 # Avoid divide by zero
+                if is_imaginary:
+                    self.fzw_pluss.real[i] = (wzk_i + self.fw[i]/k)
+                    self.fzw_minus.real[i] = -(wzk_i - self.fw[i]/k)
+                    self.fw_tilde_pluss.imag[i] = -(wzkk_i + (wzk_i/k - self.fw[i]/k**2))
+                    self.fw_tilde_minus.imag[i] = -(wzkk_i - (wzk_i/k - self.fw[i]/k**2))
+                else:
+                    self.fzw_pluss.imag[i] = wzk_i
+                    self.fzw_minus.imag[i] = wzk_i
+                    self.fw_tilde_pluss.real[i] = wzk_i/k - wzkk_i
+                    self.fw_tilde_minus.real[i] = self.fw_tilde_pluss.real[i]
+
+            self.fzw_pluss[:] *= self.prefactor_evaluated
+            self.fzw_minus[:] *= self.prefactor_evaluated
+            self.fw_tilde_pluss[:] *= self.prefactor_evaluated
+            self.fw_tilde_minus[:] *= self.prefactor_evaluated
+
 
     def generate_planar_fourier_weights_T(self, grid, R, R_T):
         """
@@ -228,6 +314,18 @@ class WeightFunction(object):
             elif self.geometry == Geometry.POLAR:
                 self.polar_convolution(rho_inf, frho_delta, weighted_density)
 
+    def convolve_densities_complex(self, rho: np.ndarray, weighted_density: np.ndarray, conv_type=ConvType.REGULAR_COMPLEX):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+        if self.convolve:
+            if self.geometry == Geometry.PLANAR:
+                self.planar_convolution_complex_fft(rho, weighted_density, conv_type)
+
 
     def update_dependencies(self, weighted_densities):
         """
@@ -284,6 +382,44 @@ class WeightFunction(object):
             self.fn[:] = frho_delta[:] * self.fw_T[:]
             weighted_density[:] = idct(self.fn, type=2) + rho_inf*self.w_conv_steady_T
 
+    def pad_profile(self, rho: np.ndarray):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+        rho_padded_complex = np.zeros(N, dtype=np.cdouble)
+        rho_padded_complex[self.N_pad:self.N-self.N_pad] = rho
+        rho_padded_complex[:self.N_pad] = rho[0]
+        rho_padded_complex[self.N-self.N_pad:self.N] = rho[-1]
+        return rho_padded_complex
+
+    def planar_convolution_complex_fft(self, rho: np.ndarray, weighted_density: np.ndarray, conv_type=ConvType.REGULAR_COMPLEX):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+        rho_padded_complex = self.pad_profile(rho)
+        frho = fft(rho_padded_complex)
+        if conv_type == ConvType.REGULAR_COMPLEX:
+            fw = self.fw_complex
+        elif conv_type == ConvType.ZW:
+            fw = self.fzw_minus
+        elif conv_type == ConvType.TILDEPLUSS:
+            fw = self.fw_tilde_pluss
+        elif conv_type == ConvType.TILDEMINUS:
+            fw = self.fw_tilde_minus
+        else:
+            raise ValueError("Unknown ConvType")
+
+        self.fzn[:] = frho[:] * fw[:]
+        weighted_density[:] = ifft(self.fzn).real[self.N_pad:self.N-self.N_pad]
+
     def planar_convolution_differentials(self, diff: np.ndarray, diff_conv: np.ndarray):
         """
 
@@ -329,6 +465,27 @@ class WeightFunction(object):
             self.fn[:] = fd_delta[:] * self.fw_T[:]
 
         diff_conv[:] = idct(self.fn, type=2) + d_inf*self.w_conv_steady_T
+
+    def planar_convolution_differentials_complex_fft(self, diff: np.ndarray, diff_conv: np.ndarray, conv_type=ConvType.REGULAR_COMPLEX):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+
+        """
+
+        diff_padded_complex = self.pad_profile(diff)
+        fd = fft(diff_padded_complex)
+        if conv_type == ConvType.REGULAR_COMPLEX:
+            fw = self.fw_signed
+        elif conv_type == ConvType.ZW:
+            fw = self.fzw_pluss
+        else:
+            raise ValueError("Unknown ConvType")
+
+        self.fzn[:] = fd*fw
+        diff_conv[:] = ifft(self.fzn).real[self.N_pad:self.N-self.N_pad]
 
 
     def spherical_convolution(self, rho_inf: float, frho_delta: np.ndarray, weighted_density: np.ndarray):
