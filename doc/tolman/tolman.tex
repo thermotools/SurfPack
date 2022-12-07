@@ -1,0 +1,226 @@
+\makeatletter
+\def\input@path{{../dftmemo/}}
+\makeatother
+\documentclass[english]{dftmemo}
+\pdfminorversion=4
+\usepackage[utf8]{inputenc}
+\usepackage{textcomp}
+\usepackage{listings}
+\usepackage{babel}
+\usepackage[square,numbers]{natbib}
+%\usepackage{amsmath}
+\usepackage{amssymb,amsmath,amsthm,amsfonts}
+\usepackage{pslatex}
+%\usepackage{bm}% better \boldsymbol
+\usepackage{array}% improves tabular environment.
+\usepackage{dcolumn}% also improves tabular environment, with decimal centring.
+%\usepackage{lastpage}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathmorphing}
+%\usepackage{pgfplots}
+%\usepackage{cleveref}
+\usepackage{pgf,pgfarrows,pgfnodes}
+
+\usepackage[final]{pdfpages}
+\usepackage{hyperref}
+\usepackage{doi}
+
+%\usepackage[altbullet,expert]{lucidabr}
+%\usepackage[charter]{mathdesign}
+\usepackage{cleveref}
+\usepackage{ifthen}
+%\usepackage{nomencl}
+\usepackage{parskip}
+\usepackage{psfrag}
+\usepackage{booktabs}
+\usepackage{pifont}
+%\usepackage{subfig,caption}
+\usepackage{microtype}% for pdflatex; medisin mot overfull \vbox
+\usepackage{xspace}% for pdflatex; medisin mot overfull \vbox
+\usepackage[font=footnotesize]{subcaption}
+\usepackage{siunitx}
+\usepackage{todonotes}
+\presetkeys%
+    {todonotes}%
+    {inline,backgroundcolor=orange}{}
+
+%% Formattering av figur- og tabelltekster
+%
+%
+% Egendefinerte
+%
+%\newcommand*{\od}[3][]{\frac{\mathrm{d}^{#1}#2}{\mathrm{d}{#3}^{#1}}}% ordinary derivative
+\newcommand*{\od}[3][]{\frac{\dif^{#1}#2}{\dif{#3}^{#1}}}% ordinary derivative
+\newcommand*{\pd}[3][]{\frac{\partial^{#1}#2}{\partial{#3}^{#1}}}% partial derivative
+\newcommand*{\pdt}[3][]{{\partial^{#1}#2}/{\partial{#3}^{#1}}}% partial
+                                % derivative for inline use.
+\newcommand{\pone}[3]{\frac{\partial #1}{\partial #2}_{#3}}% partial
+                                % derivative with information of
+                                % constant variables
+\newcommand{\ponel}[3]{\frac{\partial #1}{\partial #2}\bigg|_{#3}} % partial derivative with informatio of constant variable. A line is added.
+\newcommand{\ptwo}[3]{\frac{\partial^{2} #1}{\partial #2 \partial
+    #3}} % partial differential in two different variables
+\newcommand{\pdn}[3]{\frac{\partial^{#1}#2}{\partial{#3}^{#1}}}% partial derivative
+
+% Total derivative:
+\newcommand*{\ttd}[2]{\frac{\mathrm{D} #1}{\mathrm{D} #2}}
+\newcommand*{\td}[2]{\frac{\mathrm{d} #1}{\mathrm{d} #2}}
+\newcommand*{\ddt}{\frac{\partial}{\partial t}}
+\newcommand*{\ddx}{\frac{\partial}{\partial x}}
+% Vectors etc:
+% For Computer Modern:
+
+\DeclareMathAlphabet{\mathsfsl}{OT1}{cmss}{m}{sl}
+%\renewcommand*{\vec}[1]{\boldsymbol{#1}}%
+\newcommand*{\vc}[1]{\vec{\mathbf{#1}}}%
+\newcommand*{\tensor}[1]{\mathsfsl{#1}}% 2. order tensor
+\newcommand*{\matr}[1]{\tensor{#1}}% matrix
+\renewcommand*{\div}{\boldsymbol{\nabla\cdot}}% divergence
+\newcommand*{\grad}{\boldsymbol{\nabla}}% gradient
+% fancy differential from Claudio Beccari, TUGboat:
+% adjusts spacing automatically
+\makeatletter
+\newcommand*{\dif}{\@ifnextchar^{\DIfF}{\DIfF^{}}}
+\def\DIfF^#1{\mathop{\mathrm{\mathstrut d}}\nolimits^{#1}\gobblesp@ce}
+\def\gobblesp@ce{\futurelet\diffarg\opsp@ce}
+\def\opsp@ce{%
+  \let\DiffSpace\!%
+  \ifx\diffarg(%
+    \let\DiffSpace\relax
+  \else
+    \ifx\diffarg[%
+      \let\DiffSpace\relax
+    \else
+      \ifx\diffarg\{%
+        \let\DiffSpace\relax
+      \fi\fi\fi\DiffSpace}
+\makeatother
+%
+\newcommand*{\abs}[1]{\lvert#1\rvert}
+\newcommand*{\bigabs}[1]{\bigl\lvert#1\bigr\rvert}
+\newcommand*{\biggabs}[1]{\biggl\lvert#1\biggr\rvert}
+\newcommand*{\norm}[1]{\lVert#1\rVert}
+\newcommand{\subl}{\ensuremath{\text{sub}}}
+\newcommand{\spec}{\text{spec}}
+\newcommand{\sat}{\text{sat}}
+\newcommand{\sol}{\text{sol}}
+\newcommand{\liq}{\text{liq}}
+\newcommand{\vap}{\text{vap}}
+\newcommand{\amb}{\text{amb}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\crit}{\text{crit}}
+\newcommand{\entr}{\ensuremath{\text{s}}}
+\newcommand{\fus}{\text{fus}}
+\newcommand*{\lb}{\ensuremath{\left(}}
+\newcommand*{\rb}{\ensuremath{\right)}}
+\newcommand*{\lbf}{\ensuremath{\left[}}
+\newcommand*{\rbf}{\ensuremath{\right]}}
+\newcommand{\LEFT}{\ensuremath{\text{L}}\xspace}
+\newcommand{\RIGTH}{\ensuremath{\text{R}}\xspace}
+\newcommand{\cdft}{\ensuremath{\text{classical DFT}}\xspace}
+\newcommand{\RF}{\ensuremath{\text{RF}}\xspace}
+\newcommand{\WB}{\ensuremath{\text{WB}}\xspace}
+\newcommand{\WBII}{\ensuremath{\text{WBII}}\xspace}
+\newcommand{\excess}{\ensuremath{\text{ex}}\xspace}
+\newcommand{\ideal}{\ensuremath{\text{id}}\xspace}
+\newcommand{\rvec}{\ensuremath{\mathbf{r}}\xspace}
+\newcommand{\attractive}{\ensuremath{\text{att}}\xspace}
+\newcommand{\kB}{\ensuremath{\text{k}_{\text{B}}}\xspace}
+\newcommand{\NA}{\ensuremath{N_{\text{A}}}\xspace}
+\newcommand{\external}{\ensuremath{\text{ext}}\xspace}
+\newcommand{\bulk}{\ensuremath{\text{b}}\xspace}
+\newcommand{\pure}{\ensuremath{\text{p}}\xspace}
+\newcommand{\NC}{\ensuremath{\text{NC}}\xspace}
+\newcommand{\disp}{\ensuremath{\text{disp}}\xspace}
+\graphicspath{{gfx/}}
+
+\title{Tolman length and rigidities from DFT}
+\author{Morten Hammer}
+\date{\today}
+
+\begin{document}
+\frontmatter
+
+\section{Introduction}
+
+\citet{rehner2019} derived the equations needed to calculate the
+Tolman length and rigidity constants used when expanding the planar
+surface tension in the curvature of a droplet/bubble. This memo
+describes the implementation in \emph{thermopack\_dft}.
+
+
+\section{Fourier transforms}
+The required convolution weight functions is tabulated in
+\cite[Tab. II]{rehner2019}, and require differentials of the regular
+weight functions, $\omega$.
+
+Scalar weight functions:
+\begin{equation}
+  \mathcal{F}\lb z \omega \rb = \frac{i}{2 \pi} \omega^\prime \lb k \rb
+\end{equation}
+
+\begin{equation}
+  \mathcal{F}\lb \tilde{\omega} \rb = \frac{i}{4 \pi^2} \biggl( \frac{\omega^\prime \lb k \rb}{k} - \omega^{\prime\prime} \lb k \rb \biggr)
+\end{equation}
+
+Vector weight functions:
+\begin{equation}
+  \mathcal{F}\lb z \omega_z \pm \hat{\omega}_z \rb = \frac{i}{2 \pi} \biggl( \omega_z^\prime \lb k \rb \pm \frac{\omega_z \lb k \rb}{k} \biggr)\biggr)
+\end{equation}
+
+\begin{equation}
+  \mathcal{F}\lb z^2 \omega_z \pm z\hat{\omega}_z \rb = \frac{-1}{4 \pi^4} \biggl( \omega_z^{\prime\prime} \lb k \rb \pm \biggl( \frac{\omega_z^\prime \lb k \rb}{k} - \frac{\omega_z \lb k \rb}{k^2}\biggr)\biggr)
+\end{equation}
+
+Differentials, in Fourier space, is required for the weight functions.
+
+The weight functions in Fourier space is given in the supplementary information by \citet{stierle2020a}.
+\begin{align}
+  \label{eq:weight_functions_fourier}
+  \omega_0 \lb \mathbf{k}\rb &= j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \omega_1 \lb \mathbf{k}\rb &= R j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \omega_2 \lb \mathbf{k}\rb &= 4 \pi R^2 j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
+  \omega_3 \lb \mathbf{k}\rb &= \frac{4}{3} \pi R^3 \lb j_0\lb 2 \pi R |\mathbf{k}| \rb + j_2\lb 2 \pi R |\mathbf{k}| \rb \rb  \\
+  \omega_{z1} \lb \mathbf{k}\rb &= - \frac{i \mathbf{k}}{2 R} \omega_3 \lb \mathbf{k}\rb  \\
+  \omega_{z2} \lb \mathbf{k}\rb &= - 2 \pi i \mathbf{k} \omega_3 \lb \mathbf{k}\rb  \\
+  \omega_{\disp} \lb \mathbf{k}\rb &= j_0\lb 4 \pi \psi R |\mathbf{k}| \rb + j_2\lb 4 \pi \psi R |\mathbf{k}| \rb
+\end{align}
+Here $j$ is the spherical Bessel functions of the first kind of order
+zero and two. The Bessel functions of order 0-2 is given as
+\begin{align}
+  \label{eq:bessel_functions}
+  j_0\lb \xi \rb &= \frac{\sin \lb \xi \rb}{\xi} \\
+  j_1\lb \xi \rb &= \frac{\sin \lb \xi \rb}{\xi^2} - \frac{\cos \lb \xi \rb}{\xi}  \\
+  j_2\lb \xi \rb &= \biggl(\frac{3}{\xi^2} - 1\biggr) \frac{\sin \lb \xi \rb}{\xi} - \frac{3 \cos \lb \xi \rb}{\xi^2}.
+\end{align}
+The Bessel functions are included in SymPy, and the differentials can
+be handled analytically. Also, as we are differentiating with respect
+to $k$, it is not necessary to convolve with all the weights of the
+Fundamental Measure Theory (FMT), as the differentials of
+$\omega_0, \omega_1$ and $\omega_2$ are related by constant scalar
+values. The same applies for $\omega_{z1}$ and $\omega_{z2}$.
+
+Using $k_* = 2 \pi k$, and differentiating with respect to $k_*$ we get,
+\begin{align}
+  \mathcal{F}\lb z \omega \rb &= i \omega^\prime \lb k_* \rb \\
+  \mathcal{F}\lb \tilde{\omega} \rb &= i\biggl( \frac{\omega^\prime \lb k_* \rb}{k_*} - \omega^{\prime\prime} \lb k_* \rb \biggr) \\
+  \mathcal{F}\lb z \omega_z \pm \hat{\omega}_z \rb &= i \biggl( \omega_z^\prime \lb k_* \rb \pm \frac{\omega_z \lb k_* \rb}{k_*} \biggr)\biggr) \\
+  \mathcal{F}\lb z^2 \omega_z \pm z\hat{\omega}_z \rb &= -\biggl( \omega_z^{\prime\prime} \lb k_* \rb \pm \biggl( \frac{\omega_z^\prime \lb k_* \rb}{k_*} - \frac{\omega_z \lb k_* \rb}{k_*^{2}}\biggr)\biggr)
+\end{align}
+
+\section{Results}
+
+
+
+\clearpage
+\bibliographystyle{abbrvnat}
+\bibliography{../bib/DFT.bib,../bib/HardSphere.bib,../bib/PC-SAFT.bib}
+
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% ispell-local-dictionary: "british"
+%%% End: 
