@@ -41,14 +41,14 @@ for T_star in Tv:
     vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
     # Define interface with initial tanh density profile
-    interf = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(1), domain_size=100.0, n_grid=1024, invert_states=True)
+    interf = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(1), domain_size=200.0, n_grid=1024, invert_states=True)
 
     interf.grid.get_domain_weights(position=0.55*interf.grid.domain_size)
     # Solve for equilibrium profile
     interf.solve(solver=solver, log_iter=True)
 
     # Plot profile
-    interf.plot_property_profiles(plot_equimolar_surface=True)
+    interf.plot_property_profiles(plot_equimolar_surface=True, continue_after_plotting=True)
 
 
     gamma.append(interf.surface_tension(reduced_unit=True))

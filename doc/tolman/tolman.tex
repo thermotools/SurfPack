@@ -45,11 +45,6 @@
     {todonotes}%
     {inline,backgroundcolor=orange}{}
 
-%% Formattering av figur- og tabelltekster
-%
-%
-% Egendefinerte
-%
 %\newcommand*{\od}[3][]{\frac{\mathrm{d}^{#1}#2}{\mathrm{d}{#3}^{#1}}}% ordinary derivative
 \newcommand*{\od}[3][]{\frac{\dif^{#1}#2}{\dif{#3}^{#1}}}% ordinary derivative
 \newcommand*{\pd}[3][]{\frac{\partial^{#1}#2}{\partial{#3}^{#1}}}% partial derivative
@@ -68,6 +63,7 @@
 \newcommand*{\td}[2]{\frac{\mathrm{d} #1}{\mathrm{d} #2}}
 \newcommand*{\ddt}{\frac{\partial}{\partial t}}
 \newcommand*{\ddx}{\frac{\partial}{\partial x}}
+\newcommand*{\sgn}[1]{\text{sgn}(#1)}
 % Vectors etc:
 % For Computer Modern:
 
@@ -175,7 +171,7 @@ Vector weight functions:
 
 Differentials, in Fourier space, is required for the weight functions.
 
-The weight functions in Fourier space is given in the supplementary information by \citet{stierle2020a}.
+The weight functions in Fourier space is given in the supplementary information of \citet{stierle2020a}.
 \begin{align}
   \label{eq:weight_functions_fourier}
   \omega_0 \lb \mathbf{k}\rb &= j_0\lb 2 \pi R |\mathbf{k}| \rb  \\
@@ -194,12 +190,6 @@ zero and two. The Bessel functions of order 0-2 is given as
   j_1\lb \xi \rb &= \frac{\sin \lb \xi \rb}{\xi^2} - \frac{\cos \lb \xi \rb}{\xi}  \\
   j_2\lb \xi \rb &= \biggl(\frac{3}{\xi^2} - 1\biggr) \frac{\sin \lb \xi \rb}{\xi} - \frac{3 \cos \lb \xi \rb}{\xi^2}.
 \end{align}
-The Bessel functions are included in SymPy, and the differentials can
-be handled analytically. Also, as we are differentiating with respect
-to $k$, it is not necessary to convolve with all the weights of the
-Fundamental Measure Theory (FMT), as the differentials of
-$\omega_0, \omega_1$ and $\omega_2$ are related by constant scalar
-values. The same applies for $\omega_{z1}$ and $\omega_{z2}$.
 
 Using $k_* = 2 \pi k$, and differentiating with respect to $k_*$ we get,
 \begin{align}
@@ -208,6 +198,36 @@ Using $k_* = 2 \pi k$, and differentiating with respect to $k_*$ we get,
   \mathcal{F}\lb z \omega_z \pm \hat{\omega}_z \rb &= i \biggl( \omega_z^\prime \lb k_* \rb \pm \frac{\omega_z \lb k_* \rb}{k_*} \biggr)\biggr) \\
   \mathcal{F}\lb z^2 \omega_z \pm z\hat{\omega}_z \rb &= -\biggl( \omega_z^{\prime\prime} \lb k_* \rb \pm \biggl( \frac{\omega_z^\prime \lb k_* \rb}{k_*} - \frac{\omega_z \lb k_* \rb}{k_*^{2}}\biggr)\biggr)
 \end{align}
+
+\subsection{Differentials}
+The Bessel functions are included in SymPy, and the differentials can
+be handled analytically. Also, as we are differentiating with respect
+to $k$, it is not necessary to convolve with all the weights of the
+Fundamental Measure Theory (FMT), as the differentials of
+$\omega_0, \omega_1$ and $\omega_2$ are related by constant scalar
+values. The same applies for $\omega_{z1}$ and $\omega_{z2}$.
+
+The use of analytical differentials where very slow, and was not feasible.
+
+Differentiating the required spherical Bessel functions gives after some manipulation,
+\begin{align}
+  \label{eq:bessel_function_differentials}
+  \pd{j_0\lb \xi \rb}{\xi} &= -\frac{\sin \lb \xi \rb}{\xi^2} + \frac{\cos \lb \xi \rb}{\xi} = - j_1\lb \xi \rb\\
+  \pd[2]{j_0\lb \xi \rb}{\xi} &= -\pd{}{\xi} \biggl(\frac{\sin \lb \xi \rb}{\xi^2} - \frac{\cos \lb \xi \rb}{\xi} \biggr) \nonumber \\
+                           &= \frac{2 \sin \lb \xi \rb }{\xi^3} -  \frac{2 \cos \lb \xi \rb }{\xi^2} - \frac{\sin \lb \xi \rb }{\xi} \nonumber \\
+                           &= \frac{1}{3} \biggl( 2 j_2\lb \xi \rb - j_0\lb \xi \rb \biggr) \\
+  \pd{\left[\lb j_0\lb \xi \rb + j_2\lb \xi \rb\rb\right]}{\xi} &= \pd{}{\xi} \biggl(\frac{3\sin \lb \xi \rb}{\xi^3} - \frac{3\cos \lb \xi \rb}{\xi^2}\biggr) \nonumber \\
+                           &= \frac{-9 \sin \lb \xi \rb }{\xi^4} +  \frac{9 \cos \lb \xi \rb }{\xi^3} + \frac{3 \sin \lb \xi \rb }{\xi^2} \nonumber \\
+                           &= -\frac{9}{15} \biggl( j_3\lb \xi \rb + j_1\lb \xi \rb \biggr) \\
+  \pd[2]{\left[\lb j_0\lb \xi \rb + j_2\lb \xi \rb\rb\right]}{\xi} &= \frac{36 \sin \lb \xi \rb }{\xi^5} -  \frac{36 \cos \lb \xi \rb }{\xi^4} - \frac{15 \sin \lb \xi \rb }{\xi^3} + \frac{3 \cos \lb \xi \rb }{\xi^2} \nonumber \\
+                           &= \frac{1}{105} \biggl( 36 j_4\lb \xi \rb + 15 j_2\lb \xi \rb - 21 j_0\lb \xi \rb \biggr) \\
+\end{align}
+
+Using the relation
+\begin{equation}
+  \od{\xi}{k^*} = \od{\xi}{k^*} \lb R^* \abs{k^*} \rb= \sgn{k^*}R^*,
+\end{equation}
+the needed differentials are easy to write out.
 
 \section{Results}
 

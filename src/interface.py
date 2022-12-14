@@ -3,7 +3,8 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from dft_numerics import dft_solver
-from constants import NA, KB, Geometry, Specification, LenghtUnit, LCOLORS, Properties, get_property_label
+from constants import NA, KB, Geometry, Specification, LenghtUnit, \
+    LCOLORS, Properties, get_property_label
 from bulk import Bulk
 from density_profile import Profile
 from grid import Grid
@@ -16,6 +17,7 @@ from pyctp.ljs_wca import ljs_wca, ljs_uv
 from pyctp.pets import pets
 from pyctp.thermopack_state import State, Equilibrium
 from pcsaft_functional import pc_saft
+from weight_functions import ConvType
 from pets_functional import PeTS_functional
 from ljs_functional import ljs_bh_functional, ljs_wca_functional, ljs_uv_functional
 from saftvrmie_functional import saftvrmie_functional, saftvrqmie_functional
@@ -1101,34 +1103,36 @@ class PlanarInterface(Interface):
             self.print_perform_minimization_message()
             return
 
+        g = 2.0
         # Get sigma_0
         _, omega_a = self.grand_potential()
         omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
         sigma_0 = np.sum(omega_a)
 
-        # Ignore first term for now.....
+        # Convolve for (rho_0 * (zw))
+        conv = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
+        # Perform convolution integrals
+        conv.convolve_densities_by_type(self.profile, conv_type=ConvType.ZW)
+        #conv.plot_weighted_densities()
+        # Calculate differentials
+        f0 = self.convolver.get_differential_sum(conv.weighted_densities)
+        sigma_1_0 = np.sum(f0*self.grid.integration_weights)
+        print("sigma_1_0",sigma_1_0)
 
-        #w_left, w_right, idx = self.grid.get_domain_weights(self.r_equimolar)
         z = np.zeros_like(self.grid.z)
-        #zr = np.zeros_like(self.grid.z)
         z[:] = self.grid.z[:] - self.r_equimolar
-        #zr[:] = zl[:]
-        # zr[idx] = 0.5*(self.grid.z_edge[idx+1] - self.r_equimolar)
-        # zl[idx] = 0.5*(self.grid.z_edge[idx] - self.r_equimolar)
-        # print(idx)
-        # print((self.grid.z_edge[:]))
-        # print((self.grid.z[:]))
-        # print((self.grid.z_edge[:] - self.r_equimolar))
-        # print((self.grid.z_edge[:] - self.r_equimolar)[idx-1:idx+2])
-        # print((self.grid.z[:] - self.r_equimolar)[idx-1:idx+2])
-        # print(zl[idx-1:idx+2])
-        # print(zr[idx-1:idx+2])
-        #omega_a /= self.grid.integration_weights
-        #sigma_1 = np.sum(omega_a*zl*w_left) + np.sum(omega_a*zr*w_right)
-        sgn = 1.0 if self.bulk.liquid_is_right() else -1.0
-        sigma_1 = sgn*np.sum(omega_a*z)
-        d_tolman_sphere = -0.5*sigma_1/sigma_0
 
+        print("gamma",self.surface_tension(reduced_unit=False))
+        sgn = 1.0 if self.bulk.liquid_is_right() else -1.0
+        sigma_1_1 = sgn*np.sum(omega_a*z)*g
+        print("sigma_1_1",sigma_1_1)
+        sigma_1 = sigma_1_0 + sigma_1_1
+        print("sigma_1",sigma_1)
+        print("sigma_0",sigma_0)
+        d_tolman_sphere = -sigma_1/sigma_0/g
+        print("d_tolman_sphere",d_tolman_sphere)
+
+        print("ads",self.get_adsorption_vector(self.r_equimolar))
         # Convert to real units
         eps = self.functional.thermo.eps_div_kb[0] * KB
         sigma_1 *= eps / self.functional.grid_reducing_lenght
