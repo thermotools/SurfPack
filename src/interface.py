@@ -1116,7 +1116,7 @@ class PlanarInterface(Interface):
         #conv.plot_weighted_densities()
         # Calculate differentials
         f0 = self.convolver.get_differential_sum(conv.weighted_densities)
-        sigma_1_0 = np.sum(f0*self.grid.integration_weights)
+        sigma_1_0 = 0.5*np.sum(f0*self.grid.integration_weights)
         print("sigma_1_0",sigma_1_0)
 
         z = np.zeros_like(self.grid.z)

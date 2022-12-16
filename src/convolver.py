@@ -151,7 +151,7 @@ class WeightedDensities():
             self.n0[:] = np.sum(rho)
             self.n1[:] = np.sum(self.R * rho)
             self.n2[:] = 4 * np.pi * np.sum(self.R ** 2 * rho)
-            self.n3[:] = 4 Renei * np.sum(self.R ** 3 * rho) / 3
+            self.n3[:] = 4 * np.pi * np.sum(self.R ** 3 * rho) / 3
             self.n1v[:] = - 1.0e-3*self.n0[:]
             self.n2v[:] = 4*np.pi*np.average(self.R)*self.n1v[:]
         else:
@@ -624,7 +624,7 @@ class Convolver(object):
                 if alias in self.comp_wfs[i].fmt_aliases:
                     f0_na[:] += self.comp_differentials[i].d[alias][:]*n_alpha.n[alias][:]
                 else:
-                    f0_na[:] += self.comp_differentials[i].d[alias][:]*n_alpha.n[alias][:, i]
+                    f0_na[:] += self.comp_differentials[i].d[alias][:]*n_alpha.n[alias][i, :]
             #f0_na[:] += self.comp_differentials[i].mu_of_rho[:]*n_alpha.rho.densities[i][:]
         return f0_na
 

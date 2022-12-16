@@ -289,6 +289,13 @@ class WeightFunction(object):
         self.n_padded_grid = N
         self.n_pad = int((N - self.grid.n_grid)/2)
 
+        # Debug
+        # self.n_padded_grid = 512
+        # self.n_pad = 47
+        # N = self.n_padded_grid
+        # dz = self.grid.domain_size/(512-2*47)
+        # l = self.grid.domain_size + dz*2*47
+
         self.fw_complex = np.zeros(N, dtype=np.cdouble)
         self.fw_signed = np.zeros(N, dtype=np.cdouble)
         self.fw_tilde_pluss = np.zeros(N, dtype=np.cdouble)
@@ -297,7 +304,7 @@ class WeightFunction(object):
         self.fzw_minus = np.zeros(N, dtype=np.cdouble)
         self.fzn = np.zeros(N, dtype=np.cdouble)
         self.k_grid = np.zeros(N)
-        # Fourier space variables
+        # Fourier space variable
         for k in range(int(N/2)):
             self.k_grid[k] = k
             self.k_grid[N - k - 1] = -k - 1
@@ -309,7 +316,8 @@ class WeightFunction(object):
             k[:] = self.k_grid[:]
             k[0] = 1.0 # Avoid divide by zero message
             is_imaginary = (self.wf_type == WeightFunctionType.DELTAVEC)
-
+            set_zero_mult = np.ones(N)
+            set_zero_mult[0] = 0.0
             if is_imaginary:
                 self.fw_complex.imag[:] = fw[:]
                 self.fw_signed.imag[:] = -fw[:]
@@ -318,7 +326,7 @@ class WeightFunction(object):
                 self.fw_signed.real[:] = fw[:]
 
             if is_imaginary:
-                self.fzw_pluss.real[:] = (fwk[:] + fw[:]/k)
+                self.fzw_pluss.real[:] = -(fwk[:] + set_zero_mult*fw[:]/k)
                 self.fzw_minus.real[:] = -(fwk[:] - fw[:]/k)
                 self.fw_tilde_pluss.imag[:] = -(fwkk[:] + (fwk[:]/k - fw[:]/k**2))
                 self.fw_tilde_minus.imag[:] = -(fwkk[:] - (fwk[:]/k - fw[:]/k**2))
@@ -329,7 +337,8 @@ class WeightFunction(object):
                 self.fw_tilde_minus.real[:] = self.fw_tilde_pluss.real[:]
 
             # Set values in k=0
-            self.fzw_pluss[0] = 0.0
+            if is_imaginary:
+                self.fzw_pluss[0] *= 2.0
             self.fzw_minus[0] = 0.0
             self.fw_tilde_pluss[0] = 0.0
             self.fw_tilde_minus[0] = 0.0
