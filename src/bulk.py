@@ -214,5 +214,70 @@ class Bulk(object):
 
         return prop_b
 
+    @staticmethod
+    def curvature_expansion(bulk,
+                            sigma0,
+                            const_liquid_composition=True):
+        """Construct class from another bulk using curvature expansion for a sphereical droplet/bubble
+        For details see Aasen et al. 2018, doi: 10.1063/1.5026747
+
+        Args:
+            bulk (Bulk): Equation of state object
+            const_liquid_composition (bool): Specification
+
+        """
+
+        if bulk.liquid_is_right():
+            vap = bulk.left_state
+            liq = bulk.right_state
+        else:
+            liq = bulk.left_state
+            vap = bulk.right_state
+
+        rho_v = vap.partial_density()
+        rho_l = liq.partial_density()
+
+        mu0, mu0_rho_l, = bulk.eos.chemical_potential_tv(bulk.T, v = 1.0, x=rho_l, dmudv=True, property_flag="R")
+        mu0, mu0_rho_v, = bulk.eos.chemical_potential_tv(bulk.T, v = 1.0, x=rho_v, dmudv=True, property_flag="R")
+        for i in range(bulk.eos.nc):
+            mu0_rho_l[i,i] += 1.0/rho_l[i]
+            mu0_rho_v[i,i] += 1.0/rho_v[i]
+
+        if const_liquid_composition:
+            rho = rho_l
+            mu0_rho = mu0_rho_l
+        else:
+            rho = rho_v
+            mu0_rho = mu0_rho_v
+
+        # Equation S6
+        rho_tot = np.sum(rho)
+        M = np.outer(rho, np.ones_like(rho))
+        for i in range(bulk.eos.nc):
+            M[i,i] += rho_tot
+
+        # Find null-space defining mu_1
+        u, s, vh = np.linalg.svd(M)
+        w = u[:,-1]
+        mu_1 = mu0_rho*w
+
+        # Equation 14
+        fac = 2*sigma0 / np.sum(mu_1*(rho_l-rho_v))
+        mu_1 = mu_1*fac
+
+        rho1_l = mu_1/mu0_rho_l
+        rho1_v = mu_1/mu0_rho_v
+
+        liq_state = State.new_nvt(bulk.eos, bulk.T, V=1.0, n=rho1_l)
+        vap_state = State.new_nvt(bulk.eos, bulk.T, V=1.0, n=rho1_v)
+        if bulk.liquid_is_right():
+            left_state = vap_state
+            right_state = liq_state
+        else:
+            left_state = liq_state
+            right_state = vap_state
+
+        return Bulk(bulk.functional, left_state, right_state)
+
 if __name__ == "__main__":
     pass

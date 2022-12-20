@@ -108,7 +108,9 @@ class Interface(ABC):
             z = None
         return prof, z
 
-    def pack_x_vec(self):
+    def pack_x_vec(self, profile=None):
+        if profile == None:
+            profile = self.profile
         n_grid = self.grid.n_grid
         n_c = self.functional.nc
         n_rho = n_c * n_grid
@@ -117,11 +119,11 @@ class Interface(ABC):
                          Specification.NUMBER_OF_MOLES else 0))
         for ic in range(n_c):
             xvec[ic * n_grid:(ic+1) *
-                 n_grid] = self.profile.densities[ic][:]
+                 n_grid] = profile.densities[ic][:]
 
         if self.specification == Specification.NUMBER_OF_MOLES:
             # Convolution integrals for densities
-            self.convolver.convolve_density_profile(self.profile.densities)
+            self.convolver.convolve_density_profile(profile.densities)
             integrals = self.integrate_df_vext()
             exp_beta_mu = np.exp(self.bulk.mu_scaled_beta)
             denum = np.dot(exp_beta_mu, integrals)
@@ -140,7 +142,7 @@ class Interface(ABC):
         beta_mu[:] = self.bulk.mu_scaled_beta[:]
 
         # Perform convolution integrals
-        self.convolver.convolve_density_profile(prof)
+        self.convolver.convolve_densities_and_differentials(prof)
 
         # Calculate new density profile using the variations of the functional
         res = np.zeros(n_rho + n_c *
@@ -206,7 +208,7 @@ class Interface(ABC):
         # Reset cache
         self.reset_cache()
         # Perform convolution integrals
-        self.convolver.convolve_density_profile(self.profile)
+        self.convolver.convolve_densities_and_differentials(self.profile)
 
     def tanh_profile(self, vle, t_crit, rel_pos_dividing_surface=0.5, invert_states=False):
         """
@@ -427,7 +429,7 @@ class Interface(ABC):
         self.r_equimolar = ((N - V*rho2)/(rho1 - rho2)/prefac)**exponent
         #print("Re, Re/R", R, R/self.grid.domain_size)
 
-    def get_adsorption_vector(self, radius):
+    def get_adsorption_vector(self, radius=None):
         """
         Get adsoprption vector Gamma (Gamma is zero for equimolar radius)
         """
@@ -435,17 +437,15 @@ class Interface(ABC):
             print("Need profile to calculate adsorption vector")
             return
 
-        iR = self.grid.get_index_of_rel_pos(radius/self.grid.domain_size)
-        w_left = self.grid.get_left_weight(radius)
-        w_right = self.grid.integration_weights[iR] - w_left
+        if radius==None:
+            radius = self.r_equimolar
+
+        w_right = self.grid.z_edge[-1] - self.r_equimolar
+        w_left = self.r_equimolar - self.grid.z_edge[0]
         gamma = np.zeros_like(self.bulk.reduced_density_left)
         for i in range(self.functional.nc):
-            gamma[i] += w_left*(self.profile.densities[i][iR] - self.bulk.reduced_density_left[i])
-            gamma[i] += w_right*(self.profile.densities[i][iR] - self.bulk.reduced_density_right[i])
-            for j in range(iR):
-                gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_left[i])
-            for j in range(iR+1,self.grid.n_grid):
-                gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_right[i])
+            gamma[i] = self.profile.densities[i][:]*self.grid.integration_weights[j] \
+                - w_right*self.bulk.reduced_density_right[i] - w_left*self.bulk.reduced_density_left[i]
         return gamma
 
     def get_excess_free_energy_density(self, reduced=True):
@@ -1109,6 +1109,27 @@ class PlanarInterface(Interface):
         omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
         sigma_0 = np.sum(omega_a)
 
+        plt.figure()
+        #alias = "wv1"
+        #plt.plot(self.grid.z,self.convolver.comp_differentials[0].d[alias][:],label=alias)
+        alias = "wv2"
+        #plt.plot(self.grid.z,self.convolver.comp_differentials[0].d[alias][:],label=alias)
+
+        plt.plot(self.grid.z,self.convolver.comp_differentials[0].d_conv[alias][:],label=alias)
+        conv = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
+        #conv.convolve_densities_and_differentials(self.profile)
+        conv.convolve_density_profile(self.profile)
+        conv.convolve_differentials_by_type(conv_type=ConvType.REGULAR_COMPLEX)
+        # alias = "wv1"
+        # plt.plot(self.grid.z,conv.comp_differentials[0].d[alias][:],label=alias+"_FFT")
+        # alias = "wv2"
+        # plt.plot(self.grid.z,conv.comp_differentials[0].d[alias][:],label=alias+"_FFT")
+        plt.plot(self.grid.z,conv.comp_differentials[0].d_conv[alias][:],label=alias+"_FFT")
+
+        leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        plt.show()
+
+        sys.exit()
         # Convolve for (rho_0 * (zw))
         conv = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
         # Perform convolution integrals

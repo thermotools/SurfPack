@@ -680,14 +680,14 @@ class WeightFunction(object):
         fd = fft(diff_padded_complex)
         if conv_type == ConvType.REGULAR_COMPLEX:
             fw = self.fw_signed
+            #self.fw_complex
         elif conv_type == ConvType.ZW:
             fw = self.fzw_pluss
         else:
             raise ValueError("Unknown ConvType")
 
         self.fzn[:] = fd*fw
-        diff_conv[:] = ifft(self.fzn).real[self.N_pad:self.N-self.N_pad]
-
+        diff_conv[:] = ifft(self.fzn).real[self.n_pad:self.n_padded_grid-self.n_pad]
 
     def spherical_convolution(self, rho_inf: float, frho_delta: np.ndarray, weighted_density: np.ndarray):
         """
@@ -762,6 +762,18 @@ class WeightFunction(object):
                 self.spherical_convolution_differentials(diff, conv_diff)
             elif self.geometry == Geometry.POLAR:
                 self.polar_convolution_differentials(diff, conv_diff)
+
+    def convolve_differentials_complex(self, diff: np.ndarray, conv_diff: np.ndarray, conv_type=ConvType.REGULAR_COMPLEX):
+        """
+
+        Args:
+            densities:
+            rho (np.ndarray): Density profile
+            conv_type=ConvType
+        """
+        if self.convolve:
+            if self.geometry == Geometry.PLANAR:
+                self.planar_convolution_differentials_complex_fft(diff, conv_diff, conv_type)
 
     def convolve_differentials_T(self, diff: np.ndarray, conv_diff: np.ndarray):
         """

@@ -289,6 +289,95 @@ class Profile(object):
             self.densities.densities[ic] = interplator(z_new-shift)
             return z_new, new_l
 
+    def delta_rho(self, z, scaling=1.0):
+        """Calculate delta rho over delat z
+
+        Args:
+            scaling (float or ndarray): Scaling of profiles
+        Returns:
+            np.ndarray: drhodz calculated using two-sided stencile
+        """
+        N = self.densities.N
+        nc = self.densities.nc
+        dens = Densities(nc, N)
+        s = np.full((nc),scaling)
+        for ic in range(nc):
+            dens[ic][1:N-1] = s[ic]*(self.densities.densities[ic][2:N] - self.densities.densities[ic][0:N-2])/(z[2:N]-z[0:N-2])
+        return Profile(dens)
+
+    def __iadd__(self, other):
+        if isinstance(other, Profile):
+            for ic in range(self.densities.nc):
+                self.densities.densities[ic][:] += other.densities.densities[ic][:]
+        elif isinstance(other, float):
+            for ic in range(self.densities.nc):
+                self.densities.densities[ic][:] += other
+        else:
+            raise TypeError(f'Cannot add {type(other)} to Profile')
+        return self
+
+    def __add__(self, other):
+        N = self.densities.N
+        nc = self.densities.nc
+        dens = Densities(nc, N)
+        if isinstance(other, Profile):
+            for ic in range(nc):
+                dens[ic][:] = self.densities.densities[ic][:] + other.densities.densities[ic][:]
+        elif isinstance(other, float):
+            for ic in range(nc):
+                dens[ic][:] = self.densities.densities[ic][:] + other
+        else:
+            raise TypeError(f'Cannot Profile and {type(other)}')
+
+        return Profile(dens)
+
+    def __sub__(self, other):
+        N = self.densities.N
+        nc = self.densities.nc
+        dens = Densities(nc, N)
+        if isinstance(other, Profile):
+            for ic in range(nc):
+                dens[ic][:] = self.densities.densities[ic][:] - other.densities.densities[ic][:]
+        elif isinstance(other, float):
+            for ic in range(nc):
+                dens[ic][:] = self.densities.densities[ic][:] - other
+        else:
+            raise TypeError(f'Cannot Profile and {type(other)}')
+        return Profile(dens)
+
+    def __mul__(self, other):
+        """Handle Profile * Other"""
+        N = self.densities.N
+        nc = self.densities.nc
+        dens = Densities(nc, N)
+        if isinstance(other, Profile):
+            for ic in range(nc):
+                dens[ic][:] = self.densities.densities[ic][:]*other.densities.densities[ic][:]
+        elif isinstance(other, float):
+            for ic in range(nc):
+                dens[ic][:] = self.densities.densities[ic][:]*other
+        else:
+            raise TypeError(f'Cannot multiply a Profile with {type(other)}')
+
+        return Profile(dens)
+
+    def __imul__(self, other):
+        if isinstance(other, Profile):
+            for ic in range(nc):
+                self.densities.densities[ic][:] *= other.densities.densities[ic][:]
+        elif isinstance(other, float):
+            for ic in range(nc):
+                self.densities.densities[ic][:] *= other
+        else:
+            raise TypeError(f'Cannot multiply a Profile with {type(other)}')
+
+        return self
+
+    __rmul__ = __mul__
+    __radd__ = __add__
+    __rsub__ = __sub__
+
+
 class ProfilePlotter(object):
     """
     Plot multiple profiles

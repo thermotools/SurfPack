@@ -265,6 +265,15 @@ class WeightedDensitiesMaster(WeightedDensities):
             if alias not in wfs.fmt_aliases:
                 self.n[alias] = np.zeros((self.nc, n_grid))
 
+    @staticmethod
+    def Copy(Other):
+        """Method used to duplicate WeightedDensitiesMaster
+
+        Args:
+        Other (WeightedDensitiesMaster): Other instance of WeightedDensitiesMaster
+        """
+        return WeightedDensitiesMaster(Other.n_grid, Other.wfs_list, Other.ms)
+
     def convolve_densities(self, rho_inf: float, frho_delta: np.ndarray, i: int, temperature_diff_convolution=False):
         """
         Args:
@@ -349,6 +358,77 @@ class WeightedDensitiesMaster(WeightedDensities):
         else:
             self.n[alias][ic,:] = n[:]
 
+
+    def __iadd__(self, other):
+        if isinstance(other, WeightedDensitiesMaster):
+            for wd in self.n:
+                self.n[wd] += other.n[wd]
+        elif isinstance(other, WeightedDensities):
+            # Only add FMT contributions
+            for wd in self.n:
+                if wd in self.wfs.fmt_aliases:
+                    self.n[wd][:] += other.n[wd][:]
+        elif isinstance(other, float):
+            for wd in self.n:
+                self.n[wd] += other
+        else:
+            raise TypeError(f'Cannot add {type(other)} to WeightedDensitiesMaster')
+        return self
+
+    def __add__(self, other):
+        wdm = WeightedDensitiesMaster.Copy(self)
+        if isinstance(other, WeightedDensitiesMaster):
+            for wd in self.n:
+                wdm.n[wd] = self.n[wd] + other.n[wd]
+        elif isinstance(other, float):
+            for wd in self.n:
+                wdm.n[wd] = self.n[wd] + other
+        else:
+            raise TypeError(f'Cannot WeightedDensitiesMaster and {type(other)}')
+
+        return wdm
+
+    def __sub__(self, other):
+        wdm = WeightedDensitiesMaster.Copy(self)
+        if isinstance(other, WeightedDensitiesMaster):
+            for wd in self.n:
+                wdm.n[wd] = self.n[wd] - other.n[wd]
+        elif isinstance(other, float):
+            for wd in self.n:
+                wdm.n[wd] = self.n[wd] - other
+        else:
+            raise TypeError(f'Cannot WeightedDensitiesMaster and {type(other)}')
+        return wdm
+
+    def __mul__(self, other):
+        """Handle WeightedDensitiesMaster * Other"""
+        wdm = WeightedDensitiesMaster.Copy(self)
+        if isinstance(other, WeightedDensitiesMaster):
+            for wd in self.n:
+                wdm.n[wd] = self.n[wd]*other.n[wd]
+        elif isinstance(other, float):
+            for wd in self.n:
+                wdm.n[wd] = self.n[wd]*other
+        else:
+            raise TypeError(f'Cannot multiply a WeightedDensitiesMaster with {type(other)}')
+
+        return wdm
+
+    def __imul__(self, other):
+        if isinstance(other, WeightedDensitiesMaster):
+            for wd in self.n:
+                self.n[wd] *= self.n[wd]
+        elif isinstance(other, float):
+            for wd in self.n:
+                self.n[wd] *= other
+        else:
+            raise TypeError(f'Cannot multiply a WeightedDensitiesMaster with {type(other)}')
+
+        return self
+
+    __rmul__ = __mul__
+    __radd__ = __add__
+    __rsub__ = __sub__
 
 class CompWeightedDifferentials():
     """
@@ -454,6 +534,32 @@ class CompWeightedDifferentials():
         if functional.mu_of_rho is not None:
             self.mu_of_rho[:] = functional.mu_of_rho[:, ic]
 
+    def set_second_order_functional_differentials(self, functional, ic, wd):
+        """
+
+        Args:
+            functional:
+            ic:
+
+        Returns:
+
+        """
+        xxxx
+        self.d0[:] = self.ms*functional.d0[:, ic]
+        self.d1[:] = self.ms*functional.d1[:, ic]
+        self.d2[:] = self.ms*functional.d2[:, ic]
+        self.d3[:] = self.ms*functional.d3[:, ic]
+        self.d1v[:] = self.ms*functional.d1v[:, ic]
+        self.d2v[:] = self.ms*functional.d2v[:, ic]
+
+        for wf in self.wfs:
+            alias = self.wfs[wf].alias
+            if alias not in self.wfs.fmt_aliases:
+                self.d[alias][:] = functional.diff[alias][:, ic]
+
+        if functional.mu_of_rho is not None:
+            self.mu_of_rho[:] = functional.mu_of_rho[:, ic]
+
     def print(self, index=None):
         """
         """
@@ -463,6 +569,34 @@ class CompWeightedDifferentials():
                 print(wd.replace("w", "d") +": ", self.d[wd][:])
             else:
                 print(wd.replace("w", "d") +": ", self.d[wd][index])
+
+    def __iadd__(self, other):
+        if isinstance(other, CompWeightedDifferentials):
+            for wf in self.wfs:
+                if self.wfs[wf].convolve:
+                    self.d_conv[wf][:] += other.d_conv[wf][:]
+            self.mu_of_rho[:] += other.mu_of_rho[:]
+
+        elif isinstance(other, float):
+            for wf in self.wfs:
+                if self.wfs[wf].convolve:
+                    self.d_conv[wf][:] += other
+            self.mu_of_rho[:] += other
+
+        else:
+            raise TypeError(f'Cannot add {type(other)} to CompWeightedDifferentials')
+        return self
+
+    def __imul__(self, other):
+        if isinstance(other, float):
+            for wf in self.wfs:
+                if self.wfs[wf].convolve:
+                    self.d_conv[wf][:] *= other
+            self.mu_of_rho[:] *= other
+        else:
+            raise TypeError(f'Cannot multiply a CompWeightedDifferentials with {type(other)}')
+
+        return self
 
     # def plot(self, r, show=True):
     #     """
@@ -543,7 +677,7 @@ class Convolver(object):
         Args:
             rho (array_like): Density profile
         """
-        self.weighted_densities.reset(rho)
+        self.reset_before_convolution(rho)
         rho_delta = np.zeros(self.grid.n_grid)
         for i in range(self.functional.thermo.nc):
             rho_inf = rho.densities[i][-1]
@@ -584,6 +718,15 @@ class Convolver(object):
             #             self.weighted_densities.comp_weighted_densities[i].n[alias][:]
         self.weighted_densities.update_utility_variables()
 
+    def convolve_densities_and_differentials(self, rho):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        self.convolve_density_profile(rho)
+
         # Calculate differentials
         self.update_functional_differentials()
         for i in range(self.functional.nc):
@@ -608,6 +751,12 @@ class Convolver(object):
             self.comp_differentials[i].set_functional_differentials(
                 self.functional, i)
 
+    def reset_before_convolution(self, rho):
+        """
+        Set master weighted densities to zero before convolution
+        """
+        self.weighted_densities.reset(rho)
+
     def get_differential_sum(self, n_alpha: WeightedDensitiesMaster):
         """
         Perform convolutions for weighted densities
@@ -621,10 +770,14 @@ class Convolver(object):
         for i in range(self.functional.nc):
             for wf in self.comp_wfs[i].wfs:
                 alias = self.comp_wfs[i].wfs[wf].alias
+                #ix = 256
                 if alias in self.comp_wfs[i].fmt_aliases:
+                #if alias in ["wv1", "wv2"]:
                     f0_na[:] += self.comp_differentials[i].d[alias][:]*n_alpha.n[alias][:]
+                    print(alias,self.comp_differentials[i].d[alias][ix]*n_alpha.n[alias][ix],self.comp_differentials[i].d[alias][ix],n_alpha.n[alias][ix])
                 else:
                     f0_na[:] += self.comp_differentials[i].d[alias][:]*n_alpha.n[alias][i, :]
+                #    print(alias,self.comp_differentials[i].d[alias][ix]*n_alpha.n[alias][i, ix],self.comp_differentials[i].d[alias][ix],n_alpha.n[alias][i, ix])
             #f0_na[:] += self.comp_differentials[i].mu_of_rho[:]*n_alpha.rho.densities[i][:]
         return f0_na
 
@@ -732,7 +885,7 @@ class Convolver(object):
             rho (array_like): Density profile
         """
         self.set_up_special_weights(conv_type)
-        self.weighted_densities.reset(rho)
+        self.reset_before_convolution(rho)
         for i in range(self.functional.thermo.nc):
             self.weighted_densities.convolve_densities_by_type(rho.densities[i], i, conv_type)
 
@@ -748,6 +901,24 @@ class Convolver(object):
         #                                                         self.comp_differentials[i].d_conv[wf])
             # Calculate one-particle correlation
             #self.comp_differentials[i].update_after_convolution()
+
+    def convolve_differentials_by_type(self, conv_type):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        self.set_up_special_weights(conv_type)
+        # Calculate differentials
+        self.update_functional_differentials()
+        for i in range(self.functional.nc):
+            # Loop all weight functions
+            for wf in self.comp_wfs[i]:
+                if self.comp_wfs[i][wf].convolve:
+                    self.comp_wfs[i][wf].convolve_differentials_complex(self.comp_differentials[i].d_effective(wf),
+                                                                        self.comp_differentials[i].d_conv[wf],
+                                                                        conv_type)
 
     def plot_weighted_densities(self):
         """
@@ -775,7 +946,6 @@ class Convolver(object):
             rho (array_like): Density profile
         """
         plt.figure()
-        f0 = np.zeros(self.grid.n_grid)
         for i in range(self.functional.nc):
             for wf in self.comp_wfs[i].wfs:
                 alias = self.comp_wfs[i].wfs[wf].alias
@@ -783,6 +953,77 @@ class Convolver(object):
             plt.plot(self.grid.z,self.comp_differentials[i].mu_of_rho[:],label="rho")
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
+
+class CurvatureExpansionConvolver(Convolver):
+    """
+
+    """
+
+    def __init__(self,
+                 grid: Grid,
+                 functional,
+                 R: np.ndarray,
+                 R_T: np.ndarray,
+                 profile0):
+        """Class handeling convolution
+
+        Args:
+            grid (Grid): Grid class
+            functional (Functional): DFT functional
+
+        Returns:
+            None
+        """
+        Convolver.__init__(self, grid, functional, R, R_T)
+
+        # Perform convolution integrals for (rho_0 * (zw))
+        self.convolve_densities_by_type(profile0, conv_type=ConvType.ZW)
+
+        # Overall weighted densities (rho_0 * (zw))
+        self.weighted_densities0 = WeightedDensitiesMaster(n_grid=grid.n_grid,
+                                                           wfs_list=self.comp_wfs,
+                                                           ms=functional.thermo.m)
+        self.weighted_densities0 += self.weighted_densities
+
+        # Calculate second differentials for rho_0
+        self.functional.second_order_differentials(self.weighted_densities)
+
+        # Convolve differentials for rho_0
+        self.convolve_density_profile(profile0)
+        self.convolve_differentials_by_type(conv_type=ConvType.ZW)
+        # Store differentials
+        self.comp_differentials0 = []
+        for i in range(functional.thermo.nc):
+            self.comp_differentials0.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
+            self.comp_differentials0[i] += self.comp_differentials[i]
+
+    def convolve_densities_and_differentials(self, rho):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        self.convolve_density_profile(rho)
+
+        # Set sum d2fdn2_0*n_1
+        for i in range(self.functional.nc):
+            self.comp_differentials[i].set_second_order_functional_differentials(
+                self.functional, i, self.weighted_densities)
+        # Convolve differentials
+        self.convolve_differentials_by_type(conv_type=ConvType.REGULAR_COMPLEX)
+        # Add contribution from rho_0 and sum contributions
+        for i in range(functional.thermo.nc):
+            self.comp_differentials[i] -= self.comp_differentials0[i]
+            # Calculate one-particle correlation
+            self.comp_differentials[i].update_after_convolution()
+
+
+    def reset_before_convolution(self, rho):
+        """
+        Set master weighted densities to -(rho_0 * (zw)) before convolution
+        """
+        self.weighted_densities.reset(rho, -self.weighted_densities0)
 
 if __name__ == "__main__":
     pass
