@@ -27,7 +27,7 @@ class CurvatureExpansionInterface(PlanarInterface):
     def __init__(self,
                  vle,
                  domain_size=200.0,
-                 n_grid=4096,
+                 n_grid=1024,
                  functional_kwargs={}):
         """Class holding specifications for an interface calculation of a planar geometry
 
@@ -40,15 +40,14 @@ class CurvatureExpansionInterface(PlanarInterface):
             None
         """
         PlanarInterface.__init__(self,
-                                 Geometry.PLANAR,
                                  thermopack=vle.eos,
                                  temperature=vle.temperature,
                                  domain_size=domain_size,
                                  n_grid=n_grid,
                                  specification=Specification.NUMBER_OF_MOLES,
                                  functional_kwargs=functional_kwargs)
-        sc = State.critical(vle.liquid.x)
-        self.tanh_profile(vle,sc.T)
+        sc = State.critical(vle.eos, vle.liquid.x)
+        self.tanh_profile(vle, sc.T, invert_states=True)
         self.profile1 = None
         self.bulk1 = None
         self.profile_diff = None
@@ -79,7 +78,7 @@ class CurvatureExpansionInterface(PlanarInterface):
 
         for ic in range(n_c):
             res[ic * n_grid:(ic+1)*n_grid] = xvec[ic * n_grid:(ic+1)*n_grid] \
-                - self.profile.densities[ic] * ( beta_mu[ic] - self.convolver.correlation(ic)[:])
+                - self.profile.densities[ic] * ( beta_mu[ic] + self.convolver.correlation(ic)[:])
 
         return res
 
@@ -89,6 +88,7 @@ class CurvatureExpansionInterface(PlanarInterface):
         if self.converged:
             sigma0 = self.surface_tension(reduced_unit=False)
             self.bulk1 = Bulk.curvature_expansion(self.bulk, sigma0)
+            sys.exit()
             self.profile1 = Profile().copy_profile(self.profile)
             self.profile1.shift_and_scale(shift=0.0,
                                           grid=self.grid,
@@ -160,10 +160,10 @@ class CurvatureExpansionInterface(PlanarInterface):
         rho_0_zw = self.convolver1.weighted_densities0
         #conv_rho_0_zw = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
         # Perform convolution integrals
-        #conv_rho_0_zw.convolve_densities_by_type(self.profile, conv_type=ConvType.ZW)
+        #conv_rho_0_zw.convolve_densities_by_type(self.pr ofile, conv_type=ConvType.ZW)
         # Calculate differentials
         f0_zw = self.convolver.get_differential_sum(rho_0_zw)
-        sigma_1_0 = 0.5*np.sum(f0_zw*self.grid.integration_weights)
+        sigma_1_0 = 0.5*np.sum(f0_zw*self.grid.integration_weights)*self.bulk1.reduced_temperature
         print("sigma_1_0",sigma_1_0)
 
         z = np.zeros_like(self.grid.z)

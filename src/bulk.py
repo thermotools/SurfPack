@@ -226,7 +226,7 @@ class Bulk(object):
             const_liquid_composition (bool): Specification
 
         """
-
+        eos = bulk.functional.thermo
         if bulk.liquid_is_right():
             vap = bulk.left_state
             liq = bulk.right_state
@@ -236,10 +236,16 @@ class Bulk(object):
 
         rho_v = vap.partial_density()
         rho_l = liq.partial_density()
+        x_l = rho_l/np.sum(rho_l)
 
-        mu0, mu0_rho_l, = bulk.eos.chemical_potential_tv(bulk.T, v = 1.0, x=rho_l, dmudv=True, property_flag="R")
-        mu0, mu0_rho_v, = bulk.eos.chemical_potential_tv(bulk.T, v = 1.0, x=rho_v, dmudv=True, property_flag="R")
-        for i in range(bulk.eos.nc):
+        mu_1, rl, rv = eos.extrapolate_mu_in_inverse_radius(sigma0, bulk.temperature, rho_l, rho_v, 1.0, "SPHERICAL", 1)
+        print(rl, rv)
+
+        mu0, mu0_rho_l, = eos.chemical_potential_tv(bulk.temperature, volume = 1.0, n=rho_l, dmudn=True, property_flag="R")
+        mu0, mu0_rho_v, = eos.chemical_potential_tv(bulk.temperature, volume = 1.0, n=rho_v, dmudn=True, property_flag="R")
+        print(mu0)
+        print(mu0_rho_v)
+        for i in range(eos.nc):
             mu0_rho_l[i,i] += 1.0/rho_l[i]
             mu0_rho_v[i,i] += 1.0/rho_v[i]
 
@@ -253,7 +259,7 @@ class Bulk(object):
         # Equation S6
         rho_tot = np.sum(rho)
         M = np.outer(rho, np.ones_like(rho))
-        for i in range(bulk.eos.nc):
+        for i in range(eos.nc):
             M[i,i] += rho_tot
 
         # Find null-space defining mu_1
@@ -265,11 +271,13 @@ class Bulk(object):
         fac = 2*sigma0 / np.sum(mu_1*(rho_l-rho_v))
         mu_1 = mu_1*fac
 
-        rho1_l = mu_1/mu0_rho_l
+        print(mu_1)
+        rho1_l = mu_1/mu0_rho_l/x_l
         rho1_v = mu_1/mu0_rho_v
-
-        liq_state = State.new_nvt(bulk.eos, bulk.T, V=1.0, n=rho1_l)
-        vap_state = State.new_nvt(bulk.eos, bulk.T, V=1.0, n=rho1_v)
+        print(rho1_l, rho1_v)
+        sys.exit()
+        liq_state = State.new_nvt(eos, bulk.temperature, V=1.0, n=rho1_l)
+        vap_state = State.new_nvt(eos, bulk.temperature, V=1.0, n=rho1_v)
         if bulk.liquid_is_right():
             left_state = vap_state
             right_state = liq_state
