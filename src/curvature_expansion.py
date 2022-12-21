@@ -13,6 +13,7 @@ from pyctp.thermopack_state import State, Equilibrium
 from weight_functions import ConvType
 import numpy as np
 import matplotlib.pyplot as plt
+from interface import PlanarInterface
 
 # TODO:
 # Sign of correlation convolution
@@ -86,11 +87,11 @@ class CurvatureExpansionInterface(PlanarInterface):
         # Calculate planar profile
         PlanarInterface.solve(self, solver=solver, log_iter=log_iter)
         if self.converged:
-            sigma0 = self.
+            sigma0 = self.surface_tension(reduced_unit=False)
             self.bulk1 = Bulk.curvature_expansion(self.bulk, sigma0)
             self.profile1 = Profile().copy_profile(self.profile)
             self.profile1.shift_and_scale(shift=0.0,
-                                          self.grid,
+                                          grid=self.grid,
                                           rho_left=self.bulk1.get_reduced_density(left_state.partial_density()),
                                           rho_right=self.bulk1.get_reduced_density(right_state.partial_density()))
 

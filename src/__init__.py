@@ -12,6 +12,11 @@ from . import convolver
 from . import interface
 from . import pore
 from . import pair_correlation
+from . import curvature_expansion
+from . import saftvrmie_functional
+from . import ljs_functional
+from . import pets_functional
+from . import surface_tension_diagram
 
 __all__ = ["constants",
            "weight_functions",
@@ -25,5 +30,10 @@ __all__ = ["constants",
            "convolver",
            "interface",
            "pore",
-           "pair_correlation"]
+           "pair_correlation",
+           "curvature_expansion",
+           "saftvrmie_functional",
+           "ljs_functional",
+           "pets_functional",
+           "surface_tension_diagram"]
 

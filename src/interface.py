@@ -444,7 +444,7 @@ class Interface(ABC):
         w_left = self.r_equimolar - self.grid.z_edge[0]
         gamma = np.zeros_like(self.bulk.reduced_density_left)
         for i in range(self.functional.nc):
-            gamma[i] = self.profile.densities[i][:]*self.grid.integration_weights[j] \
+            gamma[i] = np.sum(self.profile.densities[i][:]*self.grid.integration_weights) \
                 - w_right*self.bulk.reduced_density_right[i] - w_left*self.bulk.reduced_density_left[i]
         return gamma
 
@@ -1108,63 +1108,103 @@ class PlanarInterface(Interface):
         _, omega_a = self.grand_potential()
         omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
         sigma_0 = np.sum(omega_a)
+        eps = self.functional.thermo.eps_div_kb[0] * KB
+        #print("gamma",self.surface_tension(reduced_unit=False),sigma_0*eps/self.functional.grid_reducing_lenght**2)
+        # #alias = "wv1"
+        # #plt.plot(self.grid.z,self.convolver.comp_differentials[0].d[alias][:],label=alias)
+        # alias = "wv2"
+        # #plt.plot(self.grid.z,self.convolver.comp_differentials[0].d[alias][:],label=alias)
 
-        plt.figure()
-        #alias = "wv1"
-        #plt.plot(self.grid.z,self.convolver.comp_differentials[0].d[alias][:],label=alias)
-        alias = "wv2"
-        #plt.plot(self.grid.z,self.convolver.comp_differentials[0].d[alias][:],label=alias)
-
-        plt.plot(self.grid.z,self.convolver.comp_differentials[0].d_conv[alias][:],label=alias)
-        conv = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
-        #conv.convolve_densities_and_differentials(self.profile)
-        conv.convolve_density_profile(self.profile)
-        conv.convolve_differentials_by_type(conv_type=ConvType.REGULAR_COMPLEX)
+        # conv = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
+        # #conv.convolve_densities_and_differentials(self.profile)
+        # conv.convolve_density_profile(self.profile)
+        # #conv.convolve_densities_by_type(self.profile,conv_type=ConvType.REGULAR_COMPLEX)
+        # conv.convolve_differentials_by_type(conv_type=ConvType.REGULAR_COMPLEX)
         # alias = "wv1"
         # plt.plot(self.grid.z,conv.comp_differentials[0].d[alias][:],label=alias+"_FFT")
         # alias = "wv2"
         # plt.plot(self.grid.z,conv.comp_differentials[0].d[alias][:],label=alias+"_FFT")
-        plt.plot(self.grid.z,conv.comp_differentials[0].d_conv[alias][:],label=alias+"_FFT")
+        # plt.figure()
+        # plt.plot(self.grid.z,self.convolver.comp_differentials[0].d_conv[alias][:],label=alias)
+        # plt.plot(self.grid.z,conv.comp_differentials[0].d_conv[alias][:],label=alias+"_FFT")
 
-        leg = plt.legend(loc="best", numpoints=1, frameon=False)
-        plt.show()
+        # leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        # plt.show()
 
-        sys.exit()
+        # fac = self.functional.thermo.sigma[0]**3/1e-10**3
+        # print(self.profile.densities[0][512]*fac)
+        # print(self.convolver.comp_differentials[0].d_conv[alias][512])
+        # print(conv.comp_differentials[0].d_conv[alias][512])
+
+        # plt.plot(self.convolver.comp_differentials[0].d_effective(alias))
+        # plt.plot(conv.comp_differentials[0].d_effective(alias))
+        # plt.show()
+
+        # plt.figure()
+        # plt.plot(self.convolver.weighted_densities[alias][:],label=alias+"wd")
+        # plt.plot(conv.weighted_densities[alias][:],label=alias+"_FFT")
+        # leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        # plt.show()
+
+
+        # print(self.functional.thermo.sigma[0])
+        # plt.figure()
+        # print(conv.comp_wfs[0][alias].R*conv.comp_wfs[0][alias].kernel_radius)
+        # plt.plot(np.abs(conv.comp_wfs[0][alias].k_grid*conv.comp_wfs[0][alias].R*conv.comp_wfs[0][alias].kernel_radius ))
+        # # plt.plot(conv.comp_wfs[0][alias].fw_signed.imag,label="signed")
+        # # plt.plot(conv.comp_wfs[0][alias].fw_complex.imag)
+        # leg = plt.legend(loc="best", numpoints=1, frameon=False)
+        # plt.show()
+        # sys.exit()
+
+
+        # plt.plot(self.convolver.comp_differentials[0].d_effective(alias))
+        # plt.plot(conv.comp_differentials[0].d_effective(alias))
+        # plt.show()
+        #sys.exit()
         # Convolve for (rho_0 * (zw))
         conv = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
         # Perform convolution integrals
         conv.convolve_densities_by_type(self.profile, conv_type=ConvType.ZW)
         #conv.plot_weighted_densities()
-        # Calculate differentials
-        f0 = self.convolver.get_differential_sum(conv.weighted_densities)
-        sigma_1_0 = 0.5*np.sum(f0*self.grid.integration_weights)
-        print("sigma_1_0",sigma_1_0)
-
         z = np.zeros_like(self.grid.z)
         z[:] = self.grid.z[:] - self.r_equimolar
 
-        print("gamma",self.surface_tension(reduced_unit=False))
-        sgn = 1.0 if self.bulk.liquid_is_right() else -1.0
-        sigma_1_1 = sgn*np.sum(omega_a*z)*g
-        print("sigma_1_1",sigma_1_1)
-        sigma_1 = sigma_1_0 + sigma_1_1
-        print("sigma_1",sigma_1)
-        print("sigma_0",sigma_0)
-        d_tolman_sphere = -sigma_1/sigma_0/g
-        print("d_tolman_sphere",d_tolman_sphere)
+        #conv.plot_weighted_densities()
+        # Calculate differentials
+        f0 = self.convolver.get_differential_sum(conv.weighted_densities)
+        delta_mult_sigma0 = 0.5*np.sum(f0*self.grid.integration_weights)*self.bulk.reduced_temperature - np.sum(omega_a*z)
 
-        print("ads",self.get_adsorption_vector(self.r_equimolar))
+        d_tolman_sphere = delta_mult_sigma0/sigma_0
+        #print("d_tolman_sphere",d_tolman_sphere)
+
+        #print("Contributions: ", 0.5*np.sum(f0*self.grid.integration_weights)*self.bulk.reduced_temperature/sigma_0,- np.sum(omega_a*z)/sigma_0,0.5*self.get_adsorption_vector()/sigma_0)
+
+        # sys.exit()
+        # print("gamma",self.surface_tension(reduced_unit=False))
+        # sgn = 1.0 if self.bulk.liquid_is_right() else -1.0
+        # sigma_1_1 = sgn*np.sum(omega_a*z)
+        # #*g
+        # print("sigma_1_1",sigma_1_1)
+        # sigma_1 = sigma_1_0 + sigma_1_1
+        # print("sigma_1",sigma_1)
+        # print("sigma_0",sigma_0)
+        # d_tolman_sphere = -sigma_1/sigma_0/g
+        # print("d_tolman_sphere",d_tolman_sphere)
+
+        # print("ads",self.get_adsorption_vector(self.r_equimolar))
+        # sys.exit()
         # Convert to real units
         eps = self.functional.thermo.eps_div_kb[0] * KB
-        sigma_1 *= eps / self.functional.grid_reducing_lenght
+#        sigma_1 *= eps / self.functional.grid_reducing_lenght
         d_tolman_sphere *= self.functional.grid_reducing_lenght
 
         if reduced_unit:
             sigma = self.functional.thermo.sigma[0]
-            sigma_1 *= sigma/eps
+ #           sigma_1 *= sigma/eps
             d_tolman_sphere /= sigma
 
-        return sigma_1, d_tolman_sphere
+        return d_tolman_sphere
 
 
 class SphericalInterface(Interface):

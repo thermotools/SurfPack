@@ -774,7 +774,7 @@ class Convolver(object):
                 if alias in self.comp_wfs[i].fmt_aliases:
                 #if alias in ["wv1", "wv2"]:
                     f0_na[:] += self.comp_differentials[i].d[alias][:]*n_alpha.n[alias][:]
-                    print(alias,self.comp_differentials[i].d[alias][ix]*n_alpha.n[alias][ix],self.comp_differentials[i].d[alias][ix],n_alpha.n[alias][ix])
+                    #print(alias,self.comp_differentials[i].d[alias][ix]*n_alpha.n[alias][ix],self.comp_differentials[i].d[alias][ix],n_alpha.n[alias][ix])
                 else:
                     f0_na[:] += self.comp_differentials[i].d[alias][:]*n_alpha.n[alias][i, :]
                 #    print(alias,self.comp_differentials[i].d[alias][ix]*n_alpha.n[alias][i, ix],self.comp_differentials[i].d[alias][ix],n_alpha.n[alias][i, ix])
