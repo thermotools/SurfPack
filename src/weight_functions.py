@@ -137,7 +137,7 @@ class WeightFunction(object):
         """
         fw_has_been_calculated = False
         # Test if generate_fourier_weights have been executed
-        if self.fw_complex != None:
+        if self.n_pad != None:
             fw_has_been_calculated = True
         return fw_has_been_calculated
 
@@ -183,7 +183,7 @@ class WeightFunction(object):
             elif self.wf_type == WeightFunctionType.DELTAVEC:
                 # The convolution of the fourier weights for steady profile
                 self.w_conv_steady = 0.0
-                self.fw[:] = - self.prefactor_evaluated * self.k_sin * \
+                self.fw[:] = self.prefactor_evaluated * self.k_sin * \
                     (4.0/3.0 * np.pi * R_kernel**3 * (spherical_jn(0, self.k_sin_R) + spherical_jn(2, self.k_sin_R)))
                 # elif self.alias == "wv1":
                 #     print("Setting vw1")
@@ -281,11 +281,15 @@ class WeightFunction(object):
         """
         R_kernel = self.R*self.kernel_radius
         dz = self.grid.dr
-        safe_N = 5
+        safe_N = 6
         l = self.grid.domain_size + 2*R_kernel
         N = int(l/dz) + safe_N + 1
         if N % 2 > 0:
             N += 1
+
+        # Debug
+        # N = self.grid.n_grid + 212*2
+        l = dz*N
         self.n_padded_grid = N
         self.n_pad = int((N - self.grid.n_grid)/2)
 
@@ -342,6 +346,19 @@ class WeightFunction(object):
             self.fzw_minus[0] = 0.0
             self.fw_tilde_pluss[0] = 0.0
             self.fw_tilde_minus[0] = 0.0
+
+
+            # Lanczos sigma factor to remove ringing (Gibbs phenomenon)
+            lanczos_sigma = np.ones_like(self.k_grid)
+            factor = l/(N+2)
+            lanczos_sigma[1:] = np.sin(self.k_grid[1:]*factor)/(self.k_grid[1:]*factor)
+            self.fw_complex *= lanczos_sigma
+            self.fw_signed *= lanczos_sigma
+            self.fw_tilde_pluss *= lanczos_sigma
+            self.fw_tilde_minus *= lanczos_sigma
+            self.fzw_pluss *= lanczos_sigma
+            self.fzw_minus *= lanczos_sigma
+
 
             # for i in range(N):
             #     fw_i = fw[i]
@@ -446,9 +463,9 @@ class WeightFunction(object):
             self.w_conv_steady_T = lamb_R
         elif self.wf_type == WeightFunctionType.DELTAVEC:
             if self.lamb_R.evalf(self.accuracy, subs={self.Rs:R, self.Psi:self.kernel_radius}) == 0.0:
-               self.fw_T[:] = - 4 * np.pi * self.k_sin_R * R_kernel * spherical_jn(0, self.k_sin_R)
+               self.fw_T[:] = 4 * np.pi * self.k_sin_R * R_kernel * spherical_jn(0, self.k_sin_R)
             else:
-                self.fw_T[:] = - self.k_sin_R * spherical_jn(0, self.k_sin_R) + spherical_jn(1, self.k_sin_R)
+                self.fw_T[:] = self.k_sin_R * spherical_jn(0, self.k_sin_R) + spherical_jn(1, self.k_sin_R)
             self.w_conv_steady_T = 0.0
         self.fw_T[:] *= R_T
         self.w_conv_steady_T *= R_T
@@ -680,7 +697,6 @@ class WeightFunction(object):
         fd = fft(diff_padded_complex)
         if conv_type == ConvType.REGULAR_COMPLEX:
             fw = self.fw_signed
-            #self.fw_complex
         elif conv_type == ConvType.ZW:
             fw = self.fzw_pluss
         else:
