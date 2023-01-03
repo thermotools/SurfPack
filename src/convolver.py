@@ -124,12 +124,16 @@ class WeightedDensities():
     def __getitem__(self, wd):
         return self.n[wd]
 
-    def reset(self, rho):
+    def reset(self, rho, wdm=None):
         """
         Set weights to zero
         """
-        for wd in self.n:
-            self.n[wd].fill(0.0)
+        if wdm is None:
+            for wd in self.n:
+                self.n[wd].fill(0.0)
+        else:
+            for wd in self.n:
+                self.n[wd] = wdm.n[wd]
         # Need access to local density in some functionals:
         self.rho = rho
 
@@ -244,6 +248,7 @@ class WeightedDensitiesMaster(WeightedDensities):
             ms:
         """
         WeightedDensities.__init__(self, n_grid, wfs=wfs_list[0], ms=1.0)
+        self.ms_array = ms
         self.wfs_list = wfs_list
         self.nc = len(wfs_list)
 
@@ -272,7 +277,7 @@ class WeightedDensitiesMaster(WeightedDensities):
         Args:
         Other (WeightedDensitiesMaster): Other instance of WeightedDensitiesMaster
         """
-        return WeightedDensitiesMaster(Other.n_grid, Other.wfs_list, Other.ms)
+        return WeightedDensitiesMaster(Other.n_grid, Other.wfs_list, Other.ms_array)
 
     def convolve_densities(self, rho_inf: float, frho_delta: np.ndarray, i: int, temperature_diff_convolution=False):
         """
@@ -429,6 +434,12 @@ class WeightedDensitiesMaster(WeightedDensities):
     __rmul__ = __mul__
     __radd__ = __add__
     __rsub__ = __sub__
+
+    def __neg__(self):
+        wdm = WeightedDensitiesMaster.Copy(self)
+        for wd in self.n:
+            wdm.n[wd] = -self.n[wd]
+        return wdm
 
 class CompWeightedDifferentials():
     """
@@ -597,6 +608,7 @@ class CompWeightedDifferentials():
             raise TypeError(f'Cannot multiply a CompWeightedDifferentials with {type(other)}')
 
         return self
+
 
     # def plot(self, r, show=True):
     #     """
@@ -976,13 +988,13 @@ class CurvatureExpansionConvolver(Convolver):
         """
         Convolver.__init__(self, grid, functional, R, R_T)
 
-        # Perform convolution integrals for (rho_0 * (zw))
-        self.convolve_densities_by_type(profile0, conv_type=ConvType.ZW)
-
         # Overall weighted densities (rho_0 * (zw))
         self.weighted_densities0 = WeightedDensitiesMaster(n_grid=grid.n_grid,
                                                            wfs_list=self.comp_wfs,
                                                            ms=functional.thermo.m)
+
+        # Perform convolution integrals for (rho_0 * (zw))
+        self.convolve_densities_by_type(profile0, conv_type=ConvType.ZW)
         self.weighted_densities0 += self.weighted_densities
 
         # Calculate second differentials for rho_0

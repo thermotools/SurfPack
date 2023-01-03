@@ -6,7 +6,7 @@ from dft_numerics import dft_solver
 from constants import NA, KB, Geometry, Specification, LenghtUnit, \
     LCOLORS, Properties, get_property_label
 from bulk import Bulk
-from density_profile import Profile
+from density_profile import Profile, ProfilePlotter
 from grid import Grid
 from convolver import Convolver, CurvatureExpansionConvolver
 from pyctp.thermopack_state import State, Equilibrium
@@ -88,21 +88,23 @@ class CurvatureExpansionInterface(PlanarInterface):
         if self.converged:
             sigma0 = self.surface_tension(reduced_unit=False)
             self.bulk1 = Bulk.curvature_expansion(self.bulk, sigma0)
-            sys.exit()
+            ProfilePlotter([self.profile], self.grid.z).plot()
             self.profile1 = Profile().copy_profile(self.profile)
             self.profile1.shift_and_scale(shift=0.0,
                                           grid=self.grid,
-                                          rho_left=self.bulk1.get_reduced_density(left_state.partial_density()),
-                                          rho_right=self.bulk1.get_reduced_density(right_state.partial_density()))
+                                          rho_left=self.bulk1.get_reduced_density(self.bulk1.left_state.partial_density()),
+                                          rho_right=self.bulk1.get_reduced_density(self.bulk1.right_state.partial_density()))
 
-            delta_rho=self.bulk1.get_reduced_density(left_state.partial_density()) - \
-                self.bulk1.get_reduced_density(right_state.partial_density())
-            self.profile_diff = self.profile.drhodz(grid.z, scaling = 1.0/delta_rho)
+            ProfilePlotter([self.profile, self.profile1], self.grid.z).plot()
+            delta_rho=self.bulk1.get_reduced_density(self.bulk1.left_state.partial_density()) - \
+                self.bulk1.get_reduced_density(self.bulk1.right_state.partial_density())
+            self.profile_diff = self.profile.delta_rho(self.grid.z, scaling = 1.0/delta_rho)
             self.convolver1 = CurvatureExpansionConvolver(self.grid,
                                                           self.functional,
                                                           self.bulk.R,
                                                           self.bulk.R_T,
                                                           self.profile)
+            sys.exit()
 
             # Solve specifying chemical potential
             specification = self.specification

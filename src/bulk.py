@@ -15,7 +15,8 @@ class Bulk(object):
     def __init__(self,
                  functional,
                  left_state,
-                 right_state):
+                 right_state,
+                 beta_mu=None):
         """Class holding specifications for a gird
 
         Args:
@@ -45,11 +46,14 @@ class Bulk(object):
         self.reduced_density_left = self.get_reduced_density(left_state.partial_density())
         self.reduced_density_right = self.get_reduced_density(right_state.partial_density())
 
-        # Extract normalized chemical potential (multiplied by beta) (mu/kbT)
-        mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(
-            self.reduced_density_right)
-        mu_ig_scaled_beta = np.log(self.reduced_density_right)
-        self.mu_scaled_beta = mu_ig_scaled_beta + mu_res_scaled_beta
+        if beta_mu is None:
+            # Extract normalized chemical potential (multiplied by beta) (mu/kbT)
+            mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(
+                self.reduced_density_right)
+            mu_ig_scaled_beta = np.log(self.reduced_density_right)
+            self.mu_scaled_beta = mu_ig_scaled_beta + mu_res_scaled_beta
+        else:
+            self.mu_scaled_beta = beta_mu
         self.real_mu, = functional.thermo.chemical_potential_tv(self.temperature, volume=1.0, n=left_state.partial_density())
         #real_mu_simple, = functional.thermo.chemical_potential_tv(self.temperature,
         #                                                               volume=1.0,
@@ -216,14 +220,12 @@ class Bulk(object):
 
     @staticmethod
     def curvature_expansion(bulk,
-                            sigma0,
-                            const_liquid_composition=True):
+                            sigma0):
         """Construct class from another bulk using curvature expansion for a sphereical droplet/bubble
-        For details see Aasen et al. 2018, doi: 10.1063/1.5026747
+        For details see Rehner et al. 2019, doi: 10.1063/1.5135288
 
         Args:
             bulk (Bulk): Equation of state object
-            const_liquid_composition (bool): Specification
 
         """
         eos = bulk.functional.thermo
@@ -238,44 +240,40 @@ class Bulk(object):
         rho_l = liq.partial_density()
         x_l = rho_l/np.sum(rho_l)
 
-        mu_1, rl, rv = eos.extrapolate_mu_in_inverse_radius(sigma0, bulk.temperature, rho_l, rho_v, 1.0, "SPHERICAL", 1)
-        print(rl, rv)
+        RT = bulk.temperature*bulk.functional.thermo.Rgas
+        sigma0 = 1.0e-20*sigma0/(KB*bulk.temperature)
+        # print("s0",sigma0)
+        # print("mu0",bulk.mu_scaled_beta)
+        # print("rho_l, rho_v",rho_l, rho_v)
+        # print("rho_l, rho_v",rho_l*NA/1e30, rho_v*NA/1e30)
+        # volume = 1.0/np.sum(rho_l)
+        # mu0, mu0_rho_l, = eos.chemical_potential_tv(bulk.temperature, volume = volume, n=x_l, dmudn=True, property_flag="R")
+        # print("mu0",mu0/RT+np.log(rho_l*NA/1e30))
+        # mu0_rho_l=mu0_rho_l*volume*1e30/NA/RT+1.0/(rho_l*NA/1e30)
+        # print("mu0_rho_l",mu0_rho_l*volume*1e30/NA/RT+1.0/(rho_l*NA/1e30))
+        # print(1.0/(rho_l*NA/1e30))
+        # print(mu0_rho_l*(rho_l-rho_v)*NA/1e30)
+
+        #sys.exit()
+        #mu_1, rl, rv = eos.extrapolate_mu_in_inverse_radius(sigma0, bulk.temperature, rho_l, rho_v, 1.0, "SPHERICAL", 1)
+        #print(rl, rv)
 
         mu0, mu0_rho_l, = eos.chemical_potential_tv(bulk.temperature, volume = 1.0, n=rho_l, dmudn=True, property_flag="R")
         mu0, mu0_rho_v, = eos.chemical_potential_tv(bulk.temperature, volume = 1.0, n=rho_v, dmudn=True, property_flag="R")
-        print(mu0)
-        print(mu0_rho_v)
+        mu0_rho_l /= RT
+        mu0_rho_v /= RT
         for i in range(eos.nc):
             mu0_rho_l[i,i] += 1.0/rho_l[i]
             mu0_rho_v[i,i] += 1.0/rho_v[i]
 
-        if const_liquid_composition:
-            rho = rho_l
-            mu0_rho = mu0_rho_l
-        else:
-            rho = rho_v
-            mu0_rho = mu0_rho_v
+        rho_l_mix = 1e30/NA*2.0*sigma0/(np.matmul(np.matmul(x_l,mu0_rho_l),(rho_l - rho_v)))
+        rho1_l = rho_l_mix*x_l
+        mu1 = rho_l_mix*np.matmul(mu0_rho_l,x_l)
+        rho1_v = np.matmul(np.linalg.inv(mu0_rho_v),mu1)
+        print(rho1_l)
+        print(rho1_v)
+        print(mu1)
 
-        # Equation S6
-        rho_tot = np.sum(rho)
-        M = np.outer(rho, np.ones_like(rho))
-        for i in range(eos.nc):
-            M[i,i] += rho_tot
-
-        # Find null-space defining mu_1
-        u, s, vh = np.linalg.svd(M)
-        w = u[:,-1]
-        mu_1 = mu0_rho*w
-
-        # Equation 14
-        fac = 2*sigma0 / np.sum(mu_1*(rho_l-rho_v))
-        mu_1 = mu_1*fac
-
-        print(mu_1)
-        rho1_l = mu_1/mu0_rho_l/x_l
-        rho1_v = mu_1/mu0_rho_v
-        print(rho1_l, rho1_v)
-        sys.exit()
         liq_state = State.new_nvt(eos, bulk.temperature, V=1.0, n=rho1_l)
         vap_state = State.new_nvt(eos, bulk.temperature, V=1.0, n=rho1_v)
         if bulk.liquid_is_right():
@@ -285,7 +283,10 @@ class Bulk(object):
             left_state = liq_state
             right_state = vap_state
 
-        return Bulk(bulk.functional, left_state, right_state)
+        # mu1 += np.log(NA*bulk.functional.grid_reducing_lenght**3)
+        # print(np.log(NA*bulk.functional.grid_reducing_lenght**3))
+        # sys.exit()
+        return Bulk(bulk.functional, left_state, right_state, beta_mu=mu1)
 
 if __name__ == "__main__":
     pass

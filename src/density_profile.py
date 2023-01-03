@@ -237,6 +237,7 @@ class Profile(object):
         """
         self.densities = Densities(prof.densities.nc, prof.densities.N)
         self.densities.assign_elements(prof.densities)
+        return self
 
     @property
     def rho_mix(self):
