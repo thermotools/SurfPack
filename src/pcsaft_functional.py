@@ -2,13 +2,13 @@
 import numpy as np
 import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from constants import NA, RGAS, LenghtUnit
-from fmt_functionals import Whitebear
+from fmt_functionals import Whitebear, FundamentalMeasureTheory
 from pyctp.pcsaft import pcsaft
 from pyctp.saft import saft
 from weight_functions import WeightFunctionType
 
 
-class saft_dispersion(Whitebear):
+class saft_dispersion(FundamentalMeasureTheory):
     """
 
     """
@@ -33,7 +33,8 @@ class saft_dispersion(Whitebear):
             self.grid_reducing_lenght = thermo.sigma[0]
         R = np.zeros(thermo.nc)
         R[:] = 0.5*self.d_hs[:]/self.grid_reducing_lenght
-        Whitebear.__init__(self, thermo, N, R, thermo.m, grid_unit)
+        FundamentalMeasureTheory.__init__(self, thermo, N, R, fmt_model="WB", grid_unit=grid_unit)
+        #Whitebear.__init__(self, thermo, N, R, thermo.m, grid_unit)
         self.name = "Generic-SAFT"
         self.short_name = "GS"
         # Add normalized theta weight
@@ -44,6 +45,8 @@ class saft_dispersion(Whitebear):
         # Add storage container for differentials only depending on local density
         # No convolution required
         self.mu_of_rho = np.zeros((N, self.nc))
+        # Second order differentials
+        self.phi_nn_disp = np.zeros((N, self.nc, self.nc))
 
     def calc_hs_diameters(self):
         """
@@ -61,7 +64,7 @@ class saft_dispersion(Whitebear):
         array_like: Excess HS Helmholtz free energy ()
 
         """
-        f = Whitebear.excess_free_energy(self, dens)
+        f = FundamentalMeasureTheory.excess_free_energy(self, dens)
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(len(f)):
@@ -82,7 +85,7 @@ class saft_dispersion(Whitebear):
         diff (array_like): Functional differentials
 
         """
-        Whitebear.differentials(self, dens)
+        FundamentalMeasureTheory.differentials(self, dens)
         self.mu_of_rho.fill(0.0)
         rho_thermo = np.zeros(self.nc)
         V = 1.0
@@ -105,7 +108,7 @@ class saft_dispersion(Whitebear):
         float: Excess free energy density ()
 
         """
-        phi = Whitebear.bulk_excess_free_energy_density(self, rho_b)
+        phi = FundamentalMeasureTheory.bulk_excess_free_energy_density(self, rho_b)
         # Dispersion contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
@@ -128,7 +131,7 @@ class saft_dispersion(Whitebear):
         Returns:
             float: compressibility
         """
-        z = Whitebear.bulk_compressibility(self, rho_b)
+        z = FundamentalMeasureTheory.bulk_compressibility(self, rho_b)
         # PC-SAFT contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
@@ -154,7 +157,7 @@ class saft_dispersion(Whitebear):
         float: Excess reduced HS chemical potential ()
 
         """
-        mu_ex = Whitebear.bulk_excess_chemical_potential(self, rho_b)
+        mu_ex = FundamentalMeasureTheory.bulk_excess_chemical_potential(self, rho_b)
         # Dispersion contributions
         rho_thermo = np.zeros_like(rho_b)
         rho_thermo[:] = rho_b[:]
@@ -179,7 +182,7 @@ class saft_dispersion(Whitebear):
         np.ndarray: Functional differentials
 
         """
-        d_T = Whitebear.temperature_differential(self, dens)
+        d_T = FundamentalMeasureTheory.temperature_differential(self, dens)
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(self.n_grid):
@@ -192,6 +195,45 @@ class saft_dispersion(Whitebear):
 
         return d_T
 
+    def calculate_second_order_differentials(self, dens):
+        """
+        Calculates the second order functional differentials wrpt. the weighted densities
+
+        Args:
+        dens (array_like): weighted densities
+
+        """
+        FundamentalMeasureTheory.calculate_second_order_differentials(self, dens)
+
+        rho_thermo = np.zeros(self.nc)
+        V = 1.0
+        for i in range(self.n_grid):
+            rho_thermo[:] = dens.n[self.disp_name][:, i]
+            rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
+            a, a_n, a_nn, = self.thermo.a_dispersion(
+                self.T, V, rho_thermo, a_n=True, a_nn=True)
+            self.phi_nn_disp[i, :, :] = np.sum(rho_thermo)*a_nn[:,:]
+            for j in range(self.nc):
+                for k in range(self.nc):
+                    self.phi_nn_disp[i, j, k] += a_n[j] + a_n[k]
+            self.phi_nn_disp[i, :, :] *= 1.0/(NA*self.grid_reducing_lenght**3)
+
+        #print(dens.n[self.disp_name][0, 512],7.7687131073510499E-003)
+        #print("DISP",self.phi_nn_disp[512,:,:])
+        #print(dens.n[self.disp_name][0, 0],1.4228431456327958E-002)
+        #print("DISP",self.phi_nn_disp[0,:,:])
+
+    def get_second_order_differentials(self, n1, n2, ic1=0, ic2=0):
+        """
+        Extract the second order functional differentials wrpt. the weighted densities
+
+        Args:
+
+        """
+        phi_n1n2 = FundamentalMeasureTheory.get_second_order_differentials(self, n1, n2, ic1, ic2)
+        if self.disp_name in n1 and self.disp_name in n2:
+            phi_n1n2[:] = self.phi_nn_disp[:,ic1,ic2]
+        return phi_n1n2
 
     def test_eos_differentials(self, V, n):
         """
@@ -351,7 +393,7 @@ class pc_saft(saft_dispersion):
         float: Excess free energy density ()
 
         """
-        phi = Whitebear.bulk_excess_free_energy_density(self, rho_b)
+        phi = FundamentalMeasureTheory.bulk_excess_free_energy_density(self, rho_b)
         if np.any(self.chain_functional_active):
             # Hard-chain contributions
             rho_thermo = np.zeros_like(rho_b)

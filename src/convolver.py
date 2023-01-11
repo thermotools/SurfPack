@@ -445,7 +445,7 @@ class CompWeightedDifferentials():
     """
     """
 
-    def __init__(self, n_grid: int, wfs: WeightFunctions, ms: float):
+    def __init__(self, n_grid: int, wfs: WeightFunctions, ms: float, nc: float):
         """
 
         Args:
@@ -496,6 +496,11 @@ class CompWeightedDifferentials():
         # One - body direct correlation function
         self.corr = np.zeros(n_grid)
 
+        # Second differentials
+        self.nc = nc
+        self.n_wd = len(self.wfs.fmt_aliases) + (len(self.wfs.wfs) - len(self.wfs.fmt_aliases))*nc
+        self.ds2 = None
+
     def d_effective(self, wf):
         """
 
@@ -545,7 +550,7 @@ class CompWeightedDifferentials():
         if functional.mu_of_rho is not None:
             self.mu_of_rho[:] = functional.mu_of_rho[:, ic]
 
-    def set_second_order_functional_differentials(self, functional, ic, wd):
+    def set_second_order_functional_differentials(self, functional, ic):
         """
 
         Args:
@@ -555,21 +560,94 @@ class CompWeightedDifferentials():
         Returns:
 
         """
-        xxxx
-        self.d0[:] = self.ms*functional.d0[:, ic]
-        self.d1[:] = self.ms*functional.d1[:, ic]
-        self.d2[:] = self.ms*functional.d2[:, ic]
-        self.d3[:] = self.ms*functional.d3[:, ic]
-        self.d1v[:] = self.ms*functional.d1v[:, ic]
-        self.d2v[:] = self.ms*functional.d2v[:, ic]
 
+        # Second differentials
+        self.ds2 = np.zeros((self.n_grid, self.n_wd, self.n_wd))
+
+        # FMT densities
+        for i, alias_i in enumerate(self.wfs.fmt_aliases):
+            for j, alias_j in enumerate(self.wfs.fmt_aliases):
+                self.ds2[:,i,j] = functional.get_second_order_differentials(alias_i, alias_j, ic1=ic, ic2=ic)
+
+        # Other weighted densities
+        i0 = len(self.wfs.fmt_aliases)
+        j0 = len(self.wfs.fmt_aliases)
+        for wf_i in self.wfs:
+            alias_i = self.wfs[wf_i].alias
+            if alias_i not in self.wfs.fmt_aliases:
+                for wf_j in self.wfs:
+                    alias_j = self.wfs[wf_j].alias
+                    if alias_j not in self.wfs.fmt_aliases:
+                        for i in range(self.nc):
+                            for j in range(self.nc):
+                                self.ds2[:,i0+i,j0+j] = functional.get_second_order_differentials(alias_i, alias_j, ic1=i, ic2=j)
+                i0 += self.nc
+                j0 += self.nc
+
+        #print("ds2",self.ds2[512,:,:])
+        #print("ds2",self.ds2[0,:,:])
+
+         # 0.0000000000000000        0.0000000000000000        0.0000000000000000        1.5951741883444028        0.0000000000000000        0.0000000000000000
+         # 0.0000000000000000        0.0000000000000000        1.5951741883444028        1.5454086587027394        0.0000000000000000        0.0000000000000000
+         # 0.0000000000000000        1.5951741883444028       0.11165612553939612       0.16458808565765570        0.0000000000000000        1.5839303799640695E-010
+         # 1.5951741883444028        1.5454086587027394       0.16458808565765570       0.25554111067263796        2.1922843123507077E-009   3.7230450507553121E-010
+         # 0.0000000000000000        0.0000000000000000        0.0000000000000000        2.1922843123507077E-009   0.0000000000000000       -1.5951741883444028
+         # 0.0000000000000000        0.0000000000000000        1.5839303799640695E-010   3.7230450507553121E-010  -1.5951741883444028      -0.11165612553939612     
+         # -768.02445744468503 
+        # sys.exit()
+
+    def second_order_functional_differentials_mult_wdens(self, n):
+        """
+
+        Args:
+            functional:
+            ic:
+
+        Returns:
+
+        """
+
+        # Second differentials
+        d2_n_beta = np.zeros((self.n_grid, self.n_wd))
+        n_beta = np.zeros((self.n_grid, self.n_wd))
+
+        # FMT densities
+        for i, alias_i in enumerate(self.wfs.fmt_aliases):
+            n_beta[:,i] = n[alias_i][:]
+
+        # Other weighted densities
+        i0 = len(self.wfs.fmt_aliases)
+        for wf_i in self.wfs:
+            alias_i = self.wfs[wf_i].alias
+            if alias_i not in self.wfs.fmt_aliases:
+                for i in range(self.nc):
+                    n_beta[:,i0+i] = n[alias_i][i,:]
+                i0 += self.nc
+
+        for i in range(self.n_grid):
+            d2_n_beta[i,:] = np.matmul(self.ds2[i,:,:],n_beta[i,:])
+
+        self.d0[:] = d2_n_beta[:,0]
+        self.d1[:] = d2_n_beta[:,1]
+        self.d2[:] = d2_n_beta[:,2]
+        self.d3[:] = d2_n_beta[:,3]
+        self.d1v[:] = d2_n_beta[:,4]
+        self.d2v[:] = d2_n_beta[:,5]
+
+        i0 = len(self.wfs.fmt_aliases)
         for wf in self.wfs:
             alias = self.wfs[wf].alias
             if alias not in self.wfs.fmt_aliases:
-                self.d[alias][:] = functional.diff[alias][:, ic]
+                for i in range(self.nc):
+                    self.d[alias][:] = d2_n_beta[:,i0+i]
+                i0 += self.nc
 
-        if functional.mu_of_rho is not None:
-            self.mu_of_rho[:] = functional.mu_of_rho[:, ic]
+        # print(d2_n_beta[512,:])
+        # sys.exit()
+
+ #        fa1 -0.69255221150938773       -1.4341373220713733      -0.10813903169108037      -0.10550971708160201       -8.3572802351131362E-002  -1.4005390756148730E-003
+ # fa1   0.0000000000000000        0.0000000000000000        0.0000000000000000        0.0000000000000000     
+ # fa1   17.606983353086367
 
     def print(self, index=None):
         """
@@ -596,6 +674,23 @@ class CompWeightedDifferentials():
 
         else:
             raise TypeError(f'Cannot add {type(other)} to CompWeightedDifferentials')
+        return self
+
+    def __isub__(self, other):
+        if isinstance(other, CompWeightedDifferentials):
+            for wf in self.wfs:
+                if self.wfs[wf].convolve:
+                    self.d_conv[wf][:] -= other.d_conv[wf][:]
+            self.mu_of_rho[:] -= other.mu_of_rho[:]
+
+        elif isinstance(other, float):
+            for wf in self.wfs:
+                if self.wfs[wf].convolve:
+                    self.d_conv[wf][:] -= other
+            self.mu_of_rho[:] -= other
+
+        else:
+            raise TypeError(f'Cannot subtract {type(other)} to CompWeightedDifferentials')
         return self
 
     def __imul__(self, other):
@@ -671,7 +766,10 @@ class Convolver(object):
             # Set up Fourier weights
             for wfun in self.comp_wfs[i]:
                 self.comp_wfs[i][wfun].generate_fourier_weights(grid, R[i], R_T[i])
-            self.comp_differentials.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
+            self.comp_differentials.append(CompWeightedDifferentials(n_grid=grid.n_grid,
+                                                                     wfs=self.comp_wfs[i],
+                                                                     ms=functional.thermo.m[i],
+                                                                     nc=functional.nc))
 
         # Overall weighted densities
         self.weighted_densities = WeightedDensitiesMaster(n_grid=grid.n_grid,
@@ -924,6 +1022,24 @@ class Convolver(object):
         self.set_up_special_weights(conv_type)
         # Calculate differentials
         self.update_functional_differentials()
+
+        # print(self.comp_differentials[0].d0[512])
+        # print(self.comp_differentials[0].d1[512])
+        # print(self.comp_differentials[0].d2[512])
+        # print(self.comp_differentials[0].d3[512])
+        # #print("d3 conv",self.comp_differentials[0].d_conv["w3"][512])
+        # print(self.comp_differentials[0].d1v[512])
+        # print(self.comp_differentials[0].d2v[512])
+        # print(self.comp_differentials[0].d["w_disp"][512])
+
+        # print(self.comp_differentials[0].d0[0])
+        # print(self.comp_differentials[0].d1[0])
+        # print(self.comp_differentials[0].d2[0])
+        # print(self.comp_differentials[0].d3[0])
+        # print(self.comp_differentials[0].d1v[0])
+        # print(self.comp_differentials[0].d2v[0])
+        # print(self.comp_differentials[0].d["w_disp"][0])
+
         for i in range(self.functional.nc):
             # Loop all weight functions
             for wf in self.comp_wfs[i]:
@@ -931,6 +1047,23 @@ class Convolver(object):
                     self.comp_wfs[i][wf].convolve_differentials_complex(self.comp_differentials[i].d_effective(wf),
                                                                         self.comp_differentials[i].d_conv[wf],
                                                                         conv_type)
+
+    def convolve_differentials(self):
+        """
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
+        """
+        # Calculate differentials
+        self.update_functional_differentials()
+
+        for i in range(self.functional.nc):
+            # Loop all weight functions
+            for wf in self.comp_wfs[i]:
+                if self.comp_wfs[i][wf].convolve:
+                    self.comp_wfs[i][wf].convolve_differentials(self.comp_differentials[i].d_effective(wf),
+                                                                        self.comp_differentials[i].d_conv[wf])
 
     def plot_weighted_densities(self):
         """
@@ -987,6 +1120,7 @@ class CurvatureExpansionConvolver(Convolver):
             None
         """
         Convolver.__init__(self, grid, functional, R, R_T)
+        self.convolve_for_rho1 = False
 
         # Overall weighted densities (rho_0 * (zw))
         self.weighted_densities0 = WeightedDensitiesMaster(n_grid=grid.n_grid,
@@ -995,19 +1129,66 @@ class CurvatureExpansionConvolver(Convolver):
 
         # Perform convolution integrals for (rho_0 * (zw))
         self.convolve_densities_by_type(profile0, conv_type=ConvType.ZW)
+
         self.weighted_densities0 += self.weighted_densities
 
-        # Calculate second differentials for rho_0
-        self.functional.second_order_differentials(self.weighted_densities)
+        # print("w0",self.weighted_densities0["w0"][512])
+        # print("w1",self.weighted_densities0["w1"][512])
+        # print("w2",self.weighted_densities0["w2"][512])
+        # print("w3",self.weighted_densities0["w3"][512])
+        # print("wv1",self.weighted_densities0["wv1"][512])
+        # print("wv2",self.weighted_densities0["wv2"][512])
+        # print("wdisp",self.weighted_densities0["w_disp"][0,512])
+
+        # print("w0",self.weighted_densities0["w0"][0])
+        # print("w1",self.weighted_densities0["w1"][0])
+        # print("w2",self.weighted_densities0["w2"][0])
+        # print("w3",self.weighted_densities0["w3"][0])
+        # print("wv1",self.weighted_densities0["wv1"][0])
+        # print("wv2",self.weighted_densities0["wv2"][0])
+        # print("wdisp",self.weighted_densities0["w_disp"][0,0])
 
         # Convolve differentials for rho_0
         self.convolve_density_profile(profile0)
+
+        # Calculate second differentials for rho_0
+        self.functional.calculate_second_order_differentials(self.weighted_densities)
+
+        # print("w0",self.weighted_densities["w0"][512])
+        # print("w1",self.weighted_densities["w1"][512])
+        # print("w2",self.weighted_densities["w2"][512])
+        # print("w3",self.weighted_densities["w3"][512])
+        # print("wv1",self.weighted_densities["wv1"][512])
+        # print("wv2",self.weighted_densities["wv2"][512])
+        # print("wdisp",self.weighted_densities["w_disp"][0,512])
+
+        # print("r0 w0",self.weighted_densities["w0"][0])
+        # print("r0 w1",self.weighted_densities["w1"][0])
+        # print("r0 w2",self.weighted_densities["w2"][0])
+        # print("r0 w3",self.weighted_densities["w3"][0])
+        # print("r0 wv1",self.weighted_densities["wv1"][0])
+        # print("r0 wv2",self.weighted_densities["wv2"][0])
+        # print("r0 wdisp",self.weighted_densities["w_disp"][0,0])
+
         self.convolve_differentials_by_type(conv_type=ConvType.ZW)
+
+        # print("d0 conv",self.comp_differentials[0].d_conv["w0"][512])
+        # print("d2 conv",self.comp_differentials[0].d_conv["w2"][512])
+        # print("d3 conv",self.comp_differentials[0].d_conv["w3"][512])
+        # print("dv2 conv",self.comp_differentials[0].d_conv["wv2"][512])
+        # print("ddisap conv",self.comp_differentials[0].d_conv["w_disp"][512])
+        # sys.exit()
+
+        self.convolve_for_rho1 = True
         # Store differentials
         self.comp_differentials0 = []
         for i in range(functional.thermo.nc):
-            self.comp_differentials0.append(CompWeightedDifferentials(n_grid=grid.n_grid, wfs=self.comp_wfs[i], ms=functional.thermo.m[i]))
+            self.comp_differentials0.append(CompWeightedDifferentials(n_grid=grid.n_grid,
+                                                                      wfs=self.comp_wfs[i],
+                                                                      ms=functional.thermo.m[i],
+                                                                      nc=functional.nc))
             self.comp_differentials0[i] += self.comp_differentials[i]
+            self.comp_differentials[i].set_second_order_functional_differentials(self.functional, i)
 
     def convolve_densities_and_differentials(self, rho):
         """
@@ -1018,24 +1199,103 @@ class CurvatureExpansionConvolver(Convolver):
         """
         self.convolve_density_profile(rho)
 
-        # Set sum d2fdn2_0*n_1
-        for i in range(self.functional.nc):
-            self.comp_differentials[i].set_second_order_functional_differentials(
-                self.functional, i, self.weighted_densities)
-        # Convolve differentials
+        #Add -(rho_0 * (zw)):
+        self.weighted_densities += -self.weighted_densities0
+
+        # print("w0",self.weighted_densities["w0"][512])
+        # print("w1",self.weighted_densities["w1"][512])
+        # print("w2",self.weighted_densities["w2"][512])
+        # print("w3",self.weighted_densities["w3"][512])
+        # print("wv1",self.weighted_densities["wv1"][512])
+        # print("wv2",self.weighted_densities["wv2"][512])
+        # print("wdisp",self.weighted_densities["w_disp"][0,512])
+
+        # print("wdisp corr",self.weighted_densities["w_disp"][0,512] - self.weighted_densities0["w_disp"][0,512])
+
+        # sys.exit()
+        # print("w0",self.weighted_densities["w0"][0])
+        # print("w1",self.weighted_densities["w1"][0])
+        # print("w2",self.weighted_densities["w2"][0])
+        # print("w3",self.weighted_densities["w3"][0])
+        # print("wv1",self.weighted_densities["wv1"][0])
+        # print("wv2",self.weighted_densities["wv2"][0])
+        # print("wdisp",self.weighted_densities["w_disp"][0,0])
+
+
+        # Before
+        #WD1  -1.7838832548700622E-002  -3.2877330086310212E-002 -0.76144145812392816      -0.47848191729884493        4.5671957395076465E-003  0.10577659969037921     
+        #WD1  -1.4674416198952791E-002
+
+
         self.convolve_differentials_by_type(conv_type=ConvType.REGULAR_COMPLEX)
+        #plt.plot(self.comp_differentials[0].d_effective("w_disp"))
+        #plt.show()
+
+        #self.convolve_differentials()
+        #print("dc w0",self.comp_differentials[0].d_conv["w0"][512])
+
+        # #print("dc w1",self.comp_differentials[0].d_conv["w1"][512])
+        # print("dc w2",self.comp_differentials[0].d_conv["w2"][512])
+        # print("dc w3",self.comp_differentials[0].d_conv["w3"][512])
+        # #print("dc wv1",self.comp_differentials[0].d_conv["wv1"][512])
+        # print("dc wv2",self.comp_differentials[0].d_conv["wv2"][512])
+        # print("dc w_disp",self.comp_differentials[0].d_conv["w_disp"][512])
+
+        # print("dc w0",self.comp_differentials[0].d_conv["w0"][0])
+        # print("dc w1",self.comp_differentials[0].d_conv["w1"][0])
+        # print("dc w2",self.comp_differentials[0].d_conv["w2"][0])
+        # print("dc w3",self.comp_differentials[0].d_conv["w3"][0])
+        # print("dc wv1",self.comp_differentials[0].d_conv["wv1"][0])
+        # print("dc wv2",self.comp_differentials[0].d_conv["wv2"][0])
+        # print("dc w_disp",self.comp_differentials[0].d_conv["w_disp"][0])
+
+
+        #print("overall",self.comp_differentials[0].d_conv["w2"][512]+self.comp_differentials[0].d_conv["w3"][512] + self.comp_differentials[0].d_conv["wv2"][512] + self.comp_differentials[0].d_conv["w_disp"][512])
+
+        # print("overall",self.comp_differentials[0].d_conv["w2"][0]+self.comp_differentials[0].d_conv["w3"][0] + self.comp_differentials[0].d_conv["wv2"][0] + self.comp_differentials[0].d_conv["w_disp"][0])
+
+        # print("overall",self.comp_differentials[0].d_conv["w2"][-1]+self.comp_differentials[0].d_conv["w3"][-1] + self.comp_differentials[0].d_conv["wv2"][-1] + self.comp_differentials[0].d_conv["w_disp"][-1])
+
+
+        #print("res",8.7844665271004949 + 0.99382527108555063 - 4.6459041119524445)
+        #cache(1)%functional_derivative(2048,:)  0.99382527108555063
+        #cache(3)%functional_derivative(2048,:)  -4.6459041119524445
+        #self.comp_differentials0[0].update_after_convolution()
+        #print("rho0 corr",self.comp_differentials0[0].corr[512], -0.99382527108555063 + 4.6459041119524445)
         # Add contribution from rho_0 and sum contributions
-        for i in range(functional.thermo.nc):
+        for i in range(self.functional.thermo.nc):
             self.comp_differentials[i] -= self.comp_differentials0[i]
             # Calculate one-particle correlation
             self.comp_differentials[i].update_after_convolution()
+            #print("corr",self.comp_differentials[i].corr[512])
+            #print("corr",self.comp_differentials[i].corr[0])
+            #print("corr",self.comp_differentials[i].corr[-1])
+        #sys.exit()
 
 
-    def reset_before_convolution(self, rho):
+    def update_functional_differentials(self):
         """
-        Set master weighted densities to -(rho_0 * (zw)) before convolution
+        Perform convolutions for weighted densities
+
+        Args:
+            rho (array_like): Density profile
         """
-        self.weighted_densities.reset(rho, -self.weighted_densities0)
+        if self.convolve_for_rho1:
+            for i in range(self.functional.nc):
+                self.comp_differentials[i].second_order_functional_differentials_mult_wdens(self.weighted_densities)
+        else:
+            Convolver.update_functional_differentials(self)
+
+    # def reset_before_convolution(self, rho):
+    #     """
+    #     Set master weighted densities to -(rho_0 * (zw)) before convolution
+    #     """
+    #     if self.convolve_for_rho1:
+    #         self.weighted_densities.reset(rho, -self.weighted_densities0)
+    #     else:
+    #         Convolver.reset_before_convolution(self, rho)
+
+
 
 if __name__ == "__main__":
     pass

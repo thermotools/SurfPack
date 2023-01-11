@@ -330,7 +330,8 @@ class WeightFunction(object):
                 self.fw_signed.real[:] = fw[:]
 
             if is_imaginary:
-                self.fzw_pluss.real[:] = -(fwk[:] + set_zero_mult*fw[:]/k)
+                # TOD CHECK SIGN
+                self.fzw_pluss.real[:] = (fwk[:] + set_zero_mult*fw[:]/k)
                 self.fzw_minus.real[:] = -(fwk[:] - fw[:]/k)
                 self.fw_tilde_pluss.imag[:] = -(fwkk[:] + (fwk[:]/k - fw[:]/k**2))
                 self.fw_tilde_minus.imag[:] = -(fwkk[:] - (fwk[:]/k - fw[:]/k**2))

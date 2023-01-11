@@ -35,6 +35,9 @@ class bulk_weighted_densities:
         self.dndrho[3, :] = ms*4*np.pi*R**3/3
         self.n0b = np.sum(rho_b)
 
+    def get_fmt_densities_grid(self):
+        return np.array([[self.n[0], self.n[1], self.n[2], self.n[3], 0.0, 0.0]])
+
     def print(self):
         print("Bulk weighted densities:")
         print("n_0: ", self.n[0])
@@ -45,6 +48,296 @@ class bulk_weighted_densities:
         print("dn_1_drho: ", self.dndrho[1, :])
         print("dn_2_drho: ", self.dndrho[2, :])
         print("dn_3_drho: ", self.dndrho[3, :])
+
+
+class FundamentalMeasureTheory:
+    """ Interface to FMT models implemented in thermopack:
+    RF:
+    Rosenfeld, Yaakov
+    Free-energy model for the inhomogeneous hard-sphere fluid mixture andl
+    density-functional theory of freezing.
+    Phys. Rev. Lett. 1989, 63(9):980-983
+    doi:10.1103/PhysRevLett.63.980
+    WB:
+    R. Roth, R. Evans, A. Lang and G. Kahl
+    Fundamental measure theory for hard-sphere mixtures revisited: the White Bear version
+    Journal of Physics: Condensed Matter
+    2002, 14(46):12063-12078
+    doi: 10.1088/0953-8984/14/46/313
+
+    In the bulk phase the functional reduces to the Boublik and
+    Mansoori, Carnahan, Starling, and Leland (BMCSL) EOS.
+    T. Boublik, doi: 10/bjgkjg
+    G. A. Mansoori, N. F. Carnahan, K. E. Starling, T. Leland, doi: 10/dkfhh7
+    WBII:
+    Hendrik Hansen-Goos and Roland Roth
+    Density functional theory for hard-sphere mixtures:
+    the White Bear version mark II.
+    Journal of Physics: Condensed Matter
+    2006, 18(37): 8413-8425
+    doi: 10.1088/0953-8984/18/37/002
+    """
+
+    def __init__(self, thermo, N, R, fmt_model="WB", grid_unit=LenghtUnit.ANGSTROM):
+        """
+
+        Args:
+            N (integer): Grid size
+            R (ndarray): Particle radius for all components
+            fmt_model (str): RF=Rosenfeld, WB=White Bear (default), WBII=White Bear Mark II
+            grid_unit (LenghtUnit): Information on how lenght is reduced (Deafult: ANGSTROM)
+        """
+        self.thermo = thermo
+        if fmt_model == "RF":
+            self.name = "Rosenfeld"
+        elif fmt_model == "WB":
+            self.name = "White Bear"
+        elif fmt_model == "WBII":
+            self.name = "White Bear Mark II"
+        self.short_name = fmt_model
+        self.fmt_name = fmt_model
+
+        self.R = R
+        self.ms = thermo.m
+        self.nc = thermo.nc
+        self.n_grid = N
+        # Define units for simulation grid
+        self.grid_unit = grid_unit
+
+        # Allocate arrays for differentials
+        self.d0 = np.zeros((N, self.nc))
+        self.d1 = np.zeros((N, self.nc))
+        self.d2 = np.zeros((N, self.nc))
+        self.d3 = np.zeros((N, self.nc))
+        self.d1v = np.zeros((N, self.nc))
+        self.d2v = np.zeros((N, self.nc))
+        self.d_T = np.zeros(N)
+        # Set up FMT weights
+        self.wf = WeightFunctions()
+        self.wf.add_fmt_weights()
+
+        # Differentials
+        self.diff = {}
+        for wf in self.wf.wfs:
+            alias = self.wf.wfs[wf].alias
+            if "v" in alias:
+                if "1" in alias:
+                    self.diff[alias] = self.d1v
+                else:
+                    self.diff[alias] = self.d2v
+            elif "0" in alias:
+                self.diff[alias] = self.d0
+            elif "1" in alias:
+                self.diff[alias] = self.d1
+            elif "2" in alias:
+                self.diff[alias] = self.d2
+            elif "3" in alias:
+                self.diff[alias] = self.d3
+        self.phi_nn = None
+
+    def excess_free_energy(self, dens):
+        """
+        Calculates the excess reduced hard-sphere Helmholtz free energy density from the weighted densities
+
+        Args:
+            dens (array_like): Weighted densities
+
+        Returns:
+            array_like: Excess reduced hard-sphere Helmholtz free energy (1/m3)
+
+        """
+        n_alpha = dens.get_fmt_densities_grid()
+        phi, = self.thermo.fmt_energy_density(n_alpha, phi_n=False, phi_nn=False, fmt_model=self.fmt_name)
+        return phi
+
+    def bulk_excess_free_energy_density(self, rho_b):
+        """
+        Calculates the excess free energy density.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess free energy density ()
+
+        """
+        bd = bulk_weighted_densities(rho_b, self.R, self.ms)
+        n_alpha = bd.get_fmt_densities_grid()
+        phi, = self.thermo.fmt_energy_density(n_alpha, phi_n=False, phi_nn=False, fmt_model=self.fmt_name)
+        return phi[0]
+
+    def bulk_compressibility(self, rho_b):
+        """
+        Calculates the Percus-Yevick HS compressibility from the
+        packing fraction. Multiply by rho*kB*T to get pressure.
+
+        Args:
+            rho_b (ndarray): Bulk densities
+
+        Returns:
+            float: compressibility
+        """
+        bd = bulk_weighted_densities(rho_b, self.R, self.ms)
+        n_alpha = bd.get_fmt_densities_grid()
+        phi, dphidn, = self.thermo.fmt_energy_density(n_alpha, phi_n=True, phi_nn=False, fmt_model=self.fmt_name)
+        phi = phi[0]
+        dphidn = dphidn[0]
+        beta_p_ex = - phi + np.sum(dphidn[:4] * bd.n)
+        beta_p_id = bd.n[0]
+        z = 1.0 + beta_p_ex/bd.n0b
+        return z
+
+    def bulk_excess_chemical_potential(self, rho_b):
+        """
+        Calculates the reduced HS excess chemical potential from the bulk
+        packing fraction.
+
+        Args:
+        rho_b (ndarray): Bulk densities
+
+        Returns:
+        float: Excess reduced HS chemical potential ()
+
+        """
+        bd = bulk_weighted_densities(rho_b, self.R, self.ms)
+        n_alpha = bd.get_fmt_densities_grid()
+        phi, dphidn, = self.thermo.fmt_energy_density(n_alpha, phi_n=True, phi_nn=False, fmt_model=self.fmt_name)
+        mu_ex = np.zeros(self.nc)
+        for i in range(self.nc):
+            mu_ex[i] = np.sum(dphidn[0][:4] * bd.dndrho[:, i])
+
+        return mu_ex
+
+    def bulk_fmt_functional_with_differentials(self, bd):
+        """
+        Calculates the functional differentials wrpt. the weighted densities
+        in the bulk phase.
+
+        Args:
+        bd (bulk_weighted_densities): bulk_weighted_densities
+        only_hs_system (bool): Only calculate for hs-system
+
+        """
+        n_alpha = bd.get_fmt_densities_grid()
+        phi, dphidn, = self.thermo.fmt_energy_density(n_alpha, phi_n=True, phi_nn=False, fmt_model=self.fmt_name)
+        return phi[0], dphidn[0][:4]
+
+    def differentials(self, dens):
+        """
+        Calculates the functional differentials wrpt. the weighted densities.
+
+        Args:
+        dens (array_like): weighted densities
+        diff (array_like): Functional differentials
+
+        """
+        n_alpha = dens.get_fmt_densities_grid()
+        phi, self.phi_n, = self.thermo.fmt_energy_density(n_alpha, phi_n=True, phi_nn=False, fmt_model=self.fmt_name)
+
+        self.d0[:, 0] = self.phi_n[:,0]
+        self.d1[:, 0] = self.phi_n[:,1]
+        self.d2[:, 0] = self.phi_n[:,2]
+        self.d3[:, 0] = self.phi_n[:,3]
+        self.d1v[:, 0] = self.phi_n[:,4]
+        self.d2v[:, 0] = self.phi_n[:,5]
+
+        # Distribute differentials
+        self.distribute_component_differentials()
+
+    def temperature_differential(self, dens):
+        """
+        Calculates the functional differentials wrpt. temperature
+
+        Args:
+        dens (array_like): weighted densities
+        Return:
+        np.ndarray: Functional differentials
+
+        """
+        self.d_T.fill(0.0)
+        return self.d_T
+
+    def distribute_component_differentials(self):
+        """
+        Copy differentials to component differentials
+        """
+        for i in range(self.nc-1,0,-1):
+            self.d0[:, i] = self.d0[:, 0]
+            self.d1[:, i] = self.d1[:, 0]
+            self.d2[:, i] = self.d2[:, 0]
+            self.d3[:, i] = self.d3[:, 0]
+            self.d1v[:, i] = self.d1v[:, 0]
+            self.d2v[:, i] = self.d2v[:, 0]
+
+    def test_eos_differentials(self, V, n):
+        """
+        Test the functional differentials
+        Args:
+            V (float): Volume (m3)
+            n (np.ndarray): Molar numbers (mol)
+        """
+        print("No EOS.")
+
+    def calculate_second_order_differentials(self, dens):
+        """
+        Calculates the second order functional differentials wrpt. the weighted densities
+
+        Args:
+        dens (array_like): weighted densities
+
+        """
+        n_alpha = dens.get_fmt_densities_grid()
+        # n_alpha[512,:] = [7.9969074712769022E-003,   1.4738462614359921E-002,  0.34134391187245916,
+        #                   0.21081698581255945,        -1.6225775065429682E-003,   -3.7579018103286135E-002]
+        phi, self.phi_nn, = self.thermo.fmt_energy_density(n_alpha, phi_n=False, phi_nn=True, fmt_model=self.fmt_name)
+        #print("FMT",self.phi_nn[512,:,:])
+
+        #print("n_alpha[512,:]",n_alpha[512,:])
+        #print("7.9969074712769022E-003   1.4738462614359921E-002  0.34134391187245916       0.21081698581255945        1.6225775065429682E-003   3.7579018103286135E-002")
+        # sys.exit()
+         # 0.0000000000000000        0.0000000000000000        0.0000000000000000        1.2671332023404243        0.0000000000000000        0.0000000000000000
+         # 0.0000000000000000        0.0000000000000000        1.2671332023404243       0.54807084842759435        0.0000000000000000        0.0000000000000000
+         # 0.0000000000000000        1.2671332023404243        4.1452991065117128E-002   3.9544991422293015E-002   0.0000000000000000       -4.5636164803004959E-003
+         # 1.2671332023404243       0.54807084842759435        3.9544991422293015E-002   3.9385978179161507E-002  -6.0337869282518511E-002  -6.1447701807422943E-003
+         # 0.0000000000000000        0.0000000000000000        0.0000000000000000       -6.0337869282518511E-002   0.0000000000000000       -1.2671332023404243
+         # 0.0000000000000000        0.0000000000000000       -4.5636164803004959E-003  -6.1447701807422943E-003  -1.2671332023404243       -4.1452991065117128E-002
+
+    def get_second_order_differentials(self, n1, n2, ic1=0, ic2=0):
+        """
+        Extract the second order functional differentials wrpt. the weighted densities
+
+        Args:
+
+        """
+        phi_n1n2 = np.zeros((self.n_grid))
+        i1 = self.fmt_alias_to_index(n1)
+        i2 = self.fmt_alias_to_index(n2)
+        if i1 >= 0 and i2 >= 0:
+            phi_n1n2[:] = self.phi_nn[:,i1,i2]
+        return phi_n1n2
+
+    def fmt_alias_to_index(self, w):
+        """
+        Extract the second order functional differentials wrpt. the weighted densities
+
+        Args:
+
+        """
+        if w == "wv1":
+            index = 4
+        elif w == "wv2":
+            index = 5
+        elif w == "w0":
+            index = 0
+        elif w == "w1":
+            index = 1
+        elif w == "w2":
+            index = 2
+        elif w == "w3":
+            index = 3
+        else:
+            index = -1
+        return index
 
 
 class Rosenfeld:

@@ -61,24 +61,32 @@ class CurvatureExpansionInterface(PlanarInterface):
         # Set profile
         n_grid = self.grid.n_grid
         n_c = self.functional.nc
-        prof, z = self.unpack_variables(xvec)
-
+        self.profile1, z = self.unpack_variables(xvec)
         # Specify total equimolar surface
-        gamma1 = self.total_adsorption_first_order_expansion()
-        prof += np.sum(gamma1)*self.profile_diff
-
+        gamma1 = self.adsorption_first_order_expansion() #radius=100.0
+        #print("before",self.profile1.densities[0][512])
+        self.profile1 += np.sum(gamma1)*self.profile_diff
+        #print("self.r_equimolar",self.r_equimolar)
+        #print(np.sum(self.get_adsorption_vector()))
+        #print("gamma1",np.sum(gamma1))
+        #print("after",self.profile1.densities[0][512])
         # Chemical potential
         beta_mu = self.bulk1.mu_scaled_beta[:]
-
+        #print("beta_mu",beta_mu)
         # Perform convolution integrals
-        self.convolver1.convolve_density_profile(prof)
+        self.convolver1.convolve_densities_and_differentials(self.profile1)
 
         # Calculate new density profile using the variations of the functional
         res = np.zeros(n_c * n_grid)
 
         for ic in range(n_c):
             res[ic * n_grid:(ic+1)*n_grid] = xvec[ic * n_grid:(ic+1)*n_grid] \
-                - self.profile.densities[ic] * ( beta_mu[ic] + self.convolver.correlation(ic)[:])
+                - self.profile.densities[ic] * (beta_mu[ic] + self.convolver1.correlation(ic)[:])
+
+        # print(xvec[0], self.profile.densities[0][0], beta_mu[0],self.convolver1.correlation(0)[0])
+        #plt.plot(res)
+        #plt.draw()
+        #sys.exit()
 
         return res
 
@@ -88,32 +96,37 @@ class CurvatureExpansionInterface(PlanarInterface):
         if self.converged:
             sigma0 = self.surface_tension(reduced_unit=False)
             self.bulk1 = Bulk.curvature_expansion(self.bulk, sigma0)
-            ProfilePlotter([self.profile], self.grid.z).plot()
+            #ProfilePlotter([self.profile], self.grid.z).plot()
             self.profile1 = Profile().copy_profile(self.profile)
             self.profile1.shift_and_scale(shift=0.0,
                                           grid=self.grid,
                                           rho_left=self.bulk1.get_reduced_density(self.bulk1.left_state.partial_density()),
                                           rho_right=self.bulk1.get_reduced_density(self.bulk1.right_state.partial_density()))
 
-            ProfilePlotter([self.profile, self.profile1], self.grid.z).plot()
-            delta_rho=self.bulk1.get_reduced_density(self.bulk1.left_state.partial_density()) - \
-                self.bulk1.get_reduced_density(self.bulk1.right_state.partial_density())
-            self.profile_diff = self.profile.delta_rho(self.grid.z, scaling = 1.0/delta_rho)
+            #ProfilePlotter([self.profile, self.profile1], self.grid.z).plot()
+            delta_rho0=self.bulk.get_reduced_density(self.bulk.left_state.partial_density()) - \
+                self.bulk.get_reduced_density(self.bulk.right_state.partial_density())
+            self.profile_diff = self.profile.delta_rho(self.grid.z, scaling = 1.0/delta_rho0)
             self.convolver1 = CurvatureExpansionConvolver(self.grid,
                                                           self.functional,
                                                           self.bulk.R,
                                                           self.bulk.R_T,
                                                           self.profile)
-            sys.exit()
 
             # Solve specifying chemical potential
             specification = self.specification
             self.specification = Specification.CHEMICHAL_POTENTIAL
             x0 = self.pack_x_vec(self.profile1)
+
+            # TODO: Fix error in rho0 -> Drop picard iterations...... + BC
+            solver=dft_solver().picard(tolerance=1.0e-8,max_iter=5,beta=0.05,ng_frequency=None).anderson(mmax=50, beta=0.05, tolerance=1.0e-12,max_iter=500)
             x_sol, self.converged, self.n_iter = solver.solve(
-                x0, curvature_residual, log_iter)
+                x0, self.curvature_residual, log_iter)
             if self.converged:
+                #plt.plot(self.curvature_residual(x_sol))
+                #plt.show()
                 self.profile1, z = self.unpack_variables(x_sol)
+                #ProfilePlotter([self.profile1], self.grid.z).plot()
                 self.calculate_curvature_expansion_coefficients()
             else:
                 print("Interface solver did not converge for rho1")
@@ -132,28 +145,29 @@ class CurvatureExpansionInterface(PlanarInterface):
             radius = self.r_equimolar
         l_left = radius - self.grid.z_edge[0]
         l_right = self.grid.z_edge[-1] - radius
-
         z = np.zeros_like(self.grid.z)
         z[:] = self.grid.z[:] - radius
+        #print(l_left,l_right,sum(z),sum(self.grid.z[:] - 100.0))
         gamma1 = np.zeros_like(rho0_left)
-        for ic in range(self.functional.nc):
-            gamma1[i] = np.sum(self.profile1.densities[ic][:]*self.grid.integration_weights[:]) \
+        for i in range(self.functional.nc):
+            gamma1[i] = np.sum(self.profile1.densities[i][:]*self.grid.integration_weights[:]) \
                 - rho1_left[i]*l_left - rho1_right[i]*l_right \
-                + 2.0*np.sum(z*self.profile.densities[ic][:]*self.grid.integration_weights[:]) \
-                - rho0_left[i]*l_left**2 - rho0_right[i]*l_right**2
+                + 2.0*np.sum(z*self.profile.densities[i][:]*self.grid.integration_weights[:]) \
+                + rho0_left[i]*l_left**2 - rho0_right[i]*l_right**2
         return gamma1
 
     def calculate_curvature_expansion_coefficients(self):
-        g = 2.0
         # Get sigma_0
         _, omega_a = self.grand_potential()
         omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
+        omega_a *= 1.0/self.bulk.reduced_temperature
         sigma_0 = np.sum(omega_a)
-
+        print("sigma_0",sigma_0)
         gamma_0 = self.get_adsorption_vector()
         gamma_1 = self.adsorption_first_order_expansion()
 
-        mu_1 = self.bulk1.reduced_temperature * self.bulk1.mu_scaled_beta
+        print(gamma_0, gamma_1)
+        mu_1 = self.bulk1.mu_scaled_beta
         mu_1_c = np.zeros_like(mu_1)
         mu_1_c[:] = 0.5*mu_1
         mu_2 = np.zeros_like(mu_1)
@@ -165,20 +179,21 @@ class CurvatureExpansionInterface(PlanarInterface):
         #conv_rho_0_zw.convolve_densities_by_type(self.pr ofile, conv_type=ConvType.ZW)
         # Calculate differentials
         f0_zw = self.convolver.get_differential_sum(rho_0_zw)
-        sigma_1_0 = 0.5*np.sum(f0_zw*self.grid.integration_weights)*self.bulk1.reduced_temperature
-        print("sigma_1_0",sigma_1_0)
+        sigma_1_0 = np.sum(f0_zw*self.grid.integration_weights)
+        #print("sigma_1_0",sigma_1_0)
 
         z = np.zeros_like(self.grid.z)
         z[:] = self.grid.z[:] - self.r_equimolar
 
-        print("gamma",self.surface_tension(reduced_unit=False))
+        #print("gamma",self.surface_tension(reduced_unit=False))
         sgn = 1.0 if self.bulk.liquid_is_right() else -1.0
-        sigma_1_1 = sgn*np.sum(omega_a*z)*g
-        print("sigma_1_1",sigma_1_1)
-        self.sigma1 = sigma_1_0 + sigma_1_1
-        print("sigma_1",sigma_1)
-        print("sigma_0",sigma_0)
-        self.tolman = -self.sigma1/sigma_0/g
+        sigma_1_1 = sgn*np.sum(omega_a*z)*2.0
+        #print("sigma_1_1",sigma_1_1)
+        print("contrib",sigma_1_0/sigma_0/2.0,sigma_1_1/sigma_0/2.0)
+        self.sigma_1 = -(sigma_1_0 + sigma_1_1)
+        #print("sigma_1",self.sigma_1)
+        #print("sigma_0",sigma_0)
+        self.tolman = self.sigma_1/sigma_0/2.0
         print("d_tolman_sphere",self.tolman)
 
         print("ads",self.get_adsorption_vector(self.r_equimolar))
@@ -186,8 +201,11 @@ class CurvatureExpansionInterface(PlanarInterface):
         delta_rho1 = np.zeros_like(mu_1)
         delta_rho1[:] = self.bulk1.reduced_density_left - self.bulk1.reduced_density_right
 
-        mu_2[:] = ((g - 1)*self.sigma1 - np.sum((gamma0 + 0.5*delta_rho1)*mu_1))/(g*sigma0)*mu_1
-        mu_2_c[:] = -(np.sum((gamma0 + 0.5*delta_rho1)*mu_1_c))/sigma0*mu_1_c
+        print(np.sum((gamma_0 + 0.5*delta_rho1)*mu_1))
+        mu_2[:] = (self.sigma_1 - np.sum((gamma_0 + 0.5*delta_rho1)*mu_1))/(2.0*sigma_0)*mu_1
+        mu_2_c[:] = -(np.sum((gamma_0 + 0.5*delta_rho1)*mu_1_c))/sigma_0*mu_1_c
+
+        print(mu_2,mu_2_c)
 
         # Convolve for (rho_0 * w_tilde_p)
         conv_rho_0_w_tilde_p = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
@@ -204,7 +222,8 @@ class CurvatureExpansionInterface(PlanarInterface):
         # (f0 * (zw))
         f0_conv_zw = self.convolver1.comp_differentials0
         # f1
-        f1 = self.convolver1.comp_differentials
+        #f1 = self.convolver1.comp_differentials
+        f1_zw = self.convolver.get_differential_sum(rho_0_zw)
 
         # Calculate total adsorption for planar profile
         rho0_left = self.bulk.reduced_density_left
@@ -214,8 +233,8 @@ class CurvatureExpansionInterface(PlanarInterface):
         l_right = self.grid.z_edge[-1] - self.r_equimolar
         rho0_E_z_int = np.zeros_like(rho0_left)
         for ic in range(self.functional.nc):
-            rho0_E_z_int[i] = np.sum(z*self.profile.densities[ic][:]*self.grid.integration_weights[:]) \
-                - 0.5*rho0_left[i]*l_left**2 - 0.5*rho0_right[i]*l_right**2
+            rho0_E_z_int[ic] = np.sum(z*self.profile.densities[ic][:]*self.grid.integration_weights[:]) \
+                + 0.5*rho0_left[ic]*l_left**2 - 0.5*rho0_right[ic]*l_right**2
 
         # TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # SCALING???? beta
@@ -223,9 +242,12 @@ class CurvatureExpansionInterface(PlanarInterface):
         for ic in range(self.functional.nc):
             sum_rho1_f0_zw[:] -= self.profile1.densities[ic]*f0_conv_zw[ic].corr
 
+        print("0",- 0.25*np.sum(sum_rho1_f0_zw*self.grid.integration_weights), -0.25*np.sum(f0_w_tilde_p*self.grid.integration_weights), - 2.0*np.sum(mu_2_c*gamma_0) , - 0.25*np.sum(mu_1*gamma_1))
+        print(np.shape(f1_zw), np.shape(rho_0_zw))
+        print(- 0.25*np.sum(f1_zw*self.grid.integration_weights))
         self.helfrich_k = -0.25*np.sum(f0_w_tilde_p*self.grid.integration_weights) \
             - 0.25*np.sum(sum_rho1_f0_zw*self.grid.integration_weights) \
-            - 0.25*np.sum(f1*rho_0_zw*self.grid.integration_weights) \
+            - 0.25*np.sum(f1_zw*self.grid.integration_weights) \
             - 0.5*np.sum(mu_1*rho0_E_z_int) - 2.0*np.sum(mu_2_c*gamma_0) \
             - 0.25*np.sum(mu_1*gamma_1)
         self.helfrich_k_bar = np.sum(omega_a*z*z) \
@@ -233,6 +255,8 @@ class CurvatureExpansionInterface(PlanarInterface):
             - np.sum(f0_zw*z*self.grid.integration_weights) \
             + np.sum((4*mu_2_c - mu_2)*gamma_0)
 
+        print(self.helfrich_k, self.helfrich_k_bar)
+        sys.exit()
         # Convert to real units
         eps = self.functional.thermo.eps_div_kb[0] * KB
         self.sigma_1 *= eps / self.functional.grid_reducing_lenght
