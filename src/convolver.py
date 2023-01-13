@@ -1188,6 +1188,7 @@ class CurvatureExpansionConvolver(Convolver):
                                                                       ms=functional.thermo.m[i],
                                                                       nc=functional.nc))
             self.comp_differentials0[i] += self.comp_differentials[i]
+            self.comp_differentials0[i].update_after_convolution()
             self.comp_differentials[i].set_second_order_functional_differentials(self.functional, i)
 
     def convolve_densities_and_differentials(self, rho):

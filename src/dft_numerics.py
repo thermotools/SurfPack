@@ -17,7 +17,7 @@ class dft_solver_param():
     """
     """
 
-    def __init__(self, algorithm=DftSolver.ANDERSON, beta=0.05, tolerance=1.0e-10, max_iter=200,
+    def __init__(self, algorithm=DftSolver.ANDERSON, beta=0.05, tolerance=1.0e-12, max_iter=200,
                  ensure_positive_x=True, ng_frequency=None, mmax=50):
         """Paramater class for dft solver
 
@@ -85,7 +85,7 @@ class dft_solver():
         return x_sol, converged, iterations
 
     def picard(self,
-               tolerance=1.0e-10,
+               tolerance=1.0e-12,
                max_iter=200,
                beta=0.15,
                ensure_positive_x=False,
@@ -108,7 +108,7 @@ class dft_solver():
         return self
 
     def anderson(self,
-                 tolerance=1.0e-10,
+                 tolerance=1.0e-12,
                  max_iter=200,
                  beta=0.05,
                  ensure_positive_x=False,
@@ -132,7 +132,7 @@ class dft_solver():
 
 
 def anderson_acceleration(residual, x0, mmax=50, beta=0.05,
-                          tolerance=1.0e-10, max_iter=200,
+                          tolerance=1.0e-12, max_iter=200,
                           log_iter=False, ensure_positive_x=True):
     """Method solving Picard iteration with Anderson acceleration
 
@@ -306,7 +306,7 @@ class ng_extrapolation():
 
 
 def picard_iteration(residual, x0, max_rel_change=1.0,
-                     tolerance=1.0e-10, max_iter=200, beta=0.15,
+                     tolerance=1.0e-12, max_iter=200, beta=0.15,
                      log_iter=False, ensure_positive_x=False,
                      ng_frequency=None):
     """Method solving Picard iteration
