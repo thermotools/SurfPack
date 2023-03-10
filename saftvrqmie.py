@@ -1,7 +1,7 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
-from pyctp.saftvrqmie import saftvrqmie
-from pyctp.thermopack_state import equilibrium
+from thermopack.saftvrqmie import saftvrqmie
+from thermopack.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 from src.constants import LenghtUnit, Properties
 import sys
@@ -10,19 +10,20 @@ from fmt_functionals import bulk_weighted_densities
 from src.dft_numerics import dft_solver
 import time
 
+
 def test_saftvrqmie_surface_tension():
     """Test saftvrqmie functional"""
 
     # Set up thermopack and equilibrium state
     thermopack = saftvrqmie()
-    thermopack.init("H2,Ne",additive_hard_sphere_reference=True)
+    thermopack.init("H2,Ne", additive_hard_sphere_reference=True)
     T = 24.59
     thermopack.set_tmin(5.0)
-    z=np.array([0.0144,1.0-0.0144])
-    vle = equilibrium.bubble_pressure(thermopack, T, z)
+    z = np.array([0.0144, 1.0-0.0144])
+    vle = Equilibrium.bubble_pressure(thermopack, T, z)
     Tc, _, _ = thermopack.critical(z)
     n_grid = 512
-    domain_size=200.0
+    domain_size = 200.0
 
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
@@ -51,10 +52,10 @@ def test_saftvrqmie_surface_tension():
     # interf.single_convolution()
     # # Test dFdT
     # dFdT = interf.functional.temperature_differential(interf.convolver.weighted_densities)
-    # vle_pt = equilibrium.bubble_pressure(thermopack, T_p, z=np.array([0.4,0.6]))
+    # vle_pt = Equilibrium.bubble_pressure(thermopack, T_p, z=np.array([0.4,0.6]))
     # interf_pt = PlanarInterface.from_profile(vle_pt, interf.profile, domain_size=domain_size, n_grid=n_grid)
     # F_pt = interf_pt.functional.excess_free_energy(interf.convolver.weighted_densities)
-    # vle_mt = equilibrium.bubble_pressure(thermopack, T_m, z=np.array([0.4,0.6]))
+    # vle_mt = Equilibrium.bubble_pressure(thermopack, T_m, z=np.array([0.4,0.6]))
     # interf_mt = PlanarInterface.from_profile(vle_mt, interf.profile, domain_size=domain_size, n_grid=n_grid)
     # F_mt = interf_mt.functional.excess_free_energy(interf.convolver.weighted_densities)
 
@@ -72,6 +73,7 @@ def test_saftvrqmie_surface_tension():
     gamma = interf.surface_tension_real_units()*1.0e3
     print(f"SAFT-VRQ Mie surface tension {gamma} mN/m")
     print(f"SAFT-VRQ Mie (feos) surface tension 4.24514776308888 mN/m")
+
 
 if __name__ == "__main__":
     st = time.process_time()

@@ -2,9 +2,9 @@
 
 import numpy as np
 import sys
-from pyctp.ljs_wca import ljs_uv, ljs_wca
-from pyctp.ljs_bh import ljs_bh
-from pyctp.thermopack_state import equilibrium
+from thermopack.ljs_wca import ljs_uv, ljs_wca
+from thermopack.ljs_bh import ljs_bh
+from thermopack.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 from src.constants import LenghtUnit, NA, KB, Properties
 from src.dft_numerics import dft_solver
@@ -19,8 +19,8 @@ sns.set_style('ticks')
 
 psi_disp = 1.4
 psi_soft_rep = psi_disp
-functional_kwargs={"psi_disp": psi_disp,
-                   "psi_soft_rep": psi_soft_rep}
+functional_kwargs = {"psi_disp": psi_disp,
+                     "psi_soft_rep": psi_soft_rep}
 #functional_kwargs={"psi_disp": psi_disp}
 
 # Dict of all temperatures:
@@ -38,7 +38,7 @@ thermopack.init("Ar")
 T_star = temperature["T_star"]
 T = T_star*thermopack.eps_div_kb[0]
 thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
 
 # Define interface with initial tanh density profile
 interf = PlanarInterface.from_tanh_profile(vle,
@@ -48,8 +48,8 @@ interf = PlanarInterface.from_tanh_profile(vle,
                                            invert_states=False,
                                            functional_kwargs=functional_kwargs)
 
-solver=dft_solver()
-#.picard(tolerance=1.0e-10,max_iter=600,beta=0.05,ng_frequency=None).\
+solver = dft_solver()
+# .picard(tolerance=1.0e-10,max_iter=600,beta=0.05,ng_frequency=None).\
 #    anderson(tolerance=1.0e-10,max_iter=200,beta=0.05)
 
 # Solve for equilibrium profile
@@ -64,7 +64,8 @@ interf.solve(solver=solver, log_iter=True)
 
 sigma = interf.functional.thermo.sigma[0]
 eps = interf.functional.thermo.eps_div_kb[0]*KB
-len_fac = interf.functional.grid_reducing_lenght/interf.functional.thermo.sigma[0]
+len_fac = interf.functional.grid_reducing_lenght / \
+    interf.functional.thermo.sigma[0]
 
 # Load experimental data
 data = np.loadtxt(temperature["filename"], skiprows=1, delimiter=";")
@@ -79,9 +80,12 @@ DATA_U_POT = 7
 z = np.zeros_like(interf.grid.z)
 z[:] = interf.grid.z*len_fac
 rho_star = np.zeros_like(interf.grid.z)
-rho_star[:] = interf.profile.densities[0][:]*(sigma/interf.functional.grid_reducing_lenght)**3
-rho_of_z = interp1d(z, rho_star, kind="cubic", fill_value=(rho_star[0], rho_star[-1]), bounds_error=False)
-z_test = np.linspace(z[0],z[-1],10000)
+rho_star[:] = interf.profile.densities[0][:] * \
+    (sigma/interf.functional.grid_reducing_lenght)**3
+rho_of_z = interp1d(z, rho_star, kind="cubic", fill_value=(
+    rho_star[0], rho_star[-1]), bounds_error=False)
+z_test = np.linspace(z[0], z[-1], 10000)
+
 
 def offset_error(delta_z, rho, z, rho_of_z):
     dz = delta_z[0]
@@ -89,10 +93,12 @@ def offset_error(delta_z, rho, z, rho_of_z):
     error[:] = rho - rho_of_z(z + delta_z)
     return error
 
+
 delta_z = np.array([-15.0])
 data_start = 67
 
-sol = least_squares(offset_error, delta_z, bounds=(- 50, 50), verbose=0, args=(data[data_start:,DATA_RHO], data[data_start:,DATA_X], rho_of_z))
+sol = least_squares(offset_error, delta_z, bounds=(- 50, 50), verbose=0,
+                    args=(data[data_start:, DATA_RHO], data[data_start:, DATA_X], rho_of_z))
 dz = sol.x
 
 # plt.plot(z - dz, rho_star,label=r"DFT 1.4")
@@ -143,8 +149,10 @@ u_E = interf.get_excess_energy_density()
 dz2 = 16
 dh = 1.0
 #plt.plot(z - dz, h_E,label=r"DFT-1.4")
-plt.plot(data[:,DATA_X] - dz2, data[:,DATA_RHO]*(data[:,DATA_H] - data[:,DATA_T]), label=r"MD", color="tab:blue",lw=3)
-plt.plot(z - dz - dz2, h_E + dh*rho_star,label=r"DFT", linestyle="--", color="orange",lw=3)
+plt.plot(data[:, DATA_X] - dz2, data[:, DATA_RHO]*(data[:, DATA_H] -
+         data[:, DATA_T]), label=r"MD", color="tab:blue", lw=3)
+plt.plot(z - dz - dz2, h_E + dh*rho_star, label=r"DFT",
+         linestyle="--", color="orange", lw=3)
 plt.text(5, -1.5, 'Vapor-phase')
 plt.text(35, -1.5, 'Liquid-phase')
 plt.xlim([0, 55.0])

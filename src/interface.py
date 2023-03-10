@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
+from abc import ABC, abstractmethod
+import matplotlib.pyplot as plt
+import numpy as np
+from saftvrmie_functional import saftvrmie_functional, saftvrqmie_functional
+from ljs_functional import ljs_bh_functional, ljs_wca_functional, ljs_uv_functional
+from pets_functional import PeTS_functional
+from pcsaft_functional import pc_saft
+from thermopack.thermopack_state import State, Equilibrium
+from thermopack.pets import pets
+from thermopack.ljs_wca import ljs_wca, ljs_uv
+from thermopack.ljs_bh import ljs_bh
+from thermopack.saftvrqmie import saftvrqmie
+from thermopack.saftvrmie import saftvrmie
+from thermopack.pcsaft import pcsaft
+from convolver import Convolver
+from grid import Grid
+from density_profile import Profile
+from bulk import Bulk
+from constants import NA, KB, Geometry, Specification, LenghtUnit, LCOLORS, Properties, get_property_label
+from dft_numerics import dft_solver
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from dft_numerics import dft_solver
-from constants import NA, KB, Geometry, Specification, LenghtUnit, LCOLORS, Properties, get_property_label
-from bulk import Bulk
-from density_profile import Profile
-from grid import Grid
-from convolver import Convolver
-from pyctp.pcsaft import pcsaft
-from pyctp.saftvrmie import saftvrmie
-from pyctp.saftvrqmie import saftvrqmie
-from pyctp.ljs_bh import ljs_bh
-from pyctp.ljs_wca import ljs_wca, ljs_uv
-from pyctp.pets import pets
-from pyctp.thermopack_state import state, equilibrium
-from pcsaft_functional import pc_saft
-from pets_functional import PeTS_functional
-from ljs_functional import ljs_bh_functional, ljs_wca_functional, ljs_uv_functional
-from saftvrmie_functional import saftvrmie_functional, saftvrqmie_functional
-import numpy as np
-import matplotlib.pyplot as plt
-from abc import ABC, abstractmethod
+
 
 class Interface(ABC):
     """
@@ -57,21 +58,29 @@ class Interface(ABC):
             raise AssertionError("thermopack model not compatible with FMT")
         # Create functional
         if isinstance(thermopack, pcsaft):
-            self.functional = pc_saft(n_grid, thermopack, t_red, **functional_kwargs)
+            self.functional = pc_saft(
+                n_grid, thermopack, t_red, **functional_kwargs)
         elif isinstance(thermopack, ljs_bh):
-            self.functional = ljs_bh_functional(n_grid, thermopack, t_red, **functional_kwargs)
+            self.functional = ljs_bh_functional(
+                n_grid, thermopack, t_red, **functional_kwargs)
         elif isinstance(thermopack, ljs_wca):
-            self.functional = ljs_wca_functional(n_grid, thermopack, t_red, **functional_kwargs)
+            self.functional = ljs_wca_functional(
+                n_grid, thermopack, t_red, **functional_kwargs)
         elif isinstance(thermopack, ljs_uv):
-            self.functional = ljs_uv_functional(n_grid, thermopack, t_red, **functional_kwargs)
+            self.functional = ljs_uv_functional(
+                n_grid, thermopack, t_red, **functional_kwargs)
         elif isinstance(thermopack, saftvrqmie):
-            self.functional = saftvrqmie_functional(n_grid, thermopack, t_red, **functional_kwargs)
+            self.functional = saftvrqmie_functional(
+                n_grid, thermopack, t_red, **functional_kwargs)
         elif isinstance(thermopack, saftvrmie):
-            self.functional = saftvrmie_functional(n_grid, thermopack, t_red, **functional_kwargs)
+            self.functional = saftvrmie_functional(
+                n_grid, thermopack, t_red, **functional_kwargs)
         elif isinstance(thermopack, pets):
-            self.functional = PeTS_functional(n_grid, thermopack, t_red, **functional_kwargs)
+            self.functional = PeTS_functional(
+                n_grid, thermopack, t_red, **functional_kwargs)
         else:
-            raise TypeError("No DFT functional for thermopack model: " + type(thermopack))
+            raise TypeError(
+                "No DFT functional for thermopack model: " + type(thermopack))
         # Set up grid
         self.grid = Grid(geometry, domain_size, n_grid)
         # Set defaults
@@ -93,7 +102,7 @@ class Interface(ABC):
         n_c = self.functional.nc
         prof = Profile.empty_profile(n_c, n_grid)
         # Make sure boundary cells are set to bulk densities
-        #self.mod_densities.assign_elements(self.densities)
+        # self.mod_densities.assign_elements(self.densities)
         # Calculate weighted densities
         for ic in range(n_c):
             prof.densities[ic][:] = xvec[ic*n_grid:(ic+1)*n_grid]
@@ -140,7 +149,7 @@ class Interface(ABC):
 
         for ic in range(n_c):
             res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.convolver.correlation(ic)[:]
-                       + beta_mu[ic] - self.bulk.beta * self.v_ext[ic][:]) \
+                                                      + beta_mu[ic] - self.bulk.beta * self.v_ext[ic][:]) \
                 + xvec[ic * n_grid:(ic+1)*n_grid]
 
         if self.specification == Specification.NUMBER_OF_MOLES:
@@ -163,7 +172,8 @@ class Interface(ABC):
             self.reset_cache()
             self.n_tot = self.calculate_total_moles()
             # Set up convolver
-            self.convolver = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
+            self.convolver = Convolver(
+                self.grid, self.functional, self.bulk.R, self.bulk.R_T)
             x0 = self.pack_x_vec()
             x_sol, self.converged = solver.solve(
                 x0, self.residual, log_iter)
@@ -188,7 +198,8 @@ class Interface(ABC):
     def single_convolution(self):
         # Set up convolver?
         if not self.convolver:
-            self.convolver = Convolver(self.grid, self.functional, self.bulk.R, self.bulk.R_T)
+            self.convolver = Convolver(
+                self.grid, self.functional, self.bulk.R, self.bulk.R_T)
         # Reset cache
         self.reset_cache()
         # Perform convolution integrals
@@ -230,7 +241,8 @@ class Interface(ABC):
 
         # Calculate chemical potential (excess + ideal)
         self.bulk = Bulk(self.functional, state, state)
-        self.profile = Profile.constant_profile(self.grid, self.bulk, self.v_ext)
+        self.profile = Profile.constant_profile(
+            self.grid, self.bulk, self.v_ext)
         return self
 
     def set_profile(self, vle, profile, invert_states=False):
@@ -317,7 +329,8 @@ class Interface(ABC):
         for i in range(self.functional.nc):
             # Ideal part
             mu_E[:] += self.bulk.reduced_temperature * self.profile.densities[i][:] * \
-                (self.bulk.mu_scaled_beta[i] - np.log(self.profile.densities[i][:]))
+                (self.bulk.mu_scaled_beta[i] -
+                 np.log(self.profile.densities[i][:]))
         return mu_E
 
     @abstractmethod
@@ -339,15 +352,18 @@ class Interface(ABC):
 
         v_left = self.grid.get_volume(self.r_equimolar)
         v_right = self.grid.total_volume - v_left
-        print(v_left,v_right, sum(self.grid.integration_weights)-self.grid.total_volume)
+        print(v_left, v_right, sum(
+            self.grid.integration_weights)-self.grid.total_volume)
         #gamma = np.sum(omega_a) + v_left*self.bulk.red_pressure_left + v_right*self.bulk.red_pressure_right
 
-        delta_omega = np.sum(omega_a) + self.grid.total_volume*self.bulk.red_pressure_right
+        delta_omega = np.sum(omega_a) + self.grid.total_volume * \
+            self.bulk.red_pressure_right
         dp = self.bulk.red_pressure_left - self.bulk.red_pressure_right
         gamma = (3*delta_omega*dp**2/16/np.pi)**(1/3)
         #omega_a += self.bulk.red_pressure_right * self.grid.integration_weights
         #gamma = np.sum(omega_a)
-        print("ratio: ",self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)
+        print(
+            "ratio: ", self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)
         return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
 
     @abstractmethod
@@ -374,7 +390,6 @@ class Interface(ABC):
         gamma = gamma_star * eps / sigma ** 2
         return gamma
 
-
     def calculate_total_moles(self):
         """
         Calculates the overall moles of the system.
@@ -385,7 +400,8 @@ class Interface(ABC):
 
         n_tot = 0.0
         for ic in range(self.functional.nc):
-            n_tot += np.sum(self.profile.densities[ic][:]*self.grid.integration_weights[:])
+            n_tot += np.sum(self.profile.densities[ic]
+                            [:]*self.grid.integration_weights[:])
         return n_tot
 
     def integrate_df_vext(self):
@@ -398,7 +414,7 @@ class Interface(ABC):
         n_c = self.functional.nc
         integral = np.zeros(n_c)
         for ic in range(n_c):
-            integral[ic] = np.sum(self.grid.integration_weights*
+            integral[ic] = np.sum(self.grid.integration_weights *
                                   np.exp(self.convolver.correlation(ic)[:]
                                          - self.bulk.beta * self.v_ext[ic][:]))
         return integral
@@ -444,12 +460,18 @@ class Interface(ABC):
         w_right = self.grid.integration_weights[iR] - w_left
         gamma = np.zeros_like(self.bulk.reduced_density_left)
         for i in range(self.functional.nc):
-            gamma[i] += w_left*(self.profile.densities[i][iR] - self.bulk.reduced_density_left[i])
-            gamma[i] += w_right*(self.profile.densities[i][iR] - self.bulk.reduced_density_right[i])
+            gamma[i] += w_left*(self.profile.densities[i]
+                                [iR] - self.bulk.reduced_density_left[i])
+            gamma[i] += w_right*(self.profile.densities[i]
+                                 [iR] - self.bulk.reduced_density_right[i])
             for j in range(iR):
-                gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_left[i])
-            for j in range(iR+1,self.grid.n_grid):
-                gamma[i] += self.grid.integration_weights[j]*(self.profile.densities[i][j] - self.bulk.reduced_density_right[i])
+                gamma[i] += self.grid.integration_weights[j] * \
+                    (self.profile.densities[i][j] -
+                     self.bulk.reduced_density_left[i])
+            for j in range(iR+1, self.grid.n_grid):
+                gamma[i] += self.grid.integration_weights[j] * \
+                    (self.profile.densities[i][j] -
+                     self.bulk.reduced_density_right[i])
         return gamma
 
     def get_excess_free_energy_density(self, reduced=True):
@@ -463,9 +485,12 @@ class Interface(ABC):
             print("Need profile to calculate free energy density")
             return None
 
-        F = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        F = self.functional.excess_free_energy(
+            self.convolver.weighted_densities)
         if reduced:
-            F *= self.bulk.reduced_temperature*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+            F *= self.bulk.reduced_temperature * \
+                (self.functional.thermo.sigma[0] /
+                 self.functional.grid_reducing_lenght)**3
         else:
             F *= KB*self.bulk.temperature/self.functional.grid_reducing_lenght**3
         return F
@@ -483,7 +508,8 @@ class Interface(ABC):
 
         # Calculate the excess chemical potential
         mu_E = self.sum_rho_excess_chemical_potential()
-        mu_E *= (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+        mu_E *= (self.functional.thermo.sigma[0] /
+                 self.functional.grid_reducing_lenght)**3
         return mu_E
 
     def get_excess_enthalpy_density(self, reduced=True):
@@ -502,7 +528,8 @@ class Interface(ABC):
         h_E = np.zeros(self.grid.n_grid)
         h_E[:] = self.bulk.reduced_temperature*s_E[:] + sum_rho_mu_E[:]
         if not reduced:
-            h_E[:] *= self.functional.thermo.eps_div_kb[0]*KB/self.functional.thermo.sigma[0]**3
+            h_E[:] *= self.functional.thermo.eps_div_kb[0] * \
+                KB/self.functional.thermo.sigma[0]**3
         return h_E
 
     def get_excess_energy_density(self, reduced=True):
@@ -519,7 +546,8 @@ class Interface(ABC):
         s_E = self.get_excess_entropy_density()
         u_E = a_E + s_E*self.bulk.reduced_temperature
         if not reduced:
-            u_E[:] *= self.functional.thermo.eps_div_kb[0]*KB/self.functional.thermo.sigma[0]**3
+            u_E[:] *= self.functional.thermo.eps_div_kb[0] * \
+                KB/self.functional.thermo.sigma[0]**3
         return u_E
 
     def get_excess_entropy_density(self, reduced=True):
@@ -531,15 +559,19 @@ class Interface(ABC):
             return None
 
         if self.s_E is None:
-            f = self.functional.excess_free_energy(self.convolver.weighted_densities)
-            f_T = self.convolver.functional_temperature_differential_convolution(self.profile.densities)
-            vol_fac = (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+            f = self.functional.excess_free_energy(
+                self.convolver.weighted_densities)
+            f_T = self.convolver.functional_temperature_differential_convolution(
+                self.profile.densities)
+            vol_fac = (
+                self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
             s = (- f - self.bulk.temperature * f_T)*vol_fac
             self.s_E = s
         if reduced:
             scaling = 1.0
         else:
-            scaling = self.functional.thermo.Rgas/(NA*self.functional.thermo.sigma[0]**3)
+            scaling = self.functional.thermo.Rgas / \
+                (NA*self.functional.thermo.sigma[0]**3)
         return self.s_E*scaling
 
     def chemical_potential(self, ic=0, properties="IE", reduced=True):
@@ -605,9 +637,9 @@ class Interface(ABC):
         if not grid_unit:
             grid_unit = self.functional.grid_unit
         fig, ax = plt.subplots(1, 1)
-        if grid_unit==LenghtUnit.REDUCED:
+        if grid_unit == LenghtUnit.REDUCED:
             ax.set_xlabel(r"$z/\sigma_{11}$")
-        elif grid_unit==LenghtUnit.ANGSTROM:
+        elif grid_unit == LenghtUnit.ANGSTROM:
             ax.set_xlabel(r"$z$ (Å)")
         if self.functional.grid_unit == LenghtUnit.ANGSTROM and grid_unit == LenghtUnit.REDUCED:
             len_fac = 1.0/(self.functional.thermo.sigma[0]*1e10)
@@ -617,7 +649,8 @@ class Interface(ABC):
         if prop == Properties.RHO:
             dens_fac = np.ones(self.profile.densities.nc)
             if plot_reduced_property:
-                dens_fac *= (self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+                dens_fac *= (self.functional.thermo.sigma[0] /
+                             self.functional.grid_reducing_lenght)**3
                 ax.set_ylabel(r"$\rho^*$")
             else:
                 prop_b_scaling = 1.0e-3
@@ -690,12 +723,15 @@ class Interface(ABC):
 
         if plot_bulk:
             z_b = np.array([self.grid.z[0], self.grid.z[-1]])*len_fac
-            prop_b = self.bulk.get_property(prop, reduced_property=plot_reduced_property)
+            prop_b = self.bulk.get_property(
+                prop, reduced_property=plot_reduced_property)
             if prop == Properties.RHO:
                 for i in range(self.profile.densities.nc):
-                    ax.plot(z_b, prop_b[i,:]*prop_b_scaling, color=LCOLORS[i], marker="o", linestyle="None")
+                    ax.plot(z_b, prop_b[i, :]*prop_b_scaling,
+                            color=LCOLORS[i], marker="o", linestyle="None")
             else:
-                ax.plot(z_b, prop_b*prop_b_scaling, label="Bulk", color=LCOLORS[0], marker="o", linestyle="None")
+                ax.plot(z_b, prop_b*prop_b_scaling, label="Bulk",
+                        color=LCOLORS[0], marker="o", linestyle="None")
 
         if xlim is not None:
             plt.xlim(xlim)
@@ -724,17 +760,22 @@ class Interface(ABC):
         # Test grand potential for bulk phase
         _, omega_a = self.grand_potential()
         omega_a *= 1/self.grid.integration_weights
-        reducing = self.functional.grid_reducing_lenght**3 / (self.functional.thermo.eps_div_kb[0] * KB)
+        reducing = self.functional.grid_reducing_lenght**3 / \
+            (self.functional.thermo.eps_div_kb[0] * KB)
         print("Right state:")
         print(f"  omega={omega_a[-1]}")
         print(f"  pressure: {self.bulk.red_pressure_right}")
-        print(f"  pressure + omega: {self.bulk.red_pressure_right + omega_a[-1]}")
-        print(f"  thermopack pressure: {self.bulk.right_state.pressure()*reducing}")
+        print(
+            f"  pressure + omega: {self.bulk.red_pressure_right + omega_a[-1]}")
+        print(
+            f"  thermopack pressure: {self.bulk.right_state.pressure()*reducing}")
         print("Left state:")
         print(f"  omega={omega_a[0]}")
         print(f"  pressure: {self.bulk.red_pressure_left}")
-        print(f"  pressure + omega: {self.bulk.red_pressure_left + omega_a[0]}")
-        print(f"  thermopack pressure: {self.bulk.left_state.pressure()*reducing}")
+        print(
+            f"  pressure + omega: {self.bulk.red_pressure_left + omega_a[0]}")
+        print(
+            f"  thermopack pressure: {self.bulk.left_state.pressure()*reducing}")
 
     def test_functional_differential(self, alias, eps=1.0e-5, ic=0):
         """ Method intended for debugging functional differentials
@@ -745,30 +786,38 @@ class Interface(ABC):
         """
         self.single_convolution()
         # Evaluate differential
-        self.convolver.functional.differentials(self.convolver.weighted_densities)
+        self.convolver.functional.differentials(
+            self.convolver.weighted_densities)
         diff = np.zeros(self.grid.n_grid)
         if alias == "rho":
             diff[:] = self.functional.mu_of_rho[:, ic]
         else:
             diff[:] = self.functional.diff[alias][:, ic]
         # Perturbate density
-        n,ni = self.convolver.weighted_densities.perturbate(alias=alias,eps=-eps,ic=ic)
+        n, ni = self.convolver.weighted_densities.perturbate(
+            alias=alias, eps=-eps, ic=ic)
         n0 = np.zeros_like(n)
         n0[:] = n
-        Fm = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        Fm = self.functional.excess_free_energy(
+            self.convolver.weighted_densities)
         # Reset density
-        self.convolver.weighted_densities.set_density(n,ni,alias=alias,ic=ic)
+        self.convolver.weighted_densities.set_density(
+            n, ni, alias=alias, ic=ic)
         # Perturbate density
-        n,ni = self.convolver.weighted_densities.perturbate(alias=alias,eps=eps,ic=ic)
-        Fp = self.functional.excess_free_energy(self.convolver.weighted_densities)
+        n, ni = self.convolver.weighted_densities.perturbate(
+            alias=alias, eps=eps, ic=ic)
+        Fp = self.functional.excess_free_energy(
+            self.convolver.weighted_densities)
         # Reset density
-        self.convolver.weighted_densities.set_density(n,ni,alias=alias,ic=ic)
+        self.convolver.weighted_densities.set_density(
+            n, ni, alias=alias, ic=ic)
         # Plot differentials
         n_div = n if ni is None else ni
-        plt.plot(self.grid.z,(Fp - Fm)/(2*n_div*eps),label="Numeric")
-        plt.plot(self.grid.z,diff,label="Analytic")
+        plt.plot(self.grid.z, (Fp - Fm)/(2*n_div*eps), label="Numeric")
+        plt.plot(self.grid.z, diff, label="Analytic")
         plt.xlabel("$z$")
-        plt.title("Numerical test of differential for: " + alias + " of component " + str(ic))
+        plt.title("Numerical test of differential for: " +
+                  alias + " of component " + str(ic))
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
         plt.show()
 
@@ -782,7 +831,8 @@ class Interface(ABC):
         eps = self.functional.thermo.eps_div_kb[0]*KB
         Rgas = self.functional.thermo.Rgas
         if reduced:
-            len_fac = self.functional.grid_reducing_lenght/self.functional.thermo.sigma[0]
+            len_fac = self.functional.grid_reducing_lenght / \
+                self.functional.thermo.sigma[0]
             x_label = r"$z/\sigma$"
             energy_scaling = sigma**3/eps
             s_scaling = (NA*sigma**3)/Rgas
@@ -793,7 +843,7 @@ class Interface(ABC):
             x_label = r"$z$ (Å)"
             energy_scaling = 1.0
             s_scaling = 1.0
-            p_scaling = 1.0e-6 # Pa -> MPa
+            p_scaling = 1.0e-6  # Pa -> MPa
 
         s_E = self.get_excess_entropy_density(reduced)
         a_E = self.get_excess_free_energy_density(reduced)
@@ -802,7 +852,7 @@ class Interface(ABC):
         u_E = self.get_excess_energy_density(reduced)
 
         plt.figure()
-        plt.plot(self.grid.z*len_fac, s_E,label=r"Functional")
+        plt.plot(self.grid.z*len_fac, s_E, label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], s_scaling*np.array([self.bulk.left_state.excess_entropy_density()]),
                  label=r"Bulk left", linestyle="None", marker="o")
         plt.plot([self.grid.z[-1]*len_fac], s_scaling*np.array([self.bulk.right_state.excess_entropy_density()]),
@@ -812,7 +862,7 @@ class Interface(ABC):
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
         plt.figure()
-        plt.plot(self.grid.z*len_fac, a_E,label=r"Functional")
+        plt.plot(self.grid.z*len_fac, a_E, label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_free_energy_density()]),
                  label=r"Bulk left", linestyle="None", marker="o")
         plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_free_energy_density()]),
@@ -821,19 +871,22 @@ class Interface(ABC):
         plt.xlabel(x_label)
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
-        mu_b = self.bulk.get_property(Properties.CHEMPOT, reduced_property=False)
+        mu_b = self.bulk.get_property(
+            Properties.CHEMPOT, reduced_property=False)
         for ic in range(self.functional.nc):
-            mu = self.chemical_potential(ic,"IE")
+            mu = self.chemical_potential(ic, "IE")
             plt.figure()
-            plt.plot(self.grid.z*len_fac, mu,label=r"Functional")
-            plt.plot([self.grid.z[0]*len_fac], mu_b[0][ic], label=r"Bulk left", linestyle="None", marker="o")
-            plt.plot([self.grid.z[-1]*len_fac], mu_b[1][ic], label=r"Bulk right", linestyle="None", marker="o")
+            plt.plot(self.grid.z*len_fac, mu, label=r"Functional")
+            plt.plot([self.grid.z[0]*len_fac], mu_b[0][ic],
+                     label=r"Bulk left", linestyle="None", marker="o")
+            plt.plot([self.grid.z[-1]*len_fac], mu_b[1][ic],
+                     label=r"Bulk right", linestyle="None", marker="o")
             plt.ylabel(get_property_label(Properties.CHEMPOT, reduced, ic))
             plt.xlabel(x_label)
             leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
         plt.figure()
-        plt.plot(self.grid.z*len_fac, p,label=r"Functional")
+        plt.plot(self.grid.z*len_fac, p, label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], p_scaling*np.array([self.bulk.left_state.pressure()]),
                  label=r"Bulk left", linestyle="None", marker="o")
         plt.plot([self.grid.z[-1]*len_fac], p_scaling*np.array([self.bulk.right_state.pressure()]),
@@ -843,7 +896,7 @@ class Interface(ABC):
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
         plt.figure()
-        plt.plot(self.grid.z*len_fac, u_E,label=r"Functional")
+        plt.plot(self.grid.z*len_fac, u_E, label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_energy_density()]),
                  label=r"Bulk liquid", linestyle="None", marker="o")
         plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_energy_density()]),
@@ -853,7 +906,7 @@ class Interface(ABC):
         leg = plt.legend(loc="best", numpoints=1, frameon=False)
 
         plt.figure()
-        plt.plot(self.grid.z*len_fac, h_E,label=r"Functional")
+        plt.plot(self.grid.z*len_fac, h_E, label=r"Functional")
         plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_enthalpy_density()]),
                  label=r"Bulk liquid", linestyle="None", marker="o")
         plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_enthalpy_density()]),
@@ -874,7 +927,7 @@ class PlanarInterface(Interface):
                  temperature,
                  domain_size=100.0,
                  n_grid=1024,
-                 specification = Specification.NUMBER_OF_MOLES,
+                 specification=Specification.NUMBER_OF_MOLES,
                  functional_kwargs={}):
         """Class holding specifications for an interface calculation of a planar geometry
 
@@ -981,6 +1034,7 @@ class PlanarInterface(Interface):
         p_parallel = - p_parallel / self.grid.integration_weights
         return p_parallel*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
 
+
 class SphericalInterface(Interface):
     """
     Utility class for simplifying specification of SPHERICAL interface
@@ -992,7 +1046,7 @@ class SphericalInterface(Interface):
                  radius,
                  domain_radius=100.0,
                  n_grid=1024,
-                 specification = Specification.NUMBER_OF_MOLES,
+                 specification=Specification.NUMBER_OF_MOLES,
                  functional_kwargs={}):
         """Class holding specifications for an interface calculation of a spherical geometry
 
@@ -1049,16 +1103,16 @@ class SphericalInterface(Interface):
         print(phase)
         real_radius = radius * sif.functional.grid_reducing_lenght
         print(real_radius)
-        print(vle.vapor.rho,vle.liquid.rho)
+        print(vle.vapor.rho, vle.liquid.rho)
         # Extrapolate chemical potential to first order and solve for phase densiteis
         mu, rho_l, rho_g = \
             sif.functional.thermo.extrapolate_mu_in_inverse_radius(sigma_0=sigma0,
-                                                                    temp=vle.temperature,
-                                                                    rho_l=vle.liquid.rho,
-                                                                    rho_g=vle.vapor.rho,
-                                                                    radius=real_radius,
-                                                                    geometry="SPHERICAL",
-                                                                    phase=phase)
+                                                                   temp=vle.temperature,
+                                                                   rho_l=vle.liquid.rho,
+                                                                   rho_g=vle.vapor.rho,
+                                                                   radius=real_radius,
+                                                                   geometry="SPHERICAL",
+                                                                   phase=phase)
         # Solve Laplace Extrapolate chemical potential to first order and solve for phase densiteis
         mu, rho_l, rho_g = \
             sif.functional.thermo.solve_laplace(sigma_0=sigma0,
@@ -1070,9 +1124,11 @@ class SphericalInterface(Interface):
                                                 phase=phase)
 
         rel_pos_dividing_surface = radius/domain_radius
-        vapor = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
-        liquid = state(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
-        vle_modified = equilibrium(vapor, liquid)
+        vapor = state(eos=vle.eos, T=vle.temperature,
+                      V=1/sum(rho_g), n=rho_g/sum(rho_g))
+        liquid = state(eos=vle.eos, T=vle.temperature,
+                       V=1/sum(rho_l), n=rho_l/sum(rho_l))
+        vle_modified = Equilibrium(vapor, liquid)
         # Set profile based on modefied densities
         sif.tanh_profile(vle=vle_modified,
                          t_crit=t_crit,
@@ -1096,7 +1152,8 @@ class SphericalInterface(Interface):
 
         v_left = self.grid.get_volume(self.r_equimolar)
         v_right = self.grid.total_volume - v_left
-        omega = np.sum(omega_a) + v_left*self.bulk.red_pressure_left + v_right*self.bulk.red_pressure_right
+        omega = np.sum(omega_a) + v_left*self.bulk.red_pressure_left + \
+            v_right*self.bulk.red_pressure_right
         gamma = omega / (4 * np.pi * self.r_equimolar**2)
         return gamma*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**2
 
@@ -1115,7 +1172,8 @@ class SphericalInterface(Interface):
             return
 
         _, omega_a = self.grand_potential()
-        delta_omega = np.sum(omega_a) + self.grid.total_volume*self.bulk.red_pressure_right
+        delta_omega = np.sum(omega_a) + self.grid.total_volume * \
+            self.bulk.red_pressure_right
         dp = self.bulk.red_pressure_left - self.bulk.red_pressure_right
         gamma_s = (3*delta_omega*dp**2/16/np.pi)**(1/3)
         r_s = 2*gamma_s/dp
@@ -1139,6 +1197,7 @@ class SphericalInterface(Interface):
         _, p_parallel = self.grand_potential()
         p_parallel = - p_parallel / self.grid.integration_weights
         return p_parallel*(self.functional.thermo.sigma[0]/self.functional.grid_reducing_lenght)**3
+
 
 if __name__ == "__main__":
     pass

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
+from thermopack.thermopack_state import State
+from thermopack.saftvrqmie import saftvrqmie
+import numpy as np
+from constants import NA, KB, Properties
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import NA, KB, Properties
-import numpy as np
-from pyctp.saftvrqmie import saftvrqmie
-from pyctp.thermopack_state import state
+
 
 class Bulk(object):
     """
@@ -31,28 +32,36 @@ class Bulk(object):
         self.functional = functional
         self.left_state = left_state
         self.right_state = right_state
-        self.particle_diameters, self.particle_diameters_dt = left_state.eos.hard_sphere_diameters(left_state.T)
-        self.R = np.zeros_like(self.particle_diameters) # Particle radius (Reduced)
+        self.particle_diameters, self.particle_diameters_dt = left_state.eos.hard_sphere_diameters(
+            left_state.T)
+        # Particle radius (Reduced)
+        self.R = np.zeros_like(self.particle_diameters)
         self.R[:] = 0.5*self.particle_diameters/functional.grid_reducing_lenght
         self.R_T = np.zeros_like(self.particle_diameters)
-        self.R_T[:] = 0.5*self.particle_diameters_dt/functional.grid_reducing_lenght
+        self.R_T[:] = 0.5*self.particle_diameters_dt / \
+            functional.grid_reducing_lenght
 
         # Temperature
         self.temperature = left_state.T
-        self.reduced_temperature = self.temperature / functional.thermo.eps_div_kb[0]
+        self.reduced_temperature = self.temperature / \
+            functional.thermo.eps_div_kb[0]
         self.beta = 1.0 / self.reduced_temperature
         # Bulk density
-        self.reduced_density_left = self.get_reduced_density(left_state.partial_density())
-        self.reduced_density_right = self.get_reduced_density(right_state.partial_density())
+        self.reduced_density_left = self.get_reduced_density(
+            left_state.partial_density())
+        self.reduced_density_right = self.get_reduced_density(
+            right_state.partial_density())
         # Bulk fractions
-        self.bulk_fractions = self.reduced_density_left/np.sum(self.reduced_density_left)
+        self.bulk_fractions = self.reduced_density_left / \
+            np.sum(self.reduced_density_left)
 
         # Extract normalized chemical potential (multiplied by beta) (mu/kbT)
         self.mu_res_scaled_beta = self.functional.bulk_excess_chemical_potential(
             self.reduced_density_right)
         self.mu_ig_scaled_beta = np.log(self.reduced_density_right)
         self.mu_scaled_beta = self.mu_ig_scaled_beta + self.mu_res_scaled_beta
-        self.real_mu, = functional.thermo.chemical_potential_tv(self.temperature, volume=1.0, n=left_state.partial_density())
+        self.real_mu, = functional.thermo.chemical_potential_tv(
+            self.temperature, volume=1.0, n=left_state.partial_density())
 
         # Test
         # mu_res_left, = functional.thermo.chemical_potential_tv(self.temperature, volume=left_state.v, n=left_state.x, property_flag="R")
@@ -114,7 +123,8 @@ class Bulk(object):
         """
 
         reduced_density = np.zeros_like(partial_density)
-        reduced_density[:] = partial_density*NA*self.functional.grid_reducing_lenght**3
+        reduced_density[:] = partial_density*NA * \
+            self.functional.grid_reducing_lenght**3
         return reduced_density
 
     def get_real_density(self, reduced_density):
@@ -126,23 +136,27 @@ class Bulk(object):
         """
 
         partial_density = np.zeros_like(reduced_density)
-        partial_density[:] = reduced_density/(NA*self.functional.grid_reducing_lenght**3)
+        partial_density[:] = reduced_density / \
+            (NA*self.functional.grid_reducing_lenght**3)
         return partial_density
-
 
     def update_bulk_densities(self, rho_left, rho_right):
         """
         Calculate bulk states from chemical potential and initial guess for densities
         """
         rho_left_real = self.get_real_density(rho_left)
-        rho_left_real = self.functional.thermo.solve_mu_t(self.temperature, self.real_mu, rho_initial=rho_left_real)
+        rho_left_real = self.functional.thermo.solve_mu_t(
+            self.temperature, self.real_mu, rho_initial=rho_left_real)
         self.reduced_density_left[:] = self.get_reduced_density(rho_left_real)
 
         rho_right_real = self.get_real_density(rho_right)
-        rho_right_real = self.functional.thermo.solve_mu_t(self.temperature, self.real_mu, rho_initial=rho_right_real)
-        self.reduced_density_right[:] = self.get_reduced_density(rho_right_real)
+        rho_right_real = self.functional.thermo.solve_mu_t(
+            self.temperature, self.real_mu, rho_initial=rho_right_real)
+        self.reduced_density_right[:] = self.get_reduced_density(
+            rho_right_real)
 
-        self.bulk_fractions = self.reduced_density_left/np.sum(self.reduced_density_left)
+        self.bulk_fractions = self.reduced_density_left / \
+            np.sum(self.reduced_density_left)
 
     def get_property(self, prop, reduced_property=True):
         if not reduced_property:
@@ -177,8 +191,9 @@ class Bulk(object):
         elif prop == Properties.CHEMPOT:
             prop_b = prop_scaling*np.array([self.left_state.excess_chemical_potential()/(self.temperature*self.functional.thermo.Rgas)
                                             + np.log(self.get_reduced_density(self.left_state.x/self.left_state.specific_volume())),
-                                            self.right_state.excess_chemical_potential()/(self.temperature*self.functional.thermo.Rgas)
-                                            + np.log(self.get_reduced_density(self.right_state.x/self.right_state.specific_volume()))])
+                                            self.right_state.excess_chemical_potential(
+            )/(self.temperature*self.functional.thermo.Rgas)
+                + np.log(self.get_reduced_density(self.right_state.x/self.right_state.specific_volume()))])
         elif prop == Properties.CHEMPOT_ID:
             prop_b = prop_scaling*np.array([np.log(self.get_reduced_density(self.left_state.x/self.left_state.specific_volume())),
                                             np.log(self.get_reduced_density(self.right_state.x/self.right_state.specific_volume()))])
@@ -186,9 +201,12 @@ class Bulk(object):
             prop_b = prop_scaling*np.array([self.left_state.excess_chemical_potential(),
                                             self.right_state.excess_chemical_potential()])
         elif prop == Properties.PARALLEL_PRESSURE:
-            prop_b = prop_scaling*np.array([self.left_state.pressure(), self.right_state.pressure()])
+            prop_b = prop_scaling * \
+                np.array([self.left_state.pressure(),
+                         self.right_state.pressure()])
 
         return prop_b
+
 
 if __name__ == "__main__":
     pass

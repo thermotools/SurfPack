@@ -1,20 +1,21 @@
 # Run script for the classical DFT code that interfaces with Thermopack
 import numpy as np
 import sys
-from pyctp.ljs_wca import ljs_uv, ljs_wca
-from pyctp.ljs_bh import ljs_bh
-from pyctp.thermopack_state import phase_diagram, equilibrium
+from thermopack.ljs_wca import ljs_uv, ljs_wca
+from thermopack.ljs_bh import ljs_bh
+from thermopack.thermopack_state import phase_diagram, Equilibrium
 from src.interface import PlanarInterface
 from src.surface_tension_diagram import SurfaceTensionDiagram
 from src.constants import LenghtUnit, NA
 import matplotlib.pyplot as plt
 from scipy.optimize import least_squares
 
+
 def error_function_surf_tens(psi, gamma_star_exp, vle_curve):
     psi_disp = psi[0]
     psi_soft_rep = psi_disp
-    kwargs={"psi_disp": psi_disp,
-            "psi_soft_rep": psi_soft_rep}
+    kwargs = {"psi_disp": psi_disp,
+              "psi_soft_rep": psi_soft_rep}
     diagram = SurfaceTensionDiagram(vle_curve, functional_kwargs=kwargs)
     gamma_star = diagram.surface_tension_reduced
     error = np.zeros_like(gamma_star_exp)
@@ -30,15 +31,15 @@ def regress_psi():
     z = np.ones(1)
     vle_list = []
     for i in range(np.shape(data)[0]):
-        T_star = data[i,0]
+        T_star = data[i, 0]
         T = T_star*thermopack.eps_div_kb[0]
-        vle_list.append(equilibrium.bubble_pressure(thermopack, T, z))
+        vle_list.append(Equilibrium.bubble_pressure(thermopack, T, z))
     vle_curve = phase_diagram(vle_list)
-    gamma_star_exp = data[:,1]
+    gamma_star_exp = data[:, 1]
 
     psi = np.ones(1)
     #error = error_function_surf_tens(psi, gamma_star_exp, vle_curve)
-    #print(error)
+    # print(error)
     res_lsq = least_squares(error_function_surf_tens,
                             psi,
                             bounds=(0.9, 1.21),
@@ -56,11 +57,12 @@ def regress_psi():
     print(f"mae={mae:.3f}")
     sys.exit()
 
+
 psi_disp = 1.0002
 psi_soft_rep = psi_disp
-sr_functional_kwargs={"psi_disp": psi_disp,
-                      "psi_soft_rep": psi_soft_rep}
-functional_kwargs={"psi_disp": psi_disp}
+sr_functional_kwargs = {"psi_disp": psi_disp,
+                        "psi_soft_rep": psi_soft_rep}
+functional_kwargs = {"psi_disp": psi_disp}
 
 data = np.loadtxt("surf_tens_ljs.dat", skiprows=1)
 
@@ -79,7 +81,8 @@ thermopack_bh = ljs_bh()
 thermopack_bh.init("Ar")
 thermopack.set_tmin(0.3*thermopack.eps_div_kb)
 curve_bh = phase_diagram.pure_saturation_curve(thermopack_bh, T, n=n)
-diagram_bh = SurfaceTensionDiagram(curve_bh, functional_kwargs=functional_kwargs)
+diagram_bh = SurfaceTensionDiagram(
+    curve_bh, functional_kwargs=functional_kwargs)
 print(diagram_bh.surface_tension_reduced)
 
 # Set up WCA model
@@ -87,13 +90,17 @@ thermopack_wca = ljs_wca()
 thermopack_wca.init("Ar")
 thermopack.set_tmin(0.3*thermopack.eps_div_kb)
 curve_wca = phase_diagram.pure_saturation_curve(thermopack_wca, T, n=n)
-diagram_wca = SurfaceTensionDiagram(curve_wca, functional_kwargs=sr_functional_kwargs)
+diagram_wca = SurfaceTensionDiagram(
+    curve_wca, functional_kwargs=sr_functional_kwargs)
 print(diagram_wca.surface_tension_reduced)
 
-plt.plot(data[:,0], data[:,1], marker="o", label=r"MD", linestyle="None")
-plt.plot(curve.temperatures/thermopack.eps_div_kb[0], diagram.surface_tension_reduced, label=r"UV")
-plt.plot(curve_bh.temperatures/thermopack.eps_div_kb[0], diagram_bh.surface_tension_reduced, label=r"BH")
-plt.plot(curve_wca.temperatures/thermopack.eps_div_kb[0], diagram_bh.surface_tension_reduced, label=r"WCA")
+plt.plot(data[:, 0], data[:, 1], marker="o", label=r"MD", linestyle="None")
+plt.plot(curve.temperatures /
+         thermopack.eps_div_kb[0], diagram.surface_tension_reduced, label=r"UV")
+plt.plot(curve_bh.temperatures /
+         thermopack.eps_div_kb[0], diagram_bh.surface_tension_reduced, label=r"BH")
+plt.plot(curve_wca.temperatures /
+         thermopack.eps_div_kb[0], diagram_bh.surface_tension_reduced, label=r"WCA")
 plt.ylabel(r"$\gamma^*$")
 plt.xlabel("$T^*$")
 leg = plt.legend(loc="best", numpoints=1, frameon=False)

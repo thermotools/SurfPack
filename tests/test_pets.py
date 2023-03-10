@@ -1,7 +1,7 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
-from pyctp.pets import pets
-from pyctp.thermopack_state import equilibrium
+from thermopack.pets import pets
+from thermopack.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 #from src.constants import LenghtUnit, NA, KB, Properties
 from pytest import approx
@@ -19,10 +19,11 @@ def test_ljs_surface_tension(inpt):
     T_star = inpt["Ts"]
     T = T_star*thermopack.eps_div_kb[0]
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-    vle = equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
-                                               thermopack.critical_temperature(1),
+                                               thermopack.critical_temperature(
+                                                   1),
                                                domain_size=200.0,
                                                n_grid=512)
 
