@@ -216,6 +216,8 @@ class CurvatureExpansionInterface(PlanarInterface):
         sigma_2 = 2.0*self.helfrich_k + self.helfrich_k_bar
         eps = (sigma_2 + 2*np.sum(mu_2*gamma_0) + np.sum(mu_1*gamma_1))/(2*sigma_0)
         self.profile1 += eps*self.profile_diff
+        
+        print("d_tolman_sphere",self.tolman)
 
         # Convert to real units
         self.tolman *= self.functional.grid_reducing_lenght
