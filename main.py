@@ -5,7 +5,7 @@ import sys
 from thermopack.pcsaft import pcsaft
 from thermopack.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
-from src.constants import LenghtUnit
+from src.constants import LenghtUnit, Properties
 
 # Set up thermopack and equilibrium state
 thermopack = pcsaft()
@@ -21,9 +21,10 @@ interf = PlanarInterface.from_tanh_profile(vle, thermopack.critical_temperature(
 interf.solve(log_iter=True)
 
 # Plot profile
-interf.plot_equilibrium_density_profiles(plot_actual_densities=True,
-                                         plot_equimolar_surface=True,
-                                         unit=LenghtUnit.ANGSTROM)
+interf.plot_property_profiles(prop=Properties.RHO,
+                              plot_reduced_property=False,
+                              plot_equimolar_surface=True,
+                              grid_unit=LenghtUnit.ANGSTROM)
 
 # Surface tension
 print("Surface tension: ", interf.surface_tension_real_units())

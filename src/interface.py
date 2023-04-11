@@ -1124,9 +1124,9 @@ class SphericalInterface(Interface):
                                                 phase=phase)
 
         rel_pos_dividing_surface = radius/domain_radius
-        vapor = state(eos=vle.eos, T=vle.temperature,
+        vapor = State(eos=vle.eos, T=vle.temperature,
                       V=1/sum(rho_g), n=rho_g/sum(rho_g))
-        liquid = state(eos=vle.eos, T=vle.temperature,
+        liquid = State(eos=vle.eos, T=vle.temperature,
                        V=1/sum(rho_l), n=rho_l/sum(rho_l))
         vle_modified = Equilibrium(vapor, liquid)
         # Set profile based on modefied densities

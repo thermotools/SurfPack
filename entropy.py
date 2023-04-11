@@ -114,7 +114,7 @@ plt.clf()
 # plt.show()
 
 s_scaling = 1.0e-6
-s_E = interf.get_excess_entropy_density_real_units()
+s_E = interf.get_excess_entropy_density(reduced=False)
 plt.plot(interf.grid.z, s_E*s_scaling, label=r"$s^{\rm{E}}$ functional")
 plt.plot([interf.grid.z[0]], s_scaling*np.array([vle.liquid.specific_excess_entropy()/vle.liquid.specific_volume()]),
          label=r"$s^{\rm{E}}$ bulk liquid", linestyle="None", marker="o")

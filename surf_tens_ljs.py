@@ -3,7 +3,7 @@ import numpy as np
 import sys
 from thermopack.ljs_wca import ljs_uv, ljs_wca
 from thermopack.ljs_bh import ljs_bh
-from thermopack.thermopack_state import phase_diagram, Equilibrium
+from thermopack.thermopack_state import PhaseDiagram, Equilibrium
 from src.interface import PlanarInterface
 from src.surface_tension_diagram import SurfaceTensionDiagram
 from src.constants import LenghtUnit, NA
@@ -34,7 +34,7 @@ def regress_psi():
         T_star = data[i, 0]
         T = T_star*thermopack.eps_div_kb[0]
         vle_list.append(Equilibrium.bubble_pressure(thermopack, T, z))
-    vle_curve = phase_diagram(vle_list)
+    vle_curve = PhaseDiagram(vle_list)
     gamma_star_exp = data[:, 1]
 
     psi = np.ones(1)
@@ -72,7 +72,7 @@ thermopack = ljs_uv()
 thermopack.init("Ar")
 T = 0.5*thermopack.eps_div_kb[0]
 thermopack.set_tmin(0.3*thermopack.eps_div_kb)
-curve = phase_diagram.pure_saturation_curve(thermopack, T, n=n)
+curve = PhaseDiagram.pure_saturation_curve(thermopack, T, n=n)
 diagram = SurfaceTensionDiagram(curve, functional_kwargs=sr_functional_kwargs)
 print(diagram.surface_tension_reduced)
 
@@ -80,7 +80,7 @@ print(diagram.surface_tension_reduced)
 thermopack_bh = ljs_bh()
 thermopack_bh.init("Ar")
 thermopack.set_tmin(0.3*thermopack.eps_div_kb)
-curve_bh = phase_diagram.pure_saturation_curve(thermopack_bh, T, n=n)
+curve_bh = PhaseDiagram.pure_saturation_curve(thermopack_bh, T, n=n)
 diagram_bh = SurfaceTensionDiagram(
     curve_bh, functional_kwargs=functional_kwargs)
 print(diagram_bh.surface_tension_reduced)
@@ -89,7 +89,7 @@ print(diagram_bh.surface_tension_reduced)
 thermopack_wca = ljs_wca()
 thermopack_wca.init("Ar")
 thermopack.set_tmin(0.3*thermopack.eps_div_kb)
-curve_wca = phase_diagram.pure_saturation_curve(thermopack_wca, T, n=n)
+curve_wca = PhaseDiagram.pure_saturation_curve(thermopack_wca, T, n=n)
 diagram_wca = SurfaceTensionDiagram(
     curve_wca, functional_kwargs=sr_functional_kwargs)
 print(diagram_wca.surface_tension_reduced)
