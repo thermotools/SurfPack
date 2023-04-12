@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+import numpy as np
+from interface import Interface
+from thermopack import pcsaft
+from constants import Geometry
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import Geometry
-from pyctp import pcsaft
-from interface import Interface
-import numpy as np
 
 
 class Pore(Interface):
@@ -49,10 +49,12 @@ class Pore(Interface):
                            functional_kwargs=functional_kwargs)
         self.v_ext = external_potential
 
+
 class SlitPore(Pore):
     """
 
     """
+
     def __init__(self,
                  thermopack,
                  temperature,
@@ -88,7 +90,6 @@ class SlitPore(Pore):
                       n_grid=n_grid,
                       functional_kwargs=functional_kwargs)
 
-
     @staticmethod
     def from_state(state,
                    external_potential,
@@ -112,6 +113,7 @@ class SlitPore(Pore):
                        functional_kwargs=functional_kwargs)
         pif.constant_profile(state)
         return pif
+
 
 class Surface(Pore):
 

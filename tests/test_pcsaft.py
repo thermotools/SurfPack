@@ -1,11 +1,12 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
-from pyctp.pcsaft import pcsaft
-from pyctp.thermopack_state import Equilibrium
+from thermopack.pcsaft import pcsaft
+from thermopack.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 #from src.constants import LenghtUnit, NA, KB, Properties
 from pytest import approx
 import pytest
+
 
 @pytest.mark.parametrize('inpt', [{"T": 111.667, "gamma": 13.794488625002232},
                                   {"T": 150.0, "gamma": 6.209634295335075}])
@@ -20,7 +21,8 @@ def test_pcsaft_dispersion_surface_tension(inpt):
     vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
-                                               thermopack.critical_temperature(1),
+                                               thermopack.critical_temperature(
+                                                   1),
                                                domain_size=200.0,
                                                n_grid=512)
 
@@ -34,11 +36,12 @@ def test_pcsaft_dispersion_surface_tension(inpt):
     # Test result
     assert(gamma == approx(inpt["gamma"], rel=1.0e-6))
 
+
 def test_pcsaft_dispersion_entropy():
     """Test PC-SAFT entropy"""
 
-    domain_size=200.0
-    n_grid=32
+    domain_size = 200.0
+    n_grid = 32
 
     # Set up thermopack and equilibrium state
     thermopack = pcsaft()
@@ -48,7 +51,8 @@ def test_pcsaft_dispersion_entropy():
     vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
-                                               thermopack.critical_temperature(1),
+                                               thermopack.critical_temperature(
+                                                   1),
                                                domain_size=domain_size,
                                                n_grid=n_grid)
 
@@ -82,21 +86,23 @@ def test_pcsaft_dispersion_entropy():
     # Test result
     assert(s == approx(s_num, rel=1.0e-6))
 
+
 def test_pcsaft_chain_entropy():
     """Test PC-SAFT entropy"""
 
-    domain_size=200.0
-    n_grid=32
+    domain_size = 200.0
+    n_grid = 32
 
     # Set up thermopack and equilibrium state
     thermopack = pcsaft()
     thermopack.init("C3")
-    T = 231.036 # NBP
+    T = 231.036  # NBP
     thermopack.set_tmin(0.5*thermopack.eps_div_kb)
     vle = Equilibrium.bubble_pressure(thermopack, T, z=np.ones(1))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
-                                               thermopack.critical_temperature(1),
+                                               thermopack.critical_temperature(
+                                                   1),
                                                domain_size=domain_size,
                                                n_grid=n_grid)
 
@@ -130,6 +136,7 @@ def test_pcsaft_chain_entropy():
     # Test result
     assert(s == approx(s_num, rel=5.0e-6))
 
+
 def test_pcsaft_mixture_surface_tension():
     """Test PC-SAFT mixture functional"""
 
@@ -137,8 +144,8 @@ def test_pcsaft_mixture_surface_tension():
     thermopack.init("C1,N2")
     T = 111.667
     thermopack.set_tmin(100.0)
-    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.array([0.5,0.5]))
-    Tc, _, _ = thermopack.critical(np.array([0.5,0.5]))
+    vle = Equilibrium.bubble_pressure(thermopack, T, z=np.array([0.5, 0.5]))
+    Tc, _, _ = thermopack.critical(np.array([0.5, 0.5]))
     # Define interface with initial tanh density profile
     interf = PlanarInterface.from_tanh_profile(vle,
                                                Tc,

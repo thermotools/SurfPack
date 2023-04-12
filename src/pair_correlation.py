@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
+from grid import Grid
+from profile import Profile
+from bulk import Bulk
+import numpy as np
+import fmt_functionals
+from pore import Pore
+from thermopack import pcsaft
+from convolver import Convolver
+from constants import NA, KB, Geometry, Specification, LenghtUnit
+from dft_numerics import dft_solver
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from dft_numerics import dft_solver
-from constants import NA, KB, Geometry, Specification, LenghtUnit
-from convolver import Convolver
-from pyctp import pcsaft
-from pore import Pore
-import fmt_functionals
-import numpy as np
-from bulk import Bulk
-from profile import Profile
-from grid import Grid
 
 
 class PairCorrelation(Pore):

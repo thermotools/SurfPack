@@ -9,7 +9,7 @@ from bulk import Bulk
 from density_profile import Profile, ProfilePlotter
 from grid import Grid
 from convolver import Convolver, CurvatureExpansionConvolver
-from pyctp.thermopack_state import State, Equilibrium
+from thermopack.thermopack_state import State, Equilibrium
 from weight_functions import ConvType
 import numpy as np
 import matplotlib.pyplot as plt

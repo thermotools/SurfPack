@@ -2,8 +2,8 @@
 
 import numpy as np
 import sys
-from pyctp.pets import pets
-from pyctp.thermopack_state import PhaseDiagram, Equilibrium, State
+from thermopack.pets import pets
+from thermopack.thermopack_state import PhaseDiagram, Equilibrium, State
 from src.constants import LenghtUnit, NA, KB, Properties, Specification
 from src.interface import PlanarInterface, SphericalInterface
 import matplotlib.pyplot as plt

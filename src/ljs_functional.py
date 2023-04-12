@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-import numpy as np
-import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import NA, RGAS, LenghtUnit
+from thermopack.ljs_wca import ljs_wca_base, ljs_wca, ljs_uv
+from thermopack.ljs_bh import ljs_bh
 from pcsaft_functional import saft_dispersion
-from pyctp.ljs_bh import ljs_bh
-from pyctp.ljs_wca import ljs_wca_base, ljs_wca, ljs_uv
+from constants import NA, RGAS, LenghtUnit
+import numpy as np
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+
 
 class ljs_bh_functional(saft_dispersion):
     """
@@ -29,6 +32,7 @@ class ljs_bh_functional(saft_dispersion):
                                  grid_unit=grid_unit)
         self.name += "Lennard-Jones-Spline-BH"
         self.short_name = "LJS-BH"
+
 
 class ljs_wca_base_functional(saft_dispersion):
     """
@@ -56,9 +60,9 @@ class ljs_wca_base_functional(saft_dispersion):
         # Add normalized theta weight
         self.mu_soft_rep = np.zeros((N, ljs.nc))
         self.soft_rep_name = "w_soft_rep"
-        self.wf.add_norm_theta_weight(self.soft_rep_name, kernel_radius=2*psi_soft_rep)
+        self.wf.add_norm_theta_weight(
+            self.soft_rep_name, kernel_radius=2*psi_soft_rep)
         self.diff[self.soft_rep_name] = self.mu_soft_rep
-
 
     def excess_free_energy(self, dens):
         """
@@ -95,11 +99,11 @@ class ljs_wca_base_functional(saft_dispersion):
         saft_dispersion.differentials(self, dens)
 
         # All densities must be positive
-        #prdm = dens.n[self.soft_rep_name] > 0.0  # Positive rho_disp value mask
-        #print(np.shape(dens.n[self.soft_rep_name]))
-        #for i in range(self.nc):
+        # prdm = dens.n[self.soft_rep_name] > 0.0  # Positive rho_disp value mask
+        # print(np.shape(dens.n[self.soft_rep_name]))
+        # for i in range(self.nc):
         #    np.logical_and(prdm, dens.n[self.soft_rep_name][i, :] > 0.0, out=prdm)
-        #print(np.shape(prdm))
+        # print(np.shape(prdm))
         # prdm = dens.rho_disp > 0.0  # Positive rho_disp value mask
         # for i in range(self.nc):
         #     np.logical_and(prdm, dens.rho_disp_array[:, i] > 0.0, out=prdm)
@@ -108,7 +112,7 @@ class ljs_wca_base_functional(saft_dispersion):
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(self.n_grid):
-        #   if prdm[i]:
+            #   if prdm[i]:
             rho_thermo[:] = dens.n[self.soft_rep_name][:, i]
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_n, = self.thermo.a_soft_repulsion(
@@ -137,7 +141,7 @@ class ljs_wca_base_functional(saft_dispersion):
         n = rho_thermo/rho_mix
         a,  = self.thermo.a_soft_repulsion(self.T, V, n)
         phi += rho_mix*a*NA*self.grid_reducing_lenght**3
-        print("phi soft repulsion",rho_mix*a*NA*self.grid_reducing_lenght**3)
+        print("phi soft repulsion", rho_mix*a*NA*self.grid_reducing_lenght**3)
         return phi
 
     def bulk_compressibility(self, rho_b):
@@ -231,15 +235,19 @@ class ljs_wca_base_functional(saft_dispersion):
 
         eps = 1.0e-5
         dT = self.T*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(self.T + dT, V, n, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(self.T - dT, V, n, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(
+            self.T + dT, V, n, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(
+            self.T - dT, V, n, a_t=True, a_v=True, a_n=True)
         print(f"a_T: {a_t}, {(ap-am)/2/dT}")
         print(f"a_TT: {a_tt}, {(ap_t-am_t)/2/dT}")
         print(f"a_TV: {a_tv}, {(ap_v-am_v)/2/dT}")
         print(f"a_Tn: {a_tn}, {(ap_n-am_n)/2/dT}")
         dV = V*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(self.T, V + dV, n, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(self.T, V - dV, n, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(
+            self.T, V + dV, n, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(
+            self.T, V - dV, n, a_t=True, a_v=True, a_n=True)
         print(f"a_V: {a_v}, {(ap-am)/2/dV}")
         print(f"a_VV: {a_vv}, {(ap_v-am_v)/2/dV}")
         print(f"a_TV: {a_tv}, {(ap_t-am_t)/2/dV}")
@@ -247,8 +255,10 @@ class ljs_wca_base_functional(saft_dispersion):
         eps = 1.0e-5
         dn = np.zeros_like(n)
         dn[0] = n[0]*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(self.T, V, n + dn, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(self.T, V, n - dn, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_soft_repulsion(
+            self.T, V, n + dn, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_soft_repulsion(
+            self.T, V, n - dn, a_t=True, a_v=True, a_n=True)
         print(f"a_n: {a_n}, {(ap-am)/2/dn[0]}")
         print(f"a_Vn: {a_vn}, {(ap_v-am_v)/2/dn[0]}")
         print(f"a_Tn: {a_tn}, {(ap_t-am_t)/2/dn[0]}")
@@ -280,6 +290,7 @@ class ljs_uv_functional(ljs_wca_base_functional):
                                          grid_unit=grid_unit)
         self.name += "Lennard-Jones-Spline-UV"
         self.short_name = "LJS-UV"
+
 
 class ljs_wca_functional(ljs_wca_base_functional):
     """

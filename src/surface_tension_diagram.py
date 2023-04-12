@@ -7,7 +7,7 @@ from constants import Geometry, ProfileInit, LenghtUnit, Specification, Properti
 from interface import PlanarInterface, SphericalInterface
 import numpy as np
 import matplotlib.pyplot as plt
-from pyctp.thermopack_state import MetaCurve, Equilibrium, State
+from thermopack.thermopack_state import MetaCurve, Equilibrium, State
 from density_profile import Profile, ProfilePlotter
 from matplotlib.animation import FuncAnimation
 from abc import ABC, abstractmethod
@@ -221,7 +221,7 @@ class SphericalDiagram(InterfaceList):
             liquid = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
             left_state = vapor if calculate_bubble else liquid
             right_state = liquid if calculate_bubble else vapor
-            meta = equilibrium(left_state, right_state)
+            meta = Equilibrium(left_state, right_state)
             profile = Profile()
             profile.copy_profile(spi.profile)
             z_new, r_domain = profile.shift_and_scale(shift=shift,

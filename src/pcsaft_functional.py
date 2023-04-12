@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-import numpy as np
 import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import NA, RGAS, LenghtUnit
 from fmt_functionals import Whitebear, FundamentalMeasureTheory
-from pyctp.pcsaft import pcsaft
-from pyctp.saft import saft
 from weight_functions import WeightFunctionType
+from thermopack.saft import saft
+from thermopack.pcsaft import pcsaft
+from fmt_functionals import Whitebear
+from constants import NA, RGAS, LenghtUnit
+import numpy as np
 
 
 class saft_dispersion(FundamentalMeasureTheory):
@@ -90,7 +91,7 @@ class saft_dispersion(FundamentalMeasureTheory):
         rho_thermo = np.zeros(self.nc)
         V = 1.0
         for i in range(self.n_grid):
-        #   if prdm[i]:
+            #   if prdm[i]:
             rho_thermo[:] = dens.n[self.disp_name][:, i]
             rho_thermo *= 1.0/(NA*self.grid_reducing_lenght**3)
             a, a_n, = self.thermo.a_dispersion(
@@ -249,15 +250,19 @@ class saft_dispersion(FundamentalMeasureTheory):
 
         eps = 1.0e-5
         dT = self.T*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(self.T + dT, V, n, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_dispersion(self.T - dT, V, n, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(
+            self.T + dT, V, n, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_dispersion(
+            self.T - dT, V, n, a_t=True, a_v=True, a_n=True)
         print(f"a_T: {a_t}, {(ap-am)/2/dT}")
         print(f"a_TT: {a_tt}, {(ap_t-am_t)/2/dT}")
         print(f"a_TV: {a_tv}, {(ap_v-am_v)/2/dT}")
         print(f"a_Tn: {a_tn}, {(ap_n-am_n)/2/dT}")
         dV = V*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(self.T, V + dV, n, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_dispersion(self.T, V - dV, n, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(
+            self.T, V + dV, n, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_dispersion(
+            self.T, V - dV, n, a_t=True, a_v=True, a_n=True)
         print(f"a_V: {a_v}, {(ap-am)/2/dV}")
         print(f"a_VV: {a_vv}, {(ap_v-am_v)/2/dV}")
         print(f"a_TV: {a_tv}, {(ap_t-am_t)/2/dV}")
@@ -265,12 +270,15 @@ class saft_dispersion(FundamentalMeasureTheory):
         eps = 1.0e-5
         dn = np.zeros_like(n)
         dn[0] = n[0]*eps
-        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(self.T, V, n + dn, a_t=True, a_v=True, a_n=True)
-        am, am_t, am_v, am_n = self.thermo.a_dispersion(self.T, V, n - dn, a_t=True, a_v=True, a_n=True)
+        ap, ap_t, ap_v, ap_n = self.thermo.a_dispersion(
+            self.T, V, n + dn, a_t=True, a_v=True, a_n=True)
+        am, am_t, am_v, am_n = self.thermo.a_dispersion(
+            self.T, V, n - dn, a_t=True, a_v=True, a_n=True)
         print(f"a_n: {a_n}, {(ap-am)/2/dn[0]}")
         print(f"a_Vn: {a_vn}, {(ap_v-am_v)/2/dn[0]}")
         print(f"a_Tn: {a_tn}, {(ap_t-am_t)/2/dn[0]}")
         print(f"a_nn: {a_nn}, {(ap_n-am_n)/2/dn[0]}")
+
 
 class pc_saft(saft_dispersion):
     """
@@ -311,7 +319,8 @@ class pc_saft(saft_dispersion):
             # Add normalized theta weight
             self.mu_rho_hc = np.zeros((N, pcs.nc))
             self.rho_hc_name = "w_rho_hc"
-            self.wf.add_norm_theta_weight(self.rho_hc_name, kernel_radius=2*psi_rho_hc)
+            self.wf.add_norm_theta_weight(
+                self.rho_hc_name, kernel_radius=2*psi_rho_hc)
             self.diff[self.rho_hc_name] = self.mu_rho_hc
             # Add dirac delta weight reducing to rho in bulk
             self.mu_lambda_hc = np.zeros((N, pcs.nc))
@@ -345,7 +354,8 @@ class pc_saft(saft_dispersion):
                 for j in range(self.nc):
                     if self.chain_functional_active[j]:
                         rho_j = dens.rho.densities[j][i]
-                        lng_jj, = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1)
+                        lng_jj, = self.thermo.lng_ii(
+                            self.T, volume=V, n=rho_hc_thermo, i=j+1)
                         f_chain = rho_j*(np.log(rho_j) - 1.0)
                         f_chain -= rho_j*(lng_jj + np.log(lambda_hc[j]) - 1.0)
                         f[i] += (self.thermo.m[j]-1.0)*f_chain
@@ -373,14 +383,19 @@ class pc_saft(saft_dispersion):
                 for j in range(self.nc):
                     if self.chain_functional_active[j]:
                         rho_j = dens.rho.densities[j][i]
-                        lng_jj, lng_jj_n, = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_n=True)
-                        lng_jj_n /= (NA*self.grid_reducing_lenght**3) # Reducing unit
+                        lng_jj, lng_jj_n, = self.thermo.lng_ii(
+                            self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_n=True)
+                        # Reducing unit
+                        lng_jj_n /= (NA*self.grid_reducing_lenght**3)
                         # Contribution not to be convolved:
-                        self.mu_of_rho[i, j] += (self.thermo.m[j]-1.0)*(np.log(rho_j) - lng_jj - np.log(lambda_hc[j]) + 1.0)
+                        self.mu_of_rho[i, j] += (self.thermo.m[j]-1.0)*(
+                            np.log(rho_j) - lng_jj - np.log(lambda_hc[j]) + 1.0)
                         # Convolved contributions:
-                        self.mu_lambda_hc[i, j] = -(self.thermo.m[j]-1.0)*rho_j/lambda_hc[j]
+                        self.mu_lambda_hc[i, j] = - \
+                            (self.thermo.m[j]-1.0)*rho_j/lambda_hc[j]
                         for k in range(self.nc):
-                            self.mu_rho_hc[i, k] = -(self.thermo.m[j]-1.0)*rho_j*lng_jj_n[k]
+                            self.mu_rho_hc[i, k] = - \
+                                (self.thermo.m[j]-1.0)*rho_j*lng_jj_n[k]
 
     def bulk_excess_free_energy_density(self, rho_b):
         """
@@ -431,7 +446,8 @@ class pc_saft(saft_dispersion):
             z_r = 0.0
             for j in range(self.nc):
                 if self.chain_functional_active[j]:
-                    lng_jj, lng_jj_V, = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_v=True)
+                    lng_jj, lng_jj_V, = self.thermo.lng_ii(
+                        self.T, volume=V, n=n, i=j+1, lng_v=True)
                     a_V = -(self.thermo.m[j]-1.0)*n[j]*lng_jj_V
                     z_r -= a_V*V
             z += z_r
@@ -459,7 +475,8 @@ class pc_saft(saft_dispersion):
             n = rho_thermo
             for j in range(self.nc):
                 if self.chain_functional_active[j]:
-                    lng_jj, lng_jj_n = self.thermo.lng_ii(self.T, volume=V, n=n, i=j+1, lng_n=True)
+                    lng_jj, lng_jj_n = self.thermo.lng_ii(
+                        self.T, volume=V, n=n, i=j+1, lng_n=True)
                     a_n = rho_thermo[j]*lng_jj_n
                     a_n[j] += lng_jj
                     a_n *= -(self.thermo.m[j]-1.0)
@@ -486,10 +503,10 @@ class pc_saft(saft_dispersion):
                 for j in range(self.nc):
                     if self.chain_functional_active[j]:
                         rho_j = dens.rho.densities[j][i]
-                        lng_jj, lng_jj_t, = self.thermo.lng_ii(self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_t=True)
+                        lng_jj, lng_jj_t, = self.thermo.lng_ii(
+                            self.T, volume=V, n=rho_hc_thermo, i=j+1, lng_t=True)
                         d_T[i] += -(self.thermo.m[j]-1.0)*rho_j*lng_jj_t
         return d_T
-
 
     def test_eos_differentials(self, V, n):
         """
@@ -504,18 +521,22 @@ class pc_saft(saft_dispersion):
             lng, lng_t, lng_v, lng_n, lng_tt, lng_tv, lng_vv, lng_tn, lng_vn, lng_nn = self.thermo.lng_ii(
                 self.T, V, n, 1, lng_t=True, lng_v=True, lng_n=True, lng_tt=True, lng_vv=True,
                 lng_tv=True, lng_tn=True, lng_vn=True, lng_nn=True)
-            print("lng",lng)
+            print("lng", lng)
             eps = 1.0e-5
             dT = self.T*eps
-            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T + dT, V, n, 1, lng_t=True, lng_v=True, lng_n=True)
-            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T - dT, V, n, 1, lng_t=True, lng_v=True, lng_n=True)
+            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(
+                self.T + dT, V, n, 1, lng_t=True, lng_v=True, lng_n=True)
+            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(
+                self.T - dT, V, n, 1, lng_t=True, lng_v=True, lng_n=True)
             print(f"lng_T: {lng_t}, {(lngp-lngm)/2/dT}")
             print(f"lng_TT: {lng_tt}, {(lngp_t-lngm_t)/2/dT}")
             print(f"lng_TV: {lng_tv}, {(lngp_v-lngm_v)/2/dT}")
             print(f"lng_Tn: {lng_tn}, {(lngp_n-lngm_n)/2/dT}")
             dV = V*eps
-            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T, V + dV, n, 1, lng_t=True, lng_v=True, lng_n=True)
-            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T, V - dV, n, 1, lng_t=True, lng_v=True, lng_n=True)
+            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(
+                self.T, V + dV, n, 1, lng_t=True, lng_v=True, lng_n=True)
+            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(
+                self.T, V - dV, n, 1, lng_t=True, lng_v=True, lng_n=True)
             print(f"lng_V: {lng_v}, {(lngp-lngm)/2/dV}")
             print(f"lng_VV: {lng_vv}, {(lngp_v-lngm_v)/2/dV}")
             print(f"lng_TV: {lng_tv}, {(lngp_t-lngm_t)/2/dV}")
@@ -523,8 +544,10 @@ class pc_saft(saft_dispersion):
             eps = 1.0e-5
             dn = np.zeros_like(n)
             dn[0] = n[0]*eps
-            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(self.T, V, n + dn, 1, lng_t=True, lng_v=True, lng_n=True)
-            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(self.T, V, n - dn, 1, lng_t=True, lng_v=True, lng_n=True)
+            lngp, lngp_t, lngp_v, lngp_n = self.thermo.lng_ii(
+                self.T, V, n + dn, 1, lng_t=True, lng_v=True, lng_n=True)
+            lngm, lngm_t, lngm_v, lngm_n = self.thermo.lng_ii(
+                self.T, V, n - dn, 1, lng_t=True, lng_v=True, lng_n=True)
             print(f"lng_n: {lng_n}, {(lngp-lngm)/2/dn[0]}")
             print(f"lng_Vn: {lng_vn}, {(lngp_v-lngm_v)/2/dn[0]}")
             print(f"lng_Tn: {lng_tn}, {(lngp_t-lngm_t)/2/dn[0]}")
@@ -532,14 +555,14 @@ class pc_saft(saft_dispersion):
 
 
 if __name__ == "__main__":
-    #from pyctp.thermopack_state import equilibrium
+    #from thermopack.thermopack_state import Equilibrium
     thermopack = pcsaft()
     thermopack.init("C1,N2")
     T = 111.667
     P = 1.0e5
-    z=np.array([0.5,0.5])
+    z = np.array([0.5, 0.5])
     thermopack.set_tmin(50.0)
-    v, = thermopack.specific_volume(T,P,z,thermopack.LIQPH)
+    v, = thermopack.specific_volume(T, P, z, thermopack.LIQPH)
     func = pc_saft(2,
                    thermopack,
                    T_red=T/thermopack.eps_div_kb[0])

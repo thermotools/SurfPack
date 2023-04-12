@@ -2,8 +2,8 @@
 
 import numpy as np
 import sys
-from pyctp.pcsaft import pcsaft
-from pyctp.thermopack_state import Equilibrium
+from thermopack.pcsaft import pcsaft
+from thermopack.thermopack_state import Equilibrium
 from src.interface import SphericalInterface
 from src.interface import PlanarInterface
 from src.constants import LenghtUnit

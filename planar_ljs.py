@@ -2,9 +2,9 @@
 
 import numpy as np
 import sys
-from pyctp.ljs_wca import ljs_uv, ljs_wca
-from pyctp.ljs_bh import ljs_bh
-from pyctp.thermopack_state import Equilibrium
+from thermopack.ljs_wca import ljs_uv, ljs_wca
+from thermopack.ljs_bh import ljs_bh
+from thermopack.thermopack_state import Equilibrium
 from src.interface import PlanarInterface
 from src.constants import LenghtUnit, NA, KB, Properties
 from src.dft_numerics import dft_solver
@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 
 psi_disp = 1.0
 psi_soft_rep = psi_disp
-functional_kwargs={"psi_disp": psi_disp,
-                   "psi_soft_rep": psi_soft_rep}
+functional_kwargs = {"psi_disp": psi_disp,
+                     "psi_soft_rep": psi_soft_rep}
 
 # Set up thermopack and equilibrium state
 thermopack = ljs_uv()
@@ -31,8 +31,8 @@ interf = PlanarInterface.from_tanh_profile(vle,
                                            invert_states=True,
                                            functional_kwargs=functional_kwargs)
 
-solver=dft_solver()
-#.picard(tolerance=1.0e-10,max_iter=600,beta=0.05,ng_frequency=None).\
+solver = dft_solver()
+# .picard(tolerance=1.0e-10,max_iter=600,beta=0.05,ng_frequency=None).\
 #    anderson(tolerance=1.0e-10,max_iter=200,beta=0.05)
 
 # Solve for equilibrium profile
@@ -42,8 +42,7 @@ interf.solve(solver=solver, log_iter=True)
 interf.plot_property_profiles(plot_reduced_property=True,
                               plot_equimolar_surface=True,
                               plot_bulk=True,
-                              include_legend=True,
-                              grid_unit=LenghtUnit.REDUCED)
+                              include_legend=True)
 
 # Surface tension
 print("Surface tension: ", interf.surface_tension())
@@ -51,7 +50,7 @@ print("Surface tension: ", interf.surface_tension())
 # Perturbate in temperature using density profile from solution
 # eps_T = 1.0e-5
 # T_p = T + eps_T
-# vle_p = equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
+# vle_p = Equilibrium.bubble_pressure(thermopack, T_p, z=np.ones(1))
 # interf_p = PlanarInterface.from_profile(vle_p, interf.profile, domain_size=100.0, n_grid=1024, invert_states=True)
 
 # interf_p.single_convolution()
@@ -66,7 +65,7 @@ print("Surface tension: ", interf.surface_tension())
 # n_soft_rep_p = interf_p.convolver.weighted_densities.n["w_soft_rep"]
 
 # T_m = T - eps_T
-# vle_m = equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
+# vle_m = Equilibrium.bubble_pressure(thermopack, T_m, z=np.ones(1))
 # interf_m = PlanarInterface.from_profile(vle_m, interf.profile, domain_size=100.0, n_grid=1024, invert_states=True)
 # interf_m.single_convolution()
 # F_m = interf_m.get_excess_helmholtz_energy_density()
@@ -137,11 +136,12 @@ print("Surface tension: ", interf.surface_tension())
 
 sigma = interf.functional.thermo.sigma[0]
 eps = interf.functional.thermo.eps_div_kb[0]*KB
-len_fac = interf.functional.grid_reducing_lenght/interf.functional.thermo.sigma[0]
+len_fac = interf.functional.grid_reducing_lenght / \
+    interf.functional.thermo.sigma[0]
 
 s_scaling = NA*sigma**3/interf.functional.thermo.Rgas
 s_E = interf.get_excess_entropy_density()
-plt.plot(interf.grid.z*len_fac, s_E,label=r"Functional")
+plt.plot(interf.grid.z*len_fac, s_E, label=r"Functional")
 plt.plot([interf.grid.z[0]*len_fac], s_scaling*np.array([vle.liquid.specific_excess_entropy()/vle.liquid.specific_volume()]),
          label=r"Bulk liquid", linestyle="None", marker="o")
 plt.plot([interf.grid.z[-1]*len_fac], s_scaling*np.array([vle.vapor.specific_excess_entropy()/vle.vapor.specific_volume()]),
@@ -157,8 +157,7 @@ interf.plot_property_profiles(prop=Properties.ENTROPY,
                               plot_reduced_property=True,
                               plot_equimolar_surface=True,
                               plot_bulk=True,
-                              include_legend=True,
-                              grid_unit=LenghtUnit.REDUCED)
+                              include_legend=True)
 
 
 a_E = interf.get_excess_free_energy_density()
@@ -169,7 +168,7 @@ h_E = interf.get_excess_enthalpy_density()
 u_E = interf.get_excess_energy_density()
 #a_E + T_star*s_E
 
-plt.plot(interf.grid.z*len_fac, p,label=r"Functional")
+plt.plot(interf.grid.z*len_fac, p, label=r"Functional")
 p_scaling = sigma**3/eps
 plt.plot([interf.grid.z[0]*len_fac], p_scaling*np.array([vle.liquid.pressure()]),
          label=r"Bulk liquid", linestyle="None", marker="o")
@@ -186,11 +185,10 @@ interf.plot_property_profiles(prop=Properties.PARALLEL_PRESSURE,
                               plot_reduced_property=True,
                               plot_equimolar_surface=True,
                               plot_bulk=True,
-                              include_legend=True,
-                              grid_unit=LenghtUnit.REDUCED)
+                              include_legend=True)
 
 energy_scaling = sigma**3/eps
-plt.plot(interf.grid.z*len_fac, a_E,label=r"Functional")
+plt.plot(interf.grid.z*len_fac, a_E, label=r"Functional")
 plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_excess_free_energy()/vle.liquid.specific_volume()]),
          label=r"Bulk liquid", linestyle="None", marker="o")
 plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapor.specific_excess_free_energy()/vle.vapor.specific_volume()]),
@@ -206,10 +204,9 @@ interf.plot_property_profiles(prop=Properties.FREE_ENERGY,
                               plot_reduced_property=True,
                               plot_equimolar_surface=True,
                               plot_bulk=True,
-                              include_legend=True,
-                              grid_unit=LenghtUnit.REDUCED)
+                              include_legend=True)
 
-plt.plot(interf.grid.z*len_fac, h_E,label=r"Functional")
+plt.plot(interf.grid.z*len_fac, h_E, label=r"Functional")
 plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_excess_enthalpy()/vle.liquid.specific_volume()]),
          label=r"Bulk liquid", linestyle="None", marker="o")
 plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapor.specific_excess_enthalpy()/vle.vapor.specific_volume()]),
@@ -224,10 +221,9 @@ interf.plot_property_profiles(prop=Properties.ENTHALPY,
                               plot_reduced_property=True,
                               plot_equimolar_surface=True,
                               plot_bulk=True,
-                              include_legend=True,
-                              grid_unit=LenghtUnit.REDUCED)
+                              include_legend=True)
 
-plt.plot(interf.grid.z*len_fac, u_E,label=r"Functional")
+plt.plot(interf.grid.z*len_fac, u_E, label=r"Functional")
 plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_excess_energy()/vle.liquid.specific_volume()]),
          label=r"Bulk liquid", linestyle="None", marker="o")
 plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapor.specific_excess_energy()/vle.vapor.specific_volume()]),
@@ -242,10 +238,9 @@ interf.plot_property_profiles(prop=Properties.ENERGY,
                               plot_reduced_property=True,
                               plot_equimolar_surface=True,
                               plot_bulk=True,
-                              include_legend=True,
-                              grid_unit=LenghtUnit.REDUCED)
+                              include_legend=True)
 
-plt.plot(interf.grid.z*len_fac, sum_rho_mu_E,label=r"Functional")
+plt.plot(interf.grid.z*len_fac, sum_rho_mu_E, label=r"Functional")
 plt.plot([interf.grid.z[0]*len_fac], energy_scaling*vle.liquid.excess_chemical_potential()/vle.liquid.specific_volume(),
          label=r"Bulk liquid", linestyle="None", marker="o")
 plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*vle.vapor.excess_chemical_potential()/vle.vapor.specific_volume(),
@@ -260,15 +255,14 @@ interf.plot_property_profiles(prop=Properties.CHEMPOT_SUM,
                               plot_reduced_property=True,
                               plot_equimolar_surface=True,
                               plot_bulk=True,
-                              include_legend=True,
-                              grid_unit=LenghtUnit.REDUCED)
+                              include_legend=True)
 
 # # Set up Barker-Henderson model
 # bh_functional_kwargs={"psi_disp": psi_disp}
 # thermopack_bh = ljs_bh()
 # thermopack_bh.init("Ar")
 # thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-# vle_bh = equilibrium.bubble_pressure(thermopack_bh, T, z=np.ones(1))
+# vle_bh = Equilibrium.bubble_pressure(thermopack_bh, T, z=np.ones(1))
 
 # # Define interface with initial tanh density profile
 # interf_bh = PlanarInterface.from_tanh_profile(vle_bh,
@@ -290,7 +284,7 @@ interf.plot_property_profiles(prop=Properties.CHEMPOT_SUM,
 # thermopack_wca = ljs_wca()
 # thermopack_wca.init("Ar")
 # thermopack.set_tmin(0.5*thermopack.eps_div_kb)
-# vle_wca = equilibrium.bubble_pressure(thermopack_wca, T, z=np.ones(1))
+# vle_wca = Equilibrium.bubble_pressure(thermopack_wca, T, z=np.ones(1))
 
 # # Define interface with initial tanh density profile
 # interf_wca = PlanarInterface.from_tanh_profile(vle_wca,

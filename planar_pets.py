@@ -2,8 +2,8 @@
 
 import numpy as np
 import sys
-from pyctp.pets import pets
-from pyctp.thermopack_state import PhaseDiagram, Equilibrium
+from thermopack.pets import pets
+from thermopack.thermopack_state import PhaseDiagram, Equilibrium
 from src.constants import LenghtUnit, NA, KB, Properties
 from src.interface import PlanarInterface
 from src.surface_tension_diagram import SurfaceTensionDiagram
@@ -12,25 +12,25 @@ from pets_functional import surface_tension_LJTS
 from dft_numerics import dft_solver
 
 
-#Set up thermopack and equilibrium curve
+# Set up thermopack and equilibrium curve
 thermopack = pets()
 T_star = 0.625
 T = T_star*thermopack.eps_div_kb[0]
 thermopack.set_tmin(0.3*thermopack.eps_div_kb)
 
-# n = 20
-# curve = PhaseDiagram.pure_saturation_curve(thermopack, T, n=n)
-# diagram = SurfaceTensionDiagram(curve)
-# data = surface_tension_LJTS()
+n = 20
+curve = PhaseDiagram.pure_saturation_curve(thermopack, T, n=n)
+diagram = SurfaceTensionDiagram(curve)
+data = surface_tension_LJTS()
 
-# plt.plot(data["T"], data["gamma"], marker="o", label=r"MD", linestyle="None")
-# plt.plot(curve.temperatures/thermopack.eps_div_kb[0], diagram.surface_tension_reduced)
-# plt.ylabel(r"$\gamma^*$")
-# plt.xlabel("$T^*$")
-# leg = plt.legend(loc="best", numpoints=1, frameon=False)
-# plt.savefig("pets_surface_tension.pdf")
-# plt.show()
-
+plt.plot(data["T"], data["gamma"], marker="o", label=r"MD", linestyle="None")
+plt.plot(curve.temperatures /
+         thermopack.eps_div_kb[0], diagram.surface_tension_reduced)
+plt.ylabel(r"$\gamma^*$")
+plt.xlabel("$T^*$")
+leg = plt.legend(loc="best", numpoints=1, frameon=False)
+plt.savefig("pets_surface_tension.pdf")
+plt.show()
 
 # Get surface tension values for article temperatures
 Tv = [0.625, 0.7, 0.741, 0.8, 0.9, 1.0]
@@ -53,7 +53,7 @@ for T_star in Tv:
 
     gamma.append(interf.surface_tension(reduced_unit=True))
 
-    print(interf.get_surface_of_tension(reduced_unit=True))
+    print("surface tension:",interf.get_surface_of_tension(reduced_unit=True))
     sys.exit()
 
 print(gamma)

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-import numpy as np
-import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from constants import NA, RGAS, LenghtUnit
+from thermopack.pets import pets
 from pcsaft_functional import saft_dispersion
-from pyctp.pets import pets
+from constants import NA, RGAS, LenghtUnit
+import numpy as np
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+
 
 class PeTS_functional(saft_dispersion):
     """
