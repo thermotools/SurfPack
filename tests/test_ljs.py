@@ -128,7 +128,5 @@ def test_ljs_properties():
     print(
         f"a_E={a_E[idx]}, h_E={h_E[idx]}, u_E={u_E[idx]}, s_E={s_E[idx]}, p={p[idx]}")
     # Test result
-    # assert((a_E[idx], h_E[idx], u_E[idx], s_E[idx], p[idx]) ==
-    #        approx((-0.63000898, -1.7321974,  -1.1988273,  -0.8125976,  -0.17849772), rel=1.0e-5))
     assert((a_E[idx], h_E[idx], u_E[idx], s_E[idx], p[idx]) ==
-           approx((-0.6209390056, -1.70471010,  -1.178396864,  -0.79636837,  -0.17521502128675914), rel=1.0e-5))
+           approx((-0.63000898, -1.7321974,  -1.1988273,  -0.8125976,  -0.17849772), rel=1.0e-5))

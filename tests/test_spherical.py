@@ -7,7 +7,7 @@ from src.interface import PlanarInterface, SphericalInterface
 from pytest import approx
 import pytest
 
-@pytest.mark.parametrize('inpt', [{"T": 140.0, "gamma": 7.27928381491897, "r_s": 17.669201884529716} ])
+@pytest.mark.parametrize('inpt', [{"T": 140.0, "gamma": 8.08457702550937, "r_s": 25.213970735985264} ])
 def test_pcsaft_dispersion_surface_tension(inpt):
      # Set up thermopack and equilibrium state
     thermopack = pcsaft()

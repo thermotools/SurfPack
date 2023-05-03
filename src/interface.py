@@ -131,7 +131,7 @@ class Interface(ABC):
 
         if self.specification == Specification.NUMBER_OF_MOLES:
             # Convolution integrals for densities
-            self.convolver.convolve_density_profile(profile.densities)
+            self.convolver.convolve_densities_and_differentials(profile.densities)
             integrals = self.integrate_df_vext()
             #exp_beta_mu = np.exp(self.bulk.mu_scaled_beta)
             #denum = np.dot(exp_beta_mu, integrals)
@@ -157,11 +157,6 @@ class Interface(ABC):
                        (1 if self.specification ==
                         Specification.NUMBER_OF_MOLES else 0))
 
-        for ic in range(n_c):
-            res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.convolver.correlation(ic)[:]
-                                                      + beta_mu[ic] - self.bulk.beta * self.v_ext[ic][:]) \
-                                                      + xvec[ic * n_grid:(ic+1)*n_grid]
-
         if self.specification == Specification.NUMBER_OF_MOLES:
             exp_beta_mu = np.exp(beta_mu)
             z_grid = np.zeros(n_c)
@@ -171,6 +166,12 @@ class Interface(ABC):
             res[n_rho:] = z - z_grid
             if not self.grid.geometry == Geometry.PLANAR:
                 beta_mu[:] = np.log(z)
+
+        for ic in range(n_c):
+            res[ic * n_grid:(ic+1)*n_grid] = - np.exp(self.convolver.correlation(ic)[:]
+                                                      + beta_mu[ic] - self.bulk.beta * self.v_ext[ic][:]) \
+                                                      + xvec[ic * n_grid:(ic+1)*n_grid]
+
 
         return res
 
@@ -408,6 +409,7 @@ class Interface(ABC):
             integral[ic] = np.sum(self.grid.integration_weights *
                                   np.exp(self.convolver.correlation(ic)[:]
                                          - self.bulk.beta * self.v_ext[ic][:]))
+
         return integral
 
     def calculate_equimolar_dividing_surface(self):
