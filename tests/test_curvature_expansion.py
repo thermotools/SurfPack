@@ -1,7 +1,7 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
-from pyctp.pcsaft import pcsaft
-from pyctp.thermopack_state import Equilibrium
+from thermopack.pcsaft import pcsaft
+from thermopack.thermopack_state import Equilibrium
 from src.curvature_expansion import CurvatureExpansionInterface
 from pytest import approx
 import pytest

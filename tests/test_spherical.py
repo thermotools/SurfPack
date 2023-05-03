@@ -1,13 +1,13 @@
 """Simple set of (unit)tests for thermopack_dft."""
 import numpy as np
-from pyctp.pcsaft import pcsaft
-from pyctp.thermopack_state import Equilibrium
+from thermopack.pcsaft import pcsaft
+from thermopack.thermopack_state import Equilibrium
 from src.interface import PlanarInterface, SphericalInterface
 #from src.constants import LenghtUnit, NA, KB, Properties
 from pytest import approx
 import pytest
 
-@pytest.mark.parametrize('inpt', [{"T": 140.0, "gamma": 8.077618584439763, "tolman": 0.6114414737046836} ])
+@pytest.mark.parametrize('inpt', [{"T": 140.0, "gamma": 7.27928381491897, "r_s": 17.669201884529716} ])
 def test_pcsaft_dispersion_surface_tension(inpt):
      # Set up thermopack and equilibrium state
     thermopack = pcsaft()
@@ -33,15 +33,15 @@ def test_pcsaft_dispersion_surface_tension(inpt):
     spi.solve()
 
     # Surface tension
-    gamma_s, r_s, tolman = spi.surface_of_tension()
+    gamma_s, r_s = spi.surface_of_tension()
     gamma_s *= 1.0e3
-    tolman *= 1.0e10
-    print(f"Surface of tension: {gamma_s} mN/m")
-    print(f"Tolman length: {tolman} Å")
+    r_s *= 1.0e10
+    print(f"Surface tension: {gamma_s} mN/m")
+    print(f"R_s: {r_s} Å")
 
     # Test result
     assert(gamma_s == approx(inpt["gamma"], rel=1.0e-6))
-    assert(tolman == approx(inpt["tolman"], rel=1.0e-6))
+    assert(r_s == approx(inpt["r_s"], rel=1.0e-6))
 
 
 

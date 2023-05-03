@@ -30,7 +30,7 @@ def test_pcsaft_dispersion_surface_tension(inpt):
     interf.solve()
 
     # Calculate surface tension
-    gamma = interf.surface_tension_real_units()*1.0e3
+    gamma = interf.surface_tension()*1.0e3
     print(f"PC-SAFT surface tension {gamma} mN/m")
 
     # Test result
@@ -155,6 +155,6 @@ def test_pcsaft_mixture_surface_tension():
     interf.solve()
 
     # Calculate surface tension
-    gamma = interf.surface_tension_real_units()*1.0e3
+    gamma = interf.surface_tension()*1.0e3
     print(f"PC-SAFT C1-N2 surface tension {gamma} mN/m")
     assert(gamma == approx(6.634872247359591, rel=1.0e-6))

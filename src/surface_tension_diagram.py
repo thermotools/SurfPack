@@ -380,7 +380,7 @@ class SphericalDiagram(InterfaceList):
         fac = 1.0 if self.phase == self.interfaces[0].functional.thermo.LIQPH else -1.0
         for i in range(n_if):
             if self.interfaces[i].converged:
-                gamma_t[i], r_t[i], delta = self.interfaces[i].surface_of_tension(reduced_unit)
+                gamma_t[i], r_t[i] = self.interfaces[i].surface_of_tension(reduced_unit)
                 mu0[i] = self.interfaces[i].bulk.real_mu[0]
                 dP[i] = fac*(self.interfaces[i].bulk.left_state.pressure() - self.interfaces[i].bulk.right_state.pressure())
                 n_E[i] = self.interfaces[i].n_excess()

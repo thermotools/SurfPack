@@ -396,7 +396,12 @@ class ProfilePlotter(object):
         Returns:
             None
         """
-        self.profile_list = profile_list
+        try:
+            profile_iterator = iter(profile_list)
+            self.profile_list = profile_list
+        except TypeError:
+            self.profile_list = [profile_list]
+
         self.z = z
 
     def plot(self):

@@ -31,7 +31,7 @@ def test_ljs_surface_tension(inpt):
     interf.solve()
 
     # Calculate surface tension
-    gamma = interf.surface_tension()
+    gamma = interf.surface_tension(reduced_unit=True)
     print(f"PeTS surface tension {gamma}")
 
     # Test result

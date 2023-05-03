@@ -923,6 +923,13 @@ class Convolver(object):
             # #     self.comp_wfs[i].wfs[wf].update_dependencies(self.comp_weighted_densities[i])
             # # Account for segments
             # #self.comp_weighted_densities[i].update_after_convolution()
+            # print("n0",self.weighted_densities_T.n["w0"])
+            # print("n1",self.weighted_densities_T.n["w1"])
+            # print("n2",self.weighted_densities_T.n["w2"])
+            # print("n3",self.weighted_densities_T.n["w3"])
+            # print("nv1",self.weighted_densities_T.n["wv1"])
+            # print("nv2",self.weighted_densities_T.n["wv2"])
+            # print("n_disp",self.weighted_densities_T.n["w_disp"])
             # # print("n0",self.comp_weighted_densities[i].n["w0"])
             # # print("n1",self.comp_weighted_densities[i].n["w1"])
             # # print("n2",self.comp_weighted_densities[i].n["w2"])
@@ -949,6 +956,15 @@ class Convolver(object):
         self.convolve_density_profile_T(rho)
         # dfdn
         self.update_functional_differentials()
+        # print("Func")
+        # print(self.comp_differentials[0].d["w0"])
+        # print(self.comp_differentials[0].d["w1"])
+        # print(self.comp_differentials[0].d["w2"])
+        # print(self.comp_differentials[0].d["w3"])
+        # print(self.comp_differentials[0].d["wv1"])
+        # print(self.comp_differentials[0].d["wv2"])
+        # print(self.comp_differentials[0].d["w_disp"])
+        # print("")
         # Sum dfdn*dndT
         for wf in self.comp_wfs[0]:
             if len(np.shape(self.weighted_densities_T.n[wf])) == 1:
@@ -959,6 +975,8 @@ class Convolver(object):
                     f_T[:] +=  self.comp_differentials[i].d[wf][:]*self.weighted_densities_T.n[wf][i, :]
         # dfdT
         dfdT = self.functional.temperature_differential(self.weighted_densities)
+        # print("dfdT",dfdT)
+        # print("F_T",f_T[:])
         f_T[:] += dfdT
 
         return f_T

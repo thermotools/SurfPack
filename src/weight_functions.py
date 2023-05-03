@@ -55,7 +55,7 @@ class WeightFunction(object):
         self.k = Symbol("k", real=True)
         self.prefactor_str = prefactor
         self.prefactor = sympify(prefactor, locals={'R': self.Rs, 'Psi': self.Psi})
-        self.prefactor_R = sympify(prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff("R")
+        self.prefactor_R = sympify(prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff(self.Rs)
         if wf_type == WeightFunctionType.DELTA:
             self.integral = "4.0*pi*R**2*Psi**2"
         elif wf_type == WeightFunctionType.THETA:
@@ -65,8 +65,8 @@ class WeightFunction(object):
         elif wf_type == WeightFunctionType.DELTAVEC:
             self.integral = "2*pi" # Dummy
         self.lamb = sympify(self.integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi})
-        self.lamb_R = sympify(self.integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff("R")
-        self.lamb_RR = sympify(self.integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff("R", 2)
+        self.lamb_R = sympify(self.integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff(self.Rs)
+        self.lamb_RR = sympify(self.integral+"*"+prefactor, locals={'R': self.Rs, 'Psi': self.Psi}).diff(self.Rs, 2)
         self.convolve = convolve
         self.calc_from = calc_from
         # For transformations
@@ -464,9 +464,9 @@ class WeightFunction(object):
             self.w_conv_steady_T = lamb_R
         elif self.wf_type == WeightFunctionType.DELTAVEC:
             if self.lamb_R.evalf(self.accuracy, subs={self.Rs:R, self.Psi:self.kernel_radius}) == 0.0:
-               self.fw_T[:] = 4 * np.pi * self.k_sin_R * R_kernel * spherical_jn(0, self.k_sin_R)
+                self.fw_T[:] = 4 * np.pi * self.k_sin_R * R_kernel * spherical_jn(0, self.k_sin_R)
             else:
-                self.fw_T[:] = self.k_sin_R * spherical_jn(0, self.k_sin_R) + spherical_jn(1, self.k_sin_R)
+                self.fw_T[:] = self.k_sin_R * spherical_jn(0, self.k_sin_R) - spherical_jn(1, self.k_sin_R)
             self.w_conv_steady_T = 0.0
         self.fw_T[:] *= R_T
         self.w_conv_steady_T *= R_T

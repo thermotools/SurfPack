@@ -34,12 +34,10 @@ spi.solve(log_iter=True)
 spi.plot_property_profiles(plot_reduced_property=True,
                            plot_equimolar_surface=True,
                            plot_bulk=True,
-                           include_legend=True,
-                           grid_unit=LenghtUnit.REDUCED)
+                           include_legend=True)
 
 # Surface tension
 print(f"Planar surface tension: {1.0e3*sigma0} mN/m")
-print(f"Surface tension: {1.0e3*spi.surface_tension_real_units()} mN/m")
-gamma_s, r_s, delta = spi.surface_of_tension()
-print(f"Surface of tension: {1.0e3*gamma_s} mN/m")
-print(f"Tolman length: {1.0e10*delta} Å")
+gamma_s, r_s = spi.surface_of_tension()
+print(f"Surface tension: {1.0e3*gamma_s} mN/m")
+print(f"Surface of tension radius: {1.0e10*r_s} Å")

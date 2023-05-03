@@ -133,8 +133,8 @@ class Interface(ABC):
             # Convolution integrals for densities
             self.convolver.convolve_density_profile(profile.densities)
             integrals = self.integrate_df_vext()
-            exp_beta_mu = np.exp(self.bulk.mu_scaled_beta)
-            denum = np.dot(exp_beta_mu, integrals)
+            #exp_beta_mu = np.exp(self.bulk.mu_scaled_beta)
+            #denum = np.dot(exp_beta_mu, integrals)
             z = self.n_tot / integrals
             xvec[n_rho:n_rho + n_c] = z
         return xvec
@@ -200,7 +200,7 @@ class Interface(ABC):
                         for i in range(self.functional.nc):
                             rho_left[i] = self.profile.densities[i][1]
                             rho_right[i] = self.profile.densities[i][-2]
-                        self.bulk.update_densities(rho_left, rho_right)
+                        self.bulk.update_bulk_densities(rho_left, rho_right)
                 self.calculate_equimolar_dividing_surface()
             else:
                 print("Interface solver did not converge")
@@ -379,11 +379,7 @@ class Interface(ABC):
         Returns:
             (float): Surface tension (J/m2)
         """
-        gamma_star = self.surface_tension()
-        eps = self.functional.thermo.eps_div_kb[0] * KB
-        sigma = self.functional.thermo.sigma[0]
-        gamma = gamma_star * eps / sigma ** 2
-        return gamma
+        return self.surface_tension(reduced_unit=False)
 
     def calculate_total_moles(self):
         """
@@ -1325,7 +1321,7 @@ class SphericalInterface(Interface):
                                                                     radius=signed_radius,
                                                                     geometry="SPHERICAL",
                                                                     phase=phase)
-        #print(mu)
+        #print(mu, rho_l, rho_g)
         #sys.exit()
         # Solve Laplace Extrapolate chemical potential to first order and solve for phase densiteis
         # mu, rho_l, rho_g = \
@@ -1443,8 +1439,7 @@ class SphericalInterface(Interface):
 
         Returns:
             (float): Surface tension (reduced or real units)
-            (float): Surface of tension (reduced or real units)
-            (float): Tolman length (reduced or real units)
+            (float): Surface of tension radius (reduced or real units)
         """
 
         if not self.converged:
@@ -1457,18 +1452,15 @@ class SphericalInterface(Interface):
         dp = self.bulk.red_pressure_left - self.bulk.red_pressure_right
         gamma_s = (3*delta_omega*dp**2/16/np.pi)**(1/3)
         r_s = 2*gamma_s/dp
-        delta = self.r_equimolar - r_s
         if reduced:
             sigma = self.functional.thermo.sigma[0]
-            delta *= self.functional.grid_reducing_lenght/sigma
             r_s *= self.functional.grid_reducing_lenght/sigma
             gamma_s *= (sigma/self.functional.grid_reducing_lenght)**2
         else:
             eps = self.functional.thermo.eps_div_kb[0] * KB
             gamma_s *= eps / self.functional.grid_reducing_lenght ** 2
             r_s *= self.functional.grid_reducing_lenght
-            delta *= self.functional.grid_reducing_lenght
-        return gamma_s, r_s, delta
+        return gamma_s, r_s
 
     def parallel_pressure(self, reduced=True):
         """
