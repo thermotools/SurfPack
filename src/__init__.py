@@ -1,5 +1,6 @@
 # Init file for the DFT code
 from . import constants
+from . import utilities
 from . import weight_functions
 from . import dft_numerics
 from . import fmt_functionals
@@ -19,6 +20,7 @@ from . import pets_functional
 from . import surface_tension_diagram
 
 __all__ = ["constants",
+           "utilities",
            "weight_functions",
            "dft_numerics",
            "fmt_functionals",

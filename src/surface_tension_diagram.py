@@ -13,6 +13,8 @@ from matplotlib.animation import FuncAnimation
 from abc import ABC, abstractmethod
 from tqdm import tqdm
 from scipy.interpolate import interp1d
+from utilities import extrapolate_mu_in_inverse_radius
+
 
 class InterfaceList(ABC):
     """
@@ -209,14 +211,14 @@ class SphericalDiagram(InterfaceList):
         for r in tqdm(reversed(radius_list), desc="Looping large radius spheres", total=np.shape(radius_list)[0]):
             sr = r * (-1.0 if calculate_bubble else 1.0)*1e-10
             # Extrapolate chemical potential to first order and solve for phase densiteis
-            mu, rho_l, rho_g = \
-                eos.extrapolate_mu_in_inverse_radius(sigma_0=sigma0,
-                                                     temp=vle.temperature,
-                                                     rho_l=vle.liquid.rho,
-                                                     rho_g=vle.vapor.rho,
-                                                     radius=sr,
-                                                     geometry="SPHERICAL",
-                                                     phase=self.phase)
+            mu, rho_l, rho_g = extrapolate_mu_in_inverse_radius(eos,
+                                                                sigma_0=sigma0,
+                                                                temperature=vle.temperature,
+                                                                rho_l_eq=vle.liquid.rho,
+                                                                rho_g_eq=vle.vapor.rho,
+                                                                radius=sr,
+                                                                geometry=Geometry.SPHERICAL,
+                                                                phase=self.phase)
             vapor = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
             liquid = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
             left_state = vapor if calculate_bubble else liquid
@@ -286,7 +288,7 @@ class SphericalDiagram(InterfaceList):
             profile = Profile()
             profile.copy_profile(spi.profile)
             shift = r_ext - spi.r_equimolar
-            print("shift",shift)
+            #print("shift",shift)
             z_new, r_d = profile.shift_and_scale(shift=shift,
                                                  grid=spi.grid,
                                                  n_grid=n_grid,
@@ -302,8 +304,8 @@ class SphericalDiagram(InterfaceList):
                                                   specification=Specification.CHEMICHAL_POTENTIAL,
                                                   functional_kwargs=functional_kwargs)
             spi.solve(solver=solver, log_iter=log_iter)
-            print("N", spi.n_iter)
-            print("r: ",r_ext, spi.r_equimolar,r_ext-spi.r_equimolar)
+            #print("N", spi.n_iter)
+            #print("r: ",r_ext, spi.r_equimolar,r_ext-spi.r_equimolar)
             #spi.plot_property_profiles(plot_equimolar_surface=True,
             #                           plot_bulk=True)
 
@@ -347,10 +349,10 @@ class SphericalDiagram(InterfaceList):
                                assume_sorted=True)
         dP_new = (left_state.pressure() - right_state.pressure())*fac*sigma**3/eps
         r_new = interplator(np.array([dP_new]))[0]
-        print("r*",r_new*self.interfaces[i].functional.grid_reducing_lenght/sigma)
-        plt.plot(dP, r_e)
-        plt.plot([dP_new], [r_new], linestyle="None", marker="o")
-        plt.show()
+        #print("r*",r_new*self.interfaces[i].functional.grid_reducing_lenght/sigma)
+        #plt.plot(dP, r_e)
+        #plt.plot([dP_new], [r_new], linestyle="None", marker="o")
+        #plt.show()
         return r_new
 
     def plot(self, base_file_name, reduced_unit=False):

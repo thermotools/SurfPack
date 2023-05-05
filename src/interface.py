@@ -23,7 +23,7 @@ from bulk import Bulk
 from constants import NA, KB, Geometry, Specification, LenghtUnit, LCOLORS, Properties, get_property_label
 from dft_numerics import dft_solver
 from weight_functions import ConvType
-
+from utilities import extrapolate_mu_in_inverse_radius
 
 class Interface(ABC):
     """
@@ -1315,16 +1315,15 @@ class SphericalInterface(Interface):
         real_radius = radius * sif.functional.grid_reducing_lenght
         signed_radius = real_radius * (-1.0 if calculate_bubble else 1.0)
         # Extrapolate chemical potential to first order and solve for phase densiteis
-        mu, rho_l, rho_g = \
-            sif.functional.thermo.extrapolate_mu_in_inverse_radius(sigma_0=sigma0,
-                                                                    temp=vle.temperature,
-                                                                    rho_l=vle.liquid.rho,
-                                                                    rho_g=vle.vapor.rho,
-                                                                    radius=signed_radius,
-                                                                    geometry="SPHERICAL",
-                                                                    phase=phase)
+        mu, rho_l, rho_g = extrapolate_mu_in_inverse_radius(sif.functional.thermo,
+                                                            sigma_0=sigma0,
+                                                            temperature=vle.temperature,
+                                                            rho_l_eq=vle.liquid.rho,
+                                                            rho_g_eq=vle.vapor.rho,
+                                                            radius=signed_radius,
+                                                            geometry=Geometry.SPHERICAL,
+                                                            phase=phase)
         #print(mu, rho_l, rho_g)
-        #sys.exit()
         # Solve Laplace Extrapolate chemical potential to first order and solve for phase densiteis
         # mu, rho_l, rho_g = \
         #     sif.functional.thermo.solve_laplace(sigma_0=sigma0,
