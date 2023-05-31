@@ -89,11 +89,11 @@ def get_property_label(prop, reduced, ic=0):
     elif prop == Properties.PARALLEL_PRESSURE:
         label = r"$p_{\parallel}^*$" if reduced else r"$p_{\parallel}$ (MPa)"
     elif prop == Properties.CHEMPOT:
-        label = "$\\mu^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\mu_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
+        label = "$\\mu^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\\mu_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
     elif prop == Properties.CHEMPOT_ID:
-        label = "$\mu_{\rm{I}}^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\mu_{\rm{I}}_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
+        label = "$\\mu_{\\rm{I}}^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\\mu_{\\rm{I}}_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
     elif prop == Properties.CHEMPOT_EX:
-        label = "$\mu_{\rm{E}}^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\mu_{\rm{E}}_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
+        label = "$\\mu_{\\rm{E}}^*_{\\rm{"+str(ic+1)+"}}$" if reduced else "$\\mu_{\\rm{E}}_{\\rm{"+str(ic+1)+"}}$ (J/mol)"
     else:
         raise ValueError("Wrong property in get_property_label")
     return label
