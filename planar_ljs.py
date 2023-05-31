@@ -142,9 +142,9 @@ len_fac = interf.functional.grid_reducing_lenght / \
 s_scaling = NA*sigma**3/interf.functional.thermo.Rgas
 s_E = interf.get_excess_entropy_density()
 plt.plot(interf.grid.z*len_fac, s_E, label=r"Functional")
-plt.plot([interf.grid.z[0]*len_fac], s_scaling*np.array([vle.liquid.specific_excess_entropy()/vle.liquid.specific_volume()]),
+plt.plot([interf.grid.z[0]*len_fac], s_scaling*np.array([vle.liquid.specific_residual_entropy/vle.liquid.specific_volume]),
          label=r"Bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]*len_fac], s_scaling*np.array([vle.vapor.specific_excess_entropy()/vle.vapor.specific_volume()]),
+plt.plot([interf.grid.z[-1]*len_fac], s_scaling*np.array([vle.vapour.specific_residual_entropy/vle.vapour.specific_volume]),
          label=r"Bulk vapour", linestyle="None", marker="o")
 plt.ylabel(r"$s_{\rm{E}}^*$")
 plt.xlabel("$z/\sigma$")
@@ -170,9 +170,9 @@ u_E = interf.get_excess_energy_density()
 
 plt.plot(interf.grid.z*len_fac, p, label=r"Functional")
 p_scaling = sigma**3/eps
-plt.plot([interf.grid.z[0]*len_fac], p_scaling*np.array([vle.liquid.pressure()]),
+plt.plot([interf.grid.z[0]*len_fac], p_scaling*np.array([vle.liquid.pressure]),
          label=r"Bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]*len_fac], p_scaling*np.array([vle.vapor.pressure()]),
+plt.plot([interf.grid.z[-1]*len_fac], p_scaling*np.array([vle.vapour.pressure]),
          label=r"Bulk vapour", linestyle="None", marker="o")
 plt.ylabel(r"$p^*$")
 plt.xlabel("$z/\sigma$")
@@ -189,9 +189,9 @@ interf.plot_property_profiles(prop=Properties.PARALLEL_PRESSURE,
 
 energy_scaling = sigma**3/eps
 plt.plot(interf.grid.z*len_fac, a_E, label=r"Functional")
-plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_excess_free_energy()/vle.liquid.specific_volume()]),
+plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_residual_helmholtz_energy/vle.liquid.specific_volume]),
          label=r"Bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapor.specific_excess_free_energy()/vle.vapor.specific_volume()]),
+plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapour.specific_residual_helmholtz_energy/vle.vapour.specific_volume]),
          label=r"Bulk vapour", linestyle="None", marker="o")
 plt.ylabel(r"$a_{\rm{E}}^*$")
 plt.xlabel("$z/\sigma$")
@@ -207,9 +207,9 @@ interf.plot_property_profiles(prop=Properties.FREE_ENERGY,
                               include_legend=True)
 
 plt.plot(interf.grid.z*len_fac, h_E, label=r"Functional")
-plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_excess_enthalpy()/vle.liquid.specific_volume()]),
+plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_residual_enthalpy/vle.liquid.specific_volume]),
          label=r"Bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapor.specific_excess_enthalpy()/vle.vapor.specific_volume()]),
+plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapour.specific_residual_enthalpy/vle.vapour.specific_volume]),
          label=r"Bulk vapour", linestyle="None", marker="o")
 plt.ylabel(r"$h_{\rm{E}}^*$")
 plt.xlabel("$z/\sigma$")
@@ -224,9 +224,9 @@ interf.plot_property_profiles(prop=Properties.ENTHALPY,
                               include_legend=True)
 
 plt.plot(interf.grid.z*len_fac, u_E, label=r"Functional")
-plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_excess_energy()/vle.liquid.specific_volume()]),
+plt.plot([interf.grid.z[0]*len_fac], energy_scaling*np.array([vle.liquid.specific_residual_energy/vle.liquid.specific_volume]),
          label=r"Bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapor.specific_excess_energy()/vle.vapor.specific_volume()]),
+plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*np.array([vle.vapour.specific_residual_energy/vle.vapour.specific_volume]),
          label=r"Bulk vapour", linestyle="None", marker="o")
 plt.ylabel(r"$u_{\rm{E}}^*$")
 plt.xlabel("$z/\sigma$")
@@ -241,9 +241,9 @@ interf.plot_property_profiles(prop=Properties.ENERGY,
                               include_legend=True)
 
 plt.plot(interf.grid.z*len_fac, sum_rho_mu_E, label=r"Functional")
-plt.plot([interf.grid.z[0]*len_fac], energy_scaling*vle.liquid.excess_chemical_potential()/vle.liquid.specific_volume(),
+plt.plot([interf.grid.z[0]*len_fac], energy_scaling*vle.liquid.residual_chemical_potential/vle.liquid.specific_volume,
          label=r"Bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*vle.vapor.excess_chemical_potential()/vle.vapor.specific_volume(),
+plt.plot([interf.grid.z[-1]*len_fac], energy_scaling*vle.vapour.residual_chemical_potential/vle.vapour.specific_volume,
          label=r"Bulk vapour", linestyle="None", marker="o")
 plt.ylabel(r"$\mu_{\rm{E}}^*$")
 plt.xlabel("$z/\sigma$")

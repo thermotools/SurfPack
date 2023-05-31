@@ -109,10 +109,10 @@ class SurfaceTensionDiagram(InterfaceList):
         self.surface_tension_reduced = []
 
         #
-        t_crit, _, _ = curve.vle_states[0].vapor.eos.critical(curve.vle_states[0].vapor.x)
+        t_crit, _, _ = curve.vle_states[0].vapour.eos.critical(curve.vle_states[0].vapour.molefrac)
         #if geometry == Geometry.PLANAR:
         for state in curve.vle_states:
-            if (abs(t_crit - state.vapor.T) > 1.0e-4):
+            if (abs(t_crit - state.vapour.T) > 1.0e-4):
                 interf = PlanarInterface.from_tanh_profile(state,
                                                            t_crit,
                                                            domain_size=domain_size,
@@ -182,7 +182,7 @@ class SphericalDiagram(InterfaceList):
 
         # Solve for planar interface
         eos = vle.liquid.eos
-        t_crit, _, _ = eos.critical(vle.liquid.x)
+        t_crit, _, _ = eos.critical(vle.liquid.molefrac)
         invert_states = False if calculate_bubble else True
         self.planar_interf = PlanarInterface.from_tanh_profile(vle,
                                                                t_crit,
@@ -196,7 +196,7 @@ class SphericalDiagram(InterfaceList):
         self.is_liquid_right = calculate_bubble
         self.phase = eos.LIQPH if calculate_bubble else eos.VAPPH
         self.is_liquid_bulk = calculate_bubble
-        self.z = vle.liquid.x if calculate_bubble else vle.vapor.x
+        self.z = vle.liquid.molefrac if calculate_bubble else vle.vapour.molefrac
         states = MetaCurve.isothermal(eos, vle.temperature, self.z, n_steps, self.phase)
 
         # Loop large spheres specifiyng particle numbers
@@ -215,14 +215,14 @@ class SphericalDiagram(InterfaceList):
                                                                 sigma_0=sigma0,
                                                                 temperature=vle.temperature,
                                                                 rho_l_eq=vle.liquid.rho,
-                                                                rho_g_eq=vle.vapor.rho,
+                                                                rho_g_eq=vle.vapour.rho,
                                                                 radius=sr,
                                                                 geometry=Geometry.SPHERICAL,
                                                                 phase=self.phase)
-            vapor = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
+            vapour = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_g), n=rho_g/sum(rho_g))
             liquid = State(eos=vle.eos, T=vle.temperature, V=1/sum(rho_l), n=rho_l/sum(rho_l))
-            left_state = vapor if calculate_bubble else liquid
-            right_state = liquid if calculate_bubble else vapor
+            left_state = vapour if calculate_bubble else liquid
+            right_state = liquid if calculate_bubble else vapour
             meta = Equilibrium(left_state, right_state)
             profile = Profile()
             profile.copy_profile(spi.profile)
@@ -230,8 +230,8 @@ class SphericalDiagram(InterfaceList):
                                                       grid=grid,
                                                       n_grid=n_grid_large,
                                                       interpolation="cubic",
-                                                      rho_left=bulk.get_reduced_density(left_state.partial_density()),
-                                                      rho_right=bulk.get_reduced_density(right_state.partial_density()))
+                                                      rho_left=bulk.get_reduced_density(left_state.partial_density),
+                                                      rho_right=bulk.get_reduced_density(right_state.partial_density))
 
             spi = SphericalInterface.from_profile(meta,
                                                   profile,
@@ -282,8 +282,8 @@ class SphericalDiagram(InterfaceList):
             profile.copy_profile(spi.profile)
             r_ext = self.extrapolate_r_equimolar(meta, n_points=10, interpolation="cubic")
 
-            #left_state = vapor if calculate_bubble else liquid
-            #right_state = liquid if calculate_bubble else vapor
+            #left_state = vapour if calculate_bubble else liquid
+            #right_state = liquid if calculate_bubble else vapour
             #meta = equilibrium(left_state, right_state)
             profile = Profile()
             profile.copy_profile(spi.profile)
@@ -328,8 +328,8 @@ class SphericalDiagram(InterfaceList):
         Returns:
             (float): Extrapolated equimolar radius
         """
-        left_state = meta.vapor if self.phase == meta.eos.LIQPH else meta.liquid
-        right_state = meta.liquid if self.phase == meta.eos.LIQPH else meta.vapor
+        left_state = meta.vapour if self.phase == meta.eos.LIQPH else meta.liquid
+        right_state = meta.liquid if self.phase == meta.eos.LIQPH else meta.vapour
         sigma = self.interfaces[0].functional.thermo.sigma[0]
         eps = self.interfaces[0].functional.thermo.eps_div_kb[0] * KB
         temperature = self.interfaces[0].bulk.temperature

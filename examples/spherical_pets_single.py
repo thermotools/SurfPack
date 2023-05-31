@@ -54,7 +54,7 @@ spi = SphericalInterface.from_tanh_profile(vle,
                                            specification = Specification.CHEMICHAL_POTENTIAL) #CHEMICHAL_POTENTIAL, NUMBER_OF_MOLES
 
 
-print(spi.bulk.left_state.chemical_potential(), vle.vapor.chemical_potential())
+print(spi.bulk.left_state.chemical_potential, vle.vapour.chemical_potential)
 
 #spi.plot_property_profiles()
 
@@ -81,7 +81,7 @@ print(sigma0, spi.surface_tension(reduced_unit=False), spi_profile.surface_tensi
 
 print(spi_profile.r_equimolar)
 
-print(spi_profile.bulk.left_state.chemical_potential(), vle.vapor.chemical_potential())
+print(spi_profile.bulk.left_state.chemical_potential, vle.vapour.chemical_potential)
 
 spi.plot_property_profiles()
 

@@ -84,13 +84,13 @@ def extrapolate_mu_in_inverse_radius(eos: thermo,
     rho_l_1[:] = rho_l_eq + np.matmul(1.0/mu_rho_l,mu_1)/radius
     if np.amin(rho_l_1) < 0.0:
         rho_l_1[:] = rho_l_eq
-    rho_l = eos.solve_mu_t(temperature,mu,rho_l_1,phase=eos.LIQPH)
+    rho_l = eos.density_mu_t(temperature,mu,rho_l_1)
 
     # Equation 9 truncated after first order correction
     rho_g_1 = np.zeros(eos.nc)
     rho_g_1[:] = rho_g_eq + np.matmul(1.0/mu_rho_g,mu_1)/radius
     if np.amin(rho_g_1) < 0.0:
         rho_g_1[:] = rho_g_eq
-    rho_g = eos.solve_mu_t(temperature,mu,rho_g_1,phase=eos.LIQPH)
+    rho_g = eos.density_mu_t(temperature,mu,rho_g_1)
 
     return mu, rho_l, rho_g

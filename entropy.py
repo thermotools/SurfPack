@@ -117,9 +117,9 @@ plt.clf()
 s_scaling = 1.0e-6
 s_E = interf.get_excess_entropy_density(reduced=False)
 plt.plot(interf.grid.z, s_E*s_scaling, label=r"$s^{\rm{E}}$ functional")
-plt.plot([interf.grid.z[0]], s_scaling*np.array([vle.liquid.specific_excess_entropy()/vle.liquid.specific_volume()]),
+plt.plot([interf.grid.z[0]], s_scaling*np.array([vle.liquid.specific_residual_entropy/vle.liquid.specific_volume]),
          label=r"$s^{\rm{E}}$ bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]], s_scaling*np.array([vle.vapor.specific_excess_entropy()/vle.vapor.specific_volume()]),
+plt.plot([interf.grid.z[-1]], s_scaling*np.array([vle.vapour.specific_residual_entropy/vle.vapour.specific_volume]),
          label=r"$s^{\rm{E}}$ bulk vapour", linestyle="None", marker="o")
 plt.ylabel(r"$s^{\rm{E}}$ (MJ/m$^3$/K)")
 plt.xlabel("$z$ (Å)")
@@ -130,9 +130,9 @@ plt.show()
 s_scaling = 1.0
 rho = interf.profile.rho_mix/(NA*interf.functional.grid_reducing_lenght**3)
 plt.plot(interf.grid.z, s_E/rho, label=r"$s^{\rm{E}}$ functional")
-plt.plot([interf.grid.z[0]], s_scaling*np.array([vle.liquid.specific_excess_entropy()]),
+plt.plot([interf.grid.z[0]], s_scaling*np.array([vle.liquid.specific_residual_entropy]),
          label=r"$s^{\rm{E}}$ bulk liquid", linestyle="None", marker="o")
-plt.plot([interf.grid.z[-1]], s_scaling*np.array([vle.vapor.specific_excess_entropy()]),
+plt.plot([interf.grid.z[-1]], s_scaling*np.array([vle.vapour.specific_residual_entropy]),
          label=r"$s^{\rm{E}}$ bulk vapour", linestyle="None", marker="o")
 plt.ylabel(r"$s^{\rm{E}}$ (J/mol/K)")
 plt.xlabel("$z$ (Å)")

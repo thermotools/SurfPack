@@ -231,7 +231,7 @@ class Interface(ABC):
             (array): Grand potential contribution for each grid point
         """
 
-        left_state = vle.vapor
+        left_state = vle.vapour
         right_state = vle.liquid
         if invert_states:
             left_state, right_state = right_state, left_state
@@ -268,7 +268,7 @@ class Interface(ABC):
         Returns:
             state (State): Thermodynamic state
         """
-        left_state = vle.vapor
+        left_state = vle.vapour
         right_state = vle.liquid
         if invert_states:
             left_state, right_state = right_state, left_state
@@ -859,14 +859,14 @@ class Interface(ABC):
         print(
             f"  pressure + omega: {self.bulk.red_pressure_right + omega_a[-1]}")
         print(
-            f"  thermopack pressure: {self.bulk.right_state.pressure()*reducing}")
+            f"  thermopack pressure: {self.bulk.right_state.pressure*reducing}")
         print("Left state:")
         print(f"  omega={omega_a[0]}")
         print(f"  pressure: {self.bulk.red_pressure_left}")
         print(
             f"  pressure + omega: {self.bulk.red_pressure_left + omega_a[0]}")
         print(
-            f"  thermopack pressure: {self.bulk.left_state.pressure()*reducing}")
+            f"  thermopack pressure: {self.bulk.left_state.pressure*reducing}")
 
     def test_functional_differential(self, alias, eps=1.0e-5, ic=0):
         """ Method intended for debugging functional differentials
@@ -944,9 +944,9 @@ class Interface(ABC):
 
         plt.figure()
         plt.plot(self.grid.z*len_fac, s_E, label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], s_scaling*np.array([self.bulk.left_state.excess_entropy_density()]),
+        plt.plot([self.grid.z[0]*len_fac], s_scaling*np.array([self.bulk.left_state.residual_entropy_density]),
                  label=r"Bulk left", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], s_scaling*np.array([self.bulk.right_state.excess_entropy_density()]),
+        plt.plot([self.grid.z[-1]*len_fac], s_scaling*np.array([self.bulk.right_state.residual_entropy_density]),
                  label=r"Bulk right", linestyle="None", marker="o")
         plt.ylabel(get_property_label(Properties.ENTROPY, reduced))
         plt.xlabel(x_label)
@@ -954,9 +954,9 @@ class Interface(ABC):
 
         plt.figure()
         plt.plot(self.grid.z*len_fac, a_E, label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_free_energy_density()]),
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.residual_helmholtz_energy_density]),
                  label=r"Bulk left", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_free_energy_density()]),
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.residual_helmholtz_energy_density]),
                  label=r"Bulk right", linestyle="None", marker="o")
         plt.ylabel(get_property_label(Properties.FREE_ENERGY, reduced))
         plt.xlabel(x_label)
@@ -978,9 +978,9 @@ class Interface(ABC):
 
         plt.figure()
         plt.plot(self.grid.z*len_fac, p, label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], p_scaling*np.array([self.bulk.left_state.pressure()]),
+        plt.plot([self.grid.z[0]*len_fac], p_scaling*np.array([self.bulk.left_state.pressure]),
                  label=r"Bulk left", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], p_scaling*np.array([self.bulk.right_state.pressure()]),
+        plt.plot([self.grid.z[-1]*len_fac], p_scaling*np.array([self.bulk.right_state.pressure]),
                  label=r"Bulk right", linestyle="None", marker="o")
         plt.ylabel(get_property_label(Properties.PARALLEL_PRESSURE, reduced))
         plt.xlabel(x_label)
@@ -988,9 +988,9 @@ class Interface(ABC):
 
         plt.figure()
         plt.plot(self.grid.z*len_fac, u_E, label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_energy_density()]),
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.residual_energy_density]),
                  label=r"Bulk liquid", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_energy_density()]),
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.residual_energy_density]),
                  label=r"Bulk vapour", linestyle="None", marker="o")
         plt.ylabel(get_property_label(Properties.ENERGY, reduced))
         plt.xlabel(x_label)
@@ -998,9 +998,9 @@ class Interface(ABC):
 
         plt.figure()
         plt.plot(self.grid.z*len_fac, h_E, label=r"Functional")
-        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.excess_enthalpy_density()]),
+        plt.plot([self.grid.z[0]*len_fac], energy_scaling*np.array([self.bulk.left_state.residual_enthalpy_density]),
                  label=r"Bulk liquid", linestyle="None", marker="o")
-        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.excess_enthalpy_density()]),
+        plt.plot([self.grid.z[-1]*len_fac], energy_scaling*np.array([self.bulk.right_state.residual_enthalpy_density]),
                  label=r"Bulk vapour", linestyle="None", marker="o")
         plt.ylabel(get_property_label(Properties.ENTHALPY, reduced))
         plt.xlabel(x_label)
@@ -1319,7 +1319,7 @@ class SphericalInterface(Interface):
                                                             sigma_0=sigma0,
                                                             temperature=vle.temperature,
                                                             rho_l_eq=vle.liquid.rho,
-                                                            rho_g_eq=vle.vapor.rho,
+                                                            rho_g_eq=vle.vapour.rho,
                                                             radius=signed_radius,
                                                             geometry=Geometry.SPHERICAL,
                                                             phase=phase)

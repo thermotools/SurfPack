@@ -46,7 +46,7 @@ class CurvatureExpansionInterface(PlanarInterface):
                                  n_grid=n_grid,
                                  specification=Specification.NUMBER_OF_MOLES,
                                  functional_kwargs=functional_kwargs)
-        sc = State.critical(vle.eos, vle.liquid.x)
+        sc = State.critical(vle.eos, vle.liquid.molefrac)
         self.tanh_profile(vle, sc.T, invert_states=True)
         self.profile1 = None
         self.bulk1 = None
@@ -88,11 +88,11 @@ class CurvatureExpansionInterface(PlanarInterface):
             self.profile1 = Profile().copy_profile(self.profile)
             self.profile1.shift_and_scale(shift=0.0,
                                           grid=self.grid,
-                                          rho_left=self.bulk1.get_reduced_density(self.bulk1.left_state.partial_density()),
-                                          rho_right=self.bulk1.get_reduced_density(self.bulk1.right_state.partial_density()))
+                                          rho_left=self.bulk1.get_reduced_density(self.bulk1.left_state.partial_density),
+                                          rho_right=self.bulk1.get_reduced_density(self.bulk1.right_state.partial_density))
 
-            delta_rho0=self.bulk.get_reduced_density(self.bulk.left_state.partial_density()) - \
-                self.bulk.get_reduced_density(self.bulk.right_state.partial_density())
+            delta_rho0=self.bulk.get_reduced_density(self.bulk.left_state.partial_density) - \
+                self.bulk.get_reduced_density(self.bulk.right_state.partial_density)
             self.profile_diff = self.profile.delta_rho(self.grid.z, scaling = 1.0/delta_rho0)
             self.convolver1 = CurvatureExpansionConvolver(self.grid,
                                                           self.functional,
