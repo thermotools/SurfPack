@@ -32,6 +32,12 @@ class Functional(metaclass=abc.ABCMeta):
     FAKEPH = 6
 
     def __init__(self, ncomps):
+        """Internal
+        Handles initialisation that is common for all functionals
+
+        Args:
+            ncomps (int) : Number of components
+        """
         self.ncomps = ncomps
         self.weights = []
         if not hasattr(self, 'eos'):
@@ -45,6 +51,18 @@ class Functional(metaclass=abc.ABCMeta):
         self.__load_dir__ = None
 
     def set_save_dir(self, save_dir):
+        """Utility
+        Sets this model to automatically save computed density profiles in the directory 'surfpack/saved_profiles/save_dir'.
+        The names of the saved files are generated from a hash that is guaranteed to be unique for every
+        model and state. Is used in combination with set_load_dir. Note: The save_dir is generated as a sub-directory of
+        the saved_profiles directory within the surfpack package.
+
+        Args:
+            save_dir (str) : Name of directory to save to
+
+        Raises:
+            FileExistsError : If save_dir is the name of an existing file that is not a directory.
+        """
         self.__save_dir__ = f'{os.path.dirname(__file__)}/saved_profiles/{save_dir}'
         if os.path.exists(self.__save_dir__) and not os.path.isdir(self.__save_dir__):
             raise FileExistsError(f"The file at {self.__save_dir__} exists, and is not a directory.")
@@ -52,11 +70,30 @@ class Functional(metaclass=abc.ABCMeta):
             os.makedirs(self.__save_dir__)
 
     def set_load_dir(self, load_dir):
+        """Utility
+        Sets this model to automatically search for computed profiles in `surfpack/saved_profiles/load_dir`. The names of the files are generated
+        by from a hash that ensures a unique file for every model and state.
+
+        Args:
+            load_dir (str) : Name of directory to load files from.
+
+        Raises:
+            NotADirectoryError : If load_dir does not exist.
+        """
         self.__load_dir__ = f'{os.path.dirname(__file__)}/saved_profiles/{load_dir}'
         if not os.path.isdir(self.__load_dir__):
             raise NotADirectoryError(f"Load directory {self.__load_dir__} does not exist.")
 
     def clear_profile_dir(self, clear_dir):
+        """Utility
+        Clear the directory `surfpack/saved_profiles/clear_dir`, after prompting for confirmation.
+
+        Args:
+            clear_dir (str) : The name of the directory.
+
+        Raises:
+            NotADirectoryError : If clear_dir does not exist or is not a directory.
+        """
         clear_dir = f'{os.path.dirname(__file__)}/saved_profiles/{clear_dir}'
         if not os.path.isdir(clear_dir):
             raise NotADirectoryError(f"Directory {clear_dir} does not exist or is not a directory.")
@@ -68,17 +105,32 @@ class Functional(metaclass=abc.ABCMeta):
             os.makedirs(self.__save_dir__)
 
     def validate_composition(self, z):
+        """Internal
+        Check that the composition `z` has length equal to number of components, and sums to one.
+
+        Args:
+            z (Iterable(float)) : The composition
+
+        Raises:
+            IndexError : If number of fractions does not match number of components.
+            ValueError : If fractions do not sum to unity.
+        """
         if len(z) != self.ncomps:
             raise IndexError(f'Number of mole fractions ({len(z)} did not match number of components ({self.ncomps}).')
         elif abs(sum(z) - 1) > 1e-12:
             raise ValueError(f'Mole fractions did not sum to unity but to {sum(z)}.')
 
     @abc.abstractmethod
-    def __repr__(self): pass
+    def __repr__(self):
+        """Internal
+        All Functionals must implement a unique `__repr__`, as these are used to generate the hashes that are used when saving
+        profiles. The `__repr__` should contain a human-readable text with (at least) the name of the model and all model parameters.
+        """
+        pass
 
     @abc.abstractmethod
     def reduced_helmholtz_energy_density(self, *args, **kwargs): pass
-    r"""
+    r"""Helmholtz Energy
     Returns the reduced, residual helmholtz energy density, $\phi$ (i.e. the integrand of eq. 3.4 in "introduction to DFT")
     
     $$\phi = \\frac{a^{res}}{k_B T} $$
@@ -87,40 +139,66 @@ class Functional(metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def get_characteristic_lengths(self): pass
+    def get_characteristic_lengths(self):
+        """Utility
+        Used to generate initial guesses for density profiles. Should return lengths that give an indication of molecular
+        sizes. For example diameters of hard-spheres, or the Barker-Henderson diameter.
+
+        Returns:
+             ndarray(float) : The characteristic length of the molecules.
+        """
+        pass
 
     @abc.abstractmethod
-    def get_weights(self, T): pass
-    """
-    Returns the weights for weighted densities in a 2D array, ordered as
-    weight[<weight idx>][<component idx>]
-    """
+    def get_weights(self, T):
+        """Weights
+        Returns the weights for weighted densities in a 2D array, ordered as
+        weight[<weight idx>][<component idx>]. See arrayshapes.md for a description of the ordering of different arrays.
+        """
+        pass
 
     @abc.abstractmethod
-    def get_weighted_densities(self, *args, **kwargs): pass
-    """
-    Compute the weighted densities, and optionally differentials
+    def get_weighted_densities(self, *args, **kwargs):
+        """Weighted densities
+        Compute the weighted densities, and optionally differentials
 
-    Args:
-        rho (ndarray[Profile]) : 2D array of component densities indexed as rho[<component index>][<position index>]
-        bulk (bool) : If True, use simplified expressions for bulk - not requiring FFT
-        dndrho (bool) : Flag to activate calculation of differential
+        Args:
+            rho (ndarray[Profile]) : 2D array of component densities indexed as rho[<component index>][<position index>]
+            bulk (bool) : If True, use simplified expressions for bulk - not requiring FFT
+            dndrho (bool) : Flag to activate calculation of differential
 
-    Returns:
-        ndarray : array of weighted densities indexed as n[<weight index>][<position index>]
-        ndarray : array of differentials
-    """
+        Returns:
+            ndarray : array of weighted densities indexed as n[<weight index>][<position index>]
+            ndarray : array of differentials
+        """
+        pass
 
-    def reduce_temperature(self, T, c=0): pass
-    """
-    Reduce the temperature in some meaningful manner, using LJ units when possible, doing nothing for hard spheres.
-    
-    Returns:
-        float : The reduced temperature
-    """
+    def reduce_temperature(self, T, c=0):
+        """Utility
+        Reduce the temperature in some meaningful manner, using LJ units when possible, doing nothing for hard spheres.
+
+        Args:
+            T (float) : The temperature
+            c (float, optional) : ???
+        Returns:
+            float : The reduced temperature
+        """
+        pass
 
     def find_non_bulk_idx(self, profile, rho_b, tol=0.01, start_idx=-1):
+        """Deprecated
+        Possibly no longer working, used to find the the first index in a Profile which is no longer considered a point in
+        the bulk phase, by checking the change in density and comparing to `tol`.
 
+        Args:
+            profile (Profile) : The density profile
+            rho_b (float) : The bulk density
+            tol (float) : Tolerance for relative change in density within bulk.
+            start_idx (int) : Where to start searching. If start_idx < 0, search goes "right-to-left", otherwise "left-to-right".
+
+        Returns:
+             int : The index at which the bulk ends.
+        """
         if abs((profile[start_idx] - rho_b) / rho_b) < tol:
             in_bulk = True
         else:
@@ -140,14 +218,41 @@ class Functional(metaclass=abc.ABCMeta):
         return 0
 
     def adsorbed_thickness(self, profile):
+        """Deprecated
+        Find the thickness of an adsorbed film.
+
+        Args:
+            profile (Profile) : The density profile
+
+        Returns:
+            float : The thickness of the adsorbed layer.
+        """
         idx = self.find_non_bulk_idx(profile, profile[-1])
         return profile.grid.z[idx]
 
     def adsorbed_mean_density(self, profile):
+        """Deprecated
+        Compute the mean density of an adsorbed film.
+
+        Args:
+            profile (Profile) : The density profile
+
+        Returns:
+            float : The mean density.
+        """
         idx = self.find_non_bulk_idx(profile, profile[-1])
         return np.mean(profile[:idx])
 
     def interface_thickness(self, profile, positions=False):
+        """Deprecated
+        Find the thickness of an interface.
+
+        Args:
+            profile (Profile) : The density profile
+            positions (bool) : Also return the position where the interface starts and stops.
+        Returns:
+            float : The thickness of the interface.
+        """
         idx_l = self.find_non_bulk_idx(profile, profile[0], start_idx=0)
         idx_r = self.find_non_bulk_idx(profile, profile[-1])
         if positions is True:
@@ -155,8 +260,8 @@ class Functional(metaclass=abc.ABCMeta):
         return profile.grid.z[idx_r] - profile.grid.z[idx_l]
 
     def residual_chemical_potential(self, rho, T, bulk=True):
-        """
-        Compute the chemical potential [J]
+        """Bulk Property
+        Compute the residual chemical potential [J]
 
         Args:
             rho (list[float]) : Density [particles / Å^3]
@@ -179,7 +284,7 @@ class Functional(metaclass=abc.ABCMeta):
         return beta_mu / beta # Then multiply by (k_B T)
 
     def chemical_potential(self, rho, T, bulk=True, property_flag='IR'):
-        """
+        """Bulk Property
         Compute the chemical potential [J]
 
         Args:
@@ -203,7 +308,7 @@ class Functional(metaclass=abc.ABCMeta):
         return mu_id + mu_res
 
     def residual_helmholtz_energy_density(self, rho, T, bulk=False):
-        """
+        """Profile Property
         Compute the residual Helmholtz energy density [J / Å^3]
 
         Args:
@@ -217,7 +322,7 @@ class Functional(metaclass=abc.ABCMeta):
         return Boltzmann * T * phi
 
     def residual_entropy_density(self, rho, T):
-        """
+        """Profile Property
         Compute the residual entropy density [J / Å^3 K]
 
         Args:
@@ -230,7 +335,7 @@ class Functional(metaclass=abc.ABCMeta):
         return - Boltzmann * (phi + T * dphidT)
 
     def residual_internal_energy_density(self, rho, T):
-        """
+        """Profile Property
         Compute the residual internal energy density [J / Å^3]
 
         Args:
@@ -244,7 +349,7 @@ class Functional(metaclass=abc.ABCMeta):
         return a + T * s
 
     def residual_enthalpy_density(self, rho, T):
-        """
+        """Profile Property
         Compute the residual enthalpy density [J / Å^3]
 
         Args:
@@ -263,6 +368,17 @@ class Functional(metaclass=abc.ABCMeta):
         return h_res
 
     def fugacity(self, rho, T, Vext=None):
+        """Bulk Property
+        Compute the fugacity at given density and temperature
+
+        Args:
+            rho (list[float]) : Particle density of each species
+            T (flaot) : Temperature [K]
+            Vext (ExternalPotential, optional) : External potential for each particle
+
+        Returns:
+            1d array (flaot) : The fugacity of each species.
+        """
         Vext = self.sanitize_Vext(Vext)
         c = self.correlation(rho, T)
         beta = 1 / (Boltzmann * T)
@@ -273,7 +389,7 @@ class Functional(metaclass=abc.ABCMeta):
         return f / beta
 
     def correlation(self, rho, T):
-        """
+        """Profile Property
         Compute the one-body correlation function (sec. 4.2.3 in "introduction to DFT")
 
         Args:
@@ -281,8 +397,8 @@ class Functional(metaclass=abc.ABCMeta):
             T (float) : Temperature [K]
 
         Returns:
-            2d array : One body correlation function of each species as a function of position,
-                        indexed as c[<component idx>][<grid idx>]
+            list[Profile] : One body correlation function of each species as a function of position,
+                            indexed as c[<component idx>][<grid idx>]
         """
         _, dphidn = self.reduced_helmholtz_energy_density(rho, T, dphidn=True)
 
@@ -297,7 +413,7 @@ class Functional(metaclass=abc.ABCMeta):
         return c
 
     def grand_potential(self, rho, T, Vext=None, bulk=False, property_flag='IR'):
-        """
+        """Profile Property
         Compute the Grand Potential, as defined in sec. 2.7 of R. Roth - Introduction to Density Functional Theory of
         Classical Systems: Theory and Applications.
 
@@ -310,7 +426,7 @@ class Functional(metaclass=abc.ABCMeta):
             bulk (bool) : Is this a bulk computation? Defaults to False. Note: For bulk computations, the grand
                             potential density [J / Å^3] is returned.
             property_flag (str) : Return Residual ('R'), Ideal ('I') or total ('IR') grand potential
-        Returns
+        Returns:
             float : The Grand Potential [J]. NOTE: For bulk computations, the grand potential
                     density (which is equal to the bulk pressure) [J / Å^3] is returned.
         """
@@ -347,7 +463,7 @@ class Functional(metaclass=abc.ABCMeta):
         raise KeyError(f"Invalid property flag {property_flag}, valid flags are 'IR' (total), 'I' (ideal), and 'R' (residual)")
 
     def grand_potential_density(self, rho, T, Vext=None, property_flag='IR'):
-        """
+        """Profile Property
         Compute the Grand Potential density.
 
         Args:
@@ -383,6 +499,17 @@ class Functional(metaclass=abc.ABCMeta):
 
 
     def dividing_surface_position(self, rho, T=None, dividing_surface='e'):
+        """Utility
+        Compute the position of a dividing surface on a given density profile.
+
+        Args:
+            rho (list[Profile]) : The density profile for each species
+            T (float) : The temperature
+            dividing_surface (str, optional) : Can be '(e)quimolar' (default) or '(t)ension'.
+
+        Returns:
+            float : Position of the dividing surface.
+        """
         if dividing_surface in ('e', 'equimolar'):
             return self.equimolar_surface_position(rho)
         elif dividing_surface in ('t', 'tension'):
@@ -393,7 +520,7 @@ class Functional(metaclass=abc.ABCMeta):
 
     @staticmethod
     def equimolar_surface_position(rho):
-        """
+        """Utility
         Calculate the position of the equimolar surface for a given density profile
 
         Args:
@@ -410,7 +537,7 @@ class Functional(metaclass=abc.ABCMeta):
         return rho[0].grid.size(V1) # Handles differetiating between spherical and planar geometry
 
     def surface_of_tension_position(self, rho, T):
-        """
+        """Utility
         Calculate the position of the surface of tension on a given density profile
 
         Args:
@@ -433,13 +560,22 @@ class Functional(metaclass=abc.ABCMeta):
         return (3 * delta_omega / (2 * np.pi * delta_p))**(1 / 3)
 
     def tolmann_length(self, rho, T):
+        """Profile Property
+        Compute the Tolmann length, given a density profile.
 
+        Args:
+            rho (list[Profile]) : The density profile of each species.
+            T (float) : Temperature [K]
+
+        Returns:
+            float : The Tolmann lenth
+        """
         R_eq = self.equimolar_surface_position(rho)
         R_s = self.surface_of_tension_position(rho, T)
         return R_eq - R_s
 
     def surface_tension(self, rho, T, Vext=None, dividing_surface='equimolar'):
-        """
+        """Profile Property
         Compute the surface tension for a given density profile
         Args:
             rho (list[Profile]) : Density profile for each component [particles / Å^3]
@@ -496,7 +632,7 @@ class Functional(metaclass=abc.ABCMeta):
                        f"Valid identifiers are ('e' / 'equimolar') or ('t' / 'tension').")
 
     def surface_tension_isotherm(self, T, n_points=30, dividing_surface='t', solver=None, rho0=None, calc_lve=False, verbose=False):
-        """
+        """rhoT Property
         Compute the surface tension as a function of molar composition along an isotherm
 
         Args:
@@ -509,7 +645,7 @@ class Functional(metaclass=abc.ABCMeta):
             verbose (int, optional) : Print progress information, higher number gives more output, default 0
 
         Returns
-            tuple(gamma, x) or tuple(gamma, lve) : Surface tension and composition
+            tuple(gamma, x) or tuple(gamma, lve) : Surface tension and composition (of first component)
         """
         if isinstance(n_points, Iterable):
             x_lst = n_points
@@ -544,6 +680,21 @@ class Functional(metaclass=abc.ABCMeta):
         return gamma_lst, x_lst
 
     def surface_tension_singlecomp(self, n_points=30, t_min=0.5, t_max=0.99, grid=None, solver=None, rho0=None, verbose=0):
+        """rhoT Property
+        Compute the surface tension of a pure component for a series of temperatures.
+
+        Args:
+            n_points (int) : Number of points to compute
+            t_min (float) : Start temperature, if 0 < t_min < 1, start temperature will be t_min * Tc, where Tc is the critical temperature.
+            t_max (float) : Stop temperature, if 0 < t_max < 1, stop temperature will be t_max * Tc, where Tc is the critical temperature.
+            grid (Grid) : Grid to use for initial calculation.
+            solver (Solver) : Solver to use for all calculations
+            rho0 (list[Profile]) : Initial guess for first density profile.
+            verbose (int) : Larger number gives more output during progress.
+
+        Returns:
+            tuple(gamma, T) : Where gamma and T are matching 1d arrays of the surface tension and temperature.
+        """
         tc, _, _ = self.eos.critical([1])
         t_min = tc * t_min if (0 < t_min < 1) else t_min
         t_max = tc * t_max if (0 < t_max < 1) else t_max
@@ -578,8 +729,8 @@ class Functional(metaclass=abc.ABCMeta):
         return gamma_lst, T_lst
 
     def adsorbtion(self, rho, T=None, dividing_surface='e'):
-        """
-        Compute the adsorbtion of each on the interface in a given density profile
+        """Profile Property
+        Compute the adsorbtion of each on the interface in a given density profile.
 
         Args:
             rho (list[Profile]) : The density profile for each component [1 / Å^3]
@@ -601,7 +752,7 @@ class Functional(metaclass=abc.ABCMeta):
         return (N - N_ref) / A
 
     def N_adsorbed(self, rho, T=None, dividing_surface='e'):
-        """
+        """Profile Property
         Compute the adsorbtion of each on the interface in a given density profile
 
         Args:
@@ -620,7 +771,7 @@ class Functional(metaclass=abc.ABCMeta):
         return adsorbtion * A
 
     def radial_distribution_functions(self, rho_b, T, comp_idx=0, grid=None):
-        """
+        """rhoT Property
         Compute the radial distribution functions $g_{i,j}$ for $i =$ `comp_idx` using the "Percus trick". To help convergence:
         First converge the profile for a planar geometry, exposed to an ExtendedSoft potential with a core radius $5R$, where
         $R$ is the maximum `characteristic_length` of the mixture. Then, shift that profile to the left, and use it as
@@ -671,7 +822,7 @@ class Functional(metaclass=abc.ABCMeta):
         return rdf
 
     def density_profile_wall(self, rho_b, T, grid, Vext=None, rho_0=None, verbose=False):
-        """
+        """Density Profile
         Calculate equilibrium density profile for a given external potential
         Note: Uses lazy evaluation for (rho_b, T, x, grid, Vext) to return a copy of previous result if the same
                 calculation is done several times.
@@ -680,7 +831,7 @@ class Functional(metaclass=abc.ABCMeta):
             rho_b (list[float]) : The bulk densities [particles / Å^3]
             T (float) : Temperature [K]
             grid (Grid) : Spatial discretization
-            Vext (callable, hashable, optional) : External potential as a function of position (default : Vext(r) = 0)
+            Vext (ExtPotential, optional) : External potential as a function of position (default : Vext(r) = 0)
                                                     Note: Must be hashable, to use with lazy evaluation
                                                     Recomended: Use the callable classes inherriting ExtPotential
             rho_0 (list[Profile], optional) : Initial guess for density profiles.
@@ -714,7 +865,7 @@ class Functional(metaclass=abc.ABCMeta):
         return profile
 
     def density_profile_tp(self, T, p, z, grid, rho_0=None, solver=None, verbose=False):
-        """
+        """Density Profile
         Compute the equilibrium density profile across a gas-liquid interface.
         For multicomponent systems, twophase_tpflash is used to compute the composition of the two phases.
         For single component systems, p is ignored, and pressure is computed from dew_pressure.
@@ -759,7 +910,7 @@ class Functional(metaclass=abc.ABCMeta):
         return self.density_profile_twophase(rho_g, rho_l, T, grid, beta_V=0.5, rho_0=rho_0, verbose=verbose, solver=solver)
 
     def density_profile_tz(self, T, z, grid, z_phase=1, rho_0=None, solver=None, verbose=0):
-        """
+        """Density Profile
         Compute the density profile separating two phases at temperature T, with liquid (or optionally vapour) composition x
 
         Args:
@@ -793,7 +944,7 @@ class Functional(metaclass=abc.ABCMeta):
         return self.density_profile_twophase(rho_g, rho_l, T, grid, rho_0=rho_0, solver=solver, verbose=verbose)
 
     def density_profile_singlecomp(self, T, grid, rho_0=None, solver=None, verbose=False):
-        """
+        """Density Profile
         Compute the equilibrium density profile across a gas-liquid interface.
         For multicomponent systems, twophase_tpflash is used to compute the composition of the two phases.
         For single component systems, p is ignored, and pressure is computed from dew_pressure.
@@ -819,7 +970,7 @@ class Functional(metaclass=abc.ABCMeta):
 
 
     def density_profile_twophase(self, rho_g, rho_l, T, grid, beta_V=0.5, rho_0=None, solver=None, verbose=0):
-        """
+        """Density Profile
         Compute the density profile separating two phases with denisties rho_g and rho_l
 
         Args:
@@ -906,13 +1057,15 @@ class Functional(metaclass=abc.ABCMeta):
         return sol.profile
 
     def __density_profile_twophase(self, rho_left, rho_right, T, grid, rho_0=None, constraints=None):
-
+        """Deprecated
+        """
         valid_constrains = ['rho', 'rho_frac']
         if constraints is None:
             return self.density_profile_twophase(rho_left, rho_right, T, grid, rho_0=rho_0)
 
     def density_profile_NT(self, rho1, rho2, T, grid, rho, rho_is_frac, rho_0=None):
-
+        """Deprecated
+        """
         rho1 = np.array(rho1)
         rho2 = np.array(rho2)
 
@@ -958,7 +1111,8 @@ class Functional(metaclass=abc.ABCMeta):
         return sol.profile
 
     def density_profile_muT(self, rho1, rho2, T, grid, rho, rho_is_frac, rho_0=None):
-
+        """Deprecated
+        """
         rho1 = np.array(rho1)
         rho2 = np.array(rho2)
 
@@ -1005,7 +1159,20 @@ class Functional(metaclass=abc.ABCMeta):
         return sol.profile
 
     def drubble_profile_rT(self, rho_i, rho_o, T, r, grid, rho_0=None):
+        """Density Profile
+        Compute the density profile across the interface of a droplet or bubble (drubble).
 
+        Args:
+            rho_i (list[float]) : The particle densities inside the drubble.
+            rho_o (list[float]) : The particle densities outside the drubble.
+            T (float) : Temperature [K]
+            r (float) : Drubble radius [Å]
+            grid (Grid) : The grid to use (must have Geometry.SPHERICAL)
+            rho_0 (list[Profile], optional) : Initial guess
+
+        Returns:
+            list[Profile] : The density profiles across the interface.
+        """
         if grid.geometry != Geometry.SPHERICAL:
             raise ValueError(f'Drops / Bubbles must have spherical geometry, but grid has geometry {grid.geometry}!')
         elif r > grid.L:
@@ -1019,8 +1186,8 @@ class Functional(metaclass=abc.ABCMeta):
         return self.density_profile_NT(rho_i, rho_o, T, grid, rho_tot, rho_is_frac=False, rho_0=rho_0)
 
     def sanitize_Vext(self, Vext):
-        """
-        Ensure that Vext is a tuple
+        """Internal
+        Ensure that Vext is a tuple with the proper ammount of elements.
         """
         if Vext is None:
             return tuple(lambda z: 0 for _ in range(self.ncomps))
@@ -1029,4 +1196,15 @@ class Functional(metaclass=abc.ABCMeta):
         return Vext
 
     def split_component_weighted_densities(self, n):
+        """Internal
+        Unsure if this is still in use, but I believe it takes in fmt-weighted densities as a 1d array and returns
+        the same densities as a 2d array.
+
+        Args:
+            n (list[Profile]) : FMT-weighted densities
+
+        Returns:
+            list[list[Profile]] : FMT-weighted densities, indexed as n[<component_idx>][<weight_idx>]
+        :return:
+        """
         return [n[ci : ci + 6] for ci in range(self.ncomps)]
