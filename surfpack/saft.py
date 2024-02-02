@@ -10,7 +10,7 @@ import copy
 class SAFT(Functional):
 
     def __init__(self, comps, eos, hs_model=SAFT_WhiteBear, parameter_ref='default'):
-        """
+        """Internal
         This class is inherited by SAFT_VR_Mie and PC_SAFT. The only thing they do is pass the correct eos to the
         eos argument of this initialiser.
 
@@ -548,4 +548,7 @@ class SAFT(Functional):
             phi = phi_hs + phi_disp
             return phi
 
-    def pressure_tv(self, rho, T): pass
+    def pressure_tv(self, rho, T):
+        """Deprecated
+        """
+        pass

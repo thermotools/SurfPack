@@ -12,9 +12,20 @@ from collections.abc import Iterable
 
 class PC_SAFT(SAFT):
     def __init__(self, comps, hs_model=SAFT_WhiteBear, parameter_ref='default'):
+        """Constructor
+        Initialises a PC-SAFT model.
+
+        Args:
+            comps (str) : Comma separated component identifiers, following thermopack convention.
+            hs_model (SAFT_HardSphere) : Model to use for the hard-sphere contribution. Default is SAFT_WhiteBear.
+            parameter_ref (str) : Reference for parameter set to use (see ThermoPack).
+        """
         super().__init__(comps, pcsaft, hs_model, parameter_ref=parameter_ref)
 
     def __repr__(self):
+        """Internal
+        Generates a unique string for this model, containing information about the parameters and hard-sphere model.
+        """
         ostr = f'pc-saft model for {self._comps},\n' + super().__repr__()
         return ostr
 

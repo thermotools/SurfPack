@@ -129,14 +129,15 @@ class Functional(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def reduced_helmholtz_energy_density(self, *args, **kwargs): pass
-    r"""Helmholtz Energy
-    Returns the reduced, residual helmholtz energy density, $\phi$ (i.e. the integrand of eq. 3.4 in "introduction to DFT")
-    
-    $$\phi = \\frac{a^{res}}{k_B T} $$
-    
-    where $a^{res}$ is the residual helmholtz energy density (per particle), in [J Å$^{-3}$]
-    """
+    def reduced_helmholtz_energy_density(self, *args, **kwargs):
+        r"""Profile Property
+        Returns the reduced, residual helmholtz energy density, $\phi$ (i.e. the integrand of eq. 3.4 in "introduction to DFT")
+
+        $$\phi = \\frac{a^{res}}{k_B T} $$
+
+        where $a^{res}$ is the residual helmholtz energy density (per particle), in [J Å$^{-3}$]
+        """
+        pass
 
     @abc.abstractmethod
     def get_characteristic_lengths(self):
@@ -159,7 +160,7 @@ class Functional(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def get_weighted_densities(self, *args, **kwargs):
-        """Weighted densities
+        """Weighted density
         Compute the weighted densities, and optionally differentials
 
         Args:
@@ -680,7 +681,7 @@ class Functional(metaclass=abc.ABCMeta):
         return gamma_lst, x_lst
 
     def surface_tension_singlecomp(self, n_points=30, t_min=0.5, t_max=0.99, grid=None, solver=None, rho0=None, verbose=0):
-        """rhoT Property
+        """Pure Property
         Compute the surface tension of a pure component for a series of temperatures.
 
         Args:
