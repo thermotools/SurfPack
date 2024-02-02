@@ -21,3 +21,10 @@ TAGS
 *tags
 *~
 *\#
+
+IDE and Environment
+venv/
+.idea/
+.vscode/
+.DS_Store
+*.egg-info

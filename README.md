@@ -1,6 +1,5 @@
-# Thermopack DFT
-Classical density functinal theory for thermopack
-
+# SurfPack 
+## Classical density functinal theory for surfaces and interfaces
 
 # Issues
   * Binary weights and accuracy when not using Fourier weights

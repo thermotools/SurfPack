@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=39.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "surfpack"
+version = "0.0.0"
+authors = [
+  { name = "Vegard Gjeldvik Jervell", email="vegard.g.jervell@ntnu.no" },
+  { name = "Morten Hammer", email="morten.hammer@ntnu.no" },
+]
+maintainers = [
+  { name = "Vegard Gjeldvik Jervell", email="vegard.g.jervell@ntnu.no" },
+  { name = "Morten Hammer", email="morten.hammer@ntnu.no" },
+]
+description = "Density Functional Theory for surfaces and interfaces"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Fortran",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "License :: OSI Approved :: MIT License",
+]
+keywords = ["physics", "thermodynamics", "equations_of_state", "phase_equilibria", "SAFT", "DFT", "density_functional_theory"]
+
+[project.urls]
+"Homepage" = "https://thermotools.github.io/surfpack"
+"Bug Tracker" = "https://github.com/thermotools/surfpack/issues"
+
+[dependencies]
+numpy = "~1.22"
+scipy = "~1.7"
+thermopack = '~2.2'
