@@ -40,42 +40,107 @@ class SAFT(Functional):
                                   'multipole' : self.__multipole_active__, 'chain' : self.__chain_active__}
 
     def __repr__(self):
+        """Internal
+        Called from inheriting classes.
+
+        Returns:
+            str : id. string with parameters, active contributions and hard sphere model identifier.
+        """
         ostr = f'using parameters : {[self.eos.get_pure_fluid_param(i + 1) for i in range(self.ncomps)]}\n' \
                f'with active contributions : {[k + " : " + str(self.__contributions__[k]) for k in sorted(self.__contributions__.keys())]}\n' \
                f'Hard sphere model : {repr(self.hs_model)}'
         return ostr
 
     def refresh_hs_model(self): # Call this when parameters have been changed by set-methods
+        """Internal
+        Update hard-sphere model such that parameters are in sync.
+        """
         self.ms = np.array([self.eos.get_pure_fluid_param(i + 1)[0] for i in range(self.ncomps)])
         self.hs_model = self.__HS_MODEL__(self._comps, self.eos)
 
     def get_sigma(self, ic):
+        """Utility
+        Get the sigma parameter
+
+        Args:
+            ic (int) : Component index (zero-indexed)
+
+        Returns:
+            float : Model sigma-parameter [m]
+        """
         return self.eos.get_pure_fluid_param(ic + 1)[1]
 
     def set_sigma(self, ic, sigma):
+        """Utility
+        Set the model sigma-parameter
+
+        Args:
+            ic (int) : Component index (zero-indexed)
+            sigma (float) : sigma-parameter [m]
+        """
         pure_params = list(self.eos.get_pure_fluid_param(ic + 1))
         pure_params[1] = sigma
         self.eos.set_pure_fluid_param(ic + 1, *pure_params)
         self.refresh_hs_model()
 
     def get_eps_div_k(self, ic):
+        """Utility
+        Get the epsilon parameter
+
+        Args:
+            ic (int) : Component index (zero-indexed)
+
+        Returns:
+            float : Model epsilon-parameter, divided by Boltzmanns constant [K]
+        """
         return self.eos.get_pure_fluid_param(ic + 1)[2]
 
     def set_eps_div_k(self, ic, eps_div_k):
+        """Utility
+        Set the model epsilon-parameter
+
+        Args:
+            ic (int) : Component index (zero-indexed)
+            eps_div_k (float) : epsilon-parameter divided by Boltzmanns constant [K]
+        """
         pure_params = list(self.eos.get_pure_fluid_param(ic + 1))
         pure_params[2] = eps_div_k
         self.eos.set_pure_fluid_param(ic + 1, *pure_params)
         self.refresh_hs_model()
 
     def set_pure_assoc_param(self, ic, eps, beta):
-        self.eos.set_pure_assoc_param(ic, eps, beta)
+        """Utility
+        Set pure-conponent association parameters
+
+        Args:
+            ic (int) : Component index (zero indexed)
+            eps (float) : Association energy [J / mol]
+            beta (float) : Associaiton volume [-]
+        """
+        self.eos.set_pure_assoc_param(ic + 1, eps, beta)
 
     def set_pure_param(self, ic, m, sigma, eps_div_k, *other):
+        """Utility
+        Set all pure component parameters
+
+        Args:
+            ic (int) : Component index (zero indexed)
+            m (float) : Segment number [-]
+            sigma (float) : sigma-parameter [m]
+            eps_div_k (float) : epsilon-parameter [K]
+        """
         self.set_sigma(ic, sigma)
         self.set_segment_number(ic, m)
         self.set_eps_div_k(ic, eps_div_k)
 
     def set_segment_number(self, ic, m):
+        """Utility
+        Set the segment number
+
+            ic (int) : Component index (zero indexed)
+            m (float) : Segment number
+        :return:
+        """
         pure_params = list(self.eos.get_pure_fluid_param(ic + 1))
         pure_params[0] = m
         self.ms[ic] = m
@@ -83,27 +148,61 @@ class SAFT(Functional):
         self.refresh_hs_model()
 
     def pair_potential(self, i, j, r):
+        """Utility
+        Evaluate the pair potential between component `i` and `j` at distance `r`
+
+            i (int) : Component index
+            j (int) : Component index
+            r (float) : Distance [m]
+
+        Returns:
+            float : Interaction potential energy [J]
+        """
         # Must be overridden in saft-vrq-mie class to also supply temperature
         return Boltzmann * self.eos.potential(i + 1, j + 1, r * 1e-10, 300)
 
     def set_dispersion_active(self, active):
+        """Utility
+        Toggle dispersion contribution on/off
+
+        Args:
+            active (bool) : Whether dispersion is active
+        """
         self.__dispersion_active__ = active
         self.__contributions__['dispersion'] = active
 
     def set_association_active(self, active):
+        """Utility
+        Toggle association contribution on/off
+
+        Args:
+            active (bool) : Whether association is active
+        """
         self.__association_active__ = active
         self.__contributions__['association'] = active
 
     def set_chain_active(self, active):
+        """Utility
+        Toggle chain contribution on/off
+
+        Args:
+            active (bool) : Whether chain is active
+        """
         self.__chain_active__ = active
         self.__contributions__['chain'] = active
 
     def set_multipole_active(self, active):
+        """Utility
+        Toggle multipole contribution on/off
+
+        Args:
+            active (bool) : Whether multipole is active
+        """
         self.__multipole_active__ = active
         self.__contributions__['multipole'] = active
 
     def get_weights(self, T, dwdT=False):
-        """
+        """Weights
         Get all the weights used for weighted densities in a 2D array, indexed as weight[<wt idx>][<comp idx>],
         where weight[:6] are the FMT weights, (w0, w1, w2, w3, wv1, wv2), and weight[6] is the list of
         dispersion weights (one for each component).
@@ -136,8 +235,17 @@ class SAFT(Functional):
         return dwdT
 
     def get_dispersion_weights(self, T, dwdT=False, d=None, dd_dT=None):
-        """
-        Get the weight for the dispersion term
+        """Weights
+        Get the weights for the dispersion term
+
+        Args:
+            T (float) : Temperature [K]
+            dwdT (bool, optimal) : Compute derivative wrt. T? Defaults to False.
+            d (1d array) : Pre-computed Barker-Henderson diameters
+            dd_dT (1d array) : Pre-computed temperature derivatives of Barker-Henderson diameters.
+
+        Returns:
+            2d array of WeightFunction : The weights for the dispersion weighted densities, indexed as wts[<wt_idx>][<comp_idx>]
         """
         if (d is None) or (dd_dT is None):
             d, dd_dT = self.eos.hard_sphere_diameters(T)
@@ -156,13 +264,35 @@ class SAFT(Functional):
         return dwdT
 
     def get_fmt_weighted_densities(self, rho, T, bulk=False, dndrho=False, dndT=False):
+        """Weighted density
+        Compute weighted densities from FMT model.
+
+        Args:
+            rho (list[Profile] or list[float]) : Particle densities of each species
+            T (float) : Temperature [K]
+            bulk (bool) : Default False, set to True if `rho` is `list[float]`
+            dndrho (bool) : Also compute derivatives (only for bulk)
+            dndT (bool) : Also compute derivatives
+
+        Returns:
+            list[Profile] or list[float] : The weighted densities and optionally *one* differential.
+        """
         return self.hs_model.get_weighted_densities(rho, T, bulk=bulk, dndrho=dndrho, dndT=dndT)
 
     def get_fmt_weights(self, T, dwdT=False):
+        """Weights
+        Get the FMT weight functions
+
+        Args:
+            T (float) : Temperature [K]
+            dwdT (bool) : Compute derivative instead
+        Returns:
+            list[list[WeightFunction]] : FMT weight functions, indexed as wts[<wt_idx>][<comp_idx>]
+        """
         return self.hs_model.get_weights(T, dwdT=dwdT)
 
     def get_weighted_densities(self, rho, T, bulk=False, dndrho=False, dndT=False):
-        """
+        """Weighted density
         Compute the weighted densities.
 
         Remember: dphidn is a list[Profile], indexed as dphidn[<weight idx>][<grid idx>]
@@ -190,7 +320,7 @@ class SAFT(Functional):
             return n
 
     def get_dispersion_weighted_density(self, rho_arr, T, bulk=False, dndrho=False, dndT=False):
-        """
+        """Weighted density
         Get the weighted density for the dispersion term
 
         Args:
@@ -227,7 +357,7 @@ class SAFT(Functional):
         return n_disp
 
     def reduce_temperature(self, T, c=0):
-        """
+        """Utility
         Compute the reduced temperature (LJ units)
 
         Args:
@@ -240,6 +370,20 @@ class SAFT(Functional):
         return T / eps_div_k
 
     def dispersion_helmholtz_energy_density(self, rho, T, bulk=False, dphidn=False, dphidT=False, dphidrho=False, n_disp=None):
+        """Helmholtz contribution
+
+        Args:
+            rho (list[Profile] or list[float]) : Particle density for each species
+            T (float) : Temperature [K]
+            bulk (bool) : Default False. Set to True if `rho` is `list[float]`
+            dphidn (bool) : Compute derivative
+            dphidT (bool) : Compute derivative
+            dphidrho (bool) : Compute derivative
+            n_disp (list[Profile], optional) : Pre-computed weighted densities.
+
+        Returns:
+            Profile or float : The (reduced) dispersion helmholtz energy density [-]
+        """
         if dphidT is True:
             n_disp, dndT_disp = self.get_dispersion_weighted_density(rho, T, bulk=bulk, dndT=True)
         elif n_disp is None:
@@ -362,7 +506,7 @@ class SAFT(Functional):
         return phi_disp
 
     def reduced_helmholtz_energy_density(self, rho, T, dphidn=False, bulk=False, asarray=False, dphidT=False):
-        """
+        """Profile Property
         Compute the reduced helmholtz energy density [1 / Å^3] (see the Functional class for explanation)
 
         Args:

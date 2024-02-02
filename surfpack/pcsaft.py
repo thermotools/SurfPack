@@ -19,10 +19,8 @@ class PC_SAFT(SAFT):
         return ostr
 
     def get_weights(self, T, dwdT=False):
-        """
-        Get all the weights used for weighted densities in a 2D array, indexed as weight[<wt idx>][<comp idx>],
-        where weight[:6] are the FMT weights, (w0, w1, w2, w3, wv1, wv2), and weight[6] is the list of
-        dispersion weights (one for each component).
+        """Weights
+        Get all the weights used for weighted densities in a 2D array, indexed as weight[<wt idx>][<comp idx>].
 
         Args:
             T (float) : Temperature [K], used to get hard sphere diameters
@@ -50,7 +48,17 @@ class PC_SAFT(SAFT):
         return dwdT
 
     def get_association_weights(self, T, dwdT=False):
+        """Weights
+        Get the weight functions for the association weighted densities, indexed as wts[<wt_idx>][<comp_idx>], equivalent
+        to the component weights from FMT.
 
+        Args:
+            T (float) : Temperature [K]
+            dwdT (bool) : Compute derivative
+
+        Returns:
+            list[list[Analytical]] : The weight functions.
+        """
         if dwdT is True:
             dwdT_assoc = [[0 for _ in range(self.ncomps)] for _ in range(6 * self.ncomps)]
             dwdT_fmt = self.get_fmt_weights(T, dwdT=True)
@@ -68,7 +76,14 @@ class PC_SAFT(SAFT):
         return w_assoc
 
     def get_chain_weights(self, T, dwdT=False):
-        """
+        """Weights
+        Get the weight functions for the chain contribution, indexed as wts[<wt_idx>][<comp_idx>]. The weights
+        wts[0] correspond to the local density, wts[1] are eq. Eq. 53 in Sauer & Gross, 10.1021/acs.iecr.6b04551 (lambda)
+        and wts[1] are Eq. 54 in the same paper.
+
+        Args:
+            T (float) : Temperature [K]
+            dwdT (bool) : Compute derivative instead.
         Returns:
             list[list[Analytical]] : The weight functions, shape (3 * ncomps, ncomps)
         """
@@ -92,6 +107,20 @@ class PC_SAFT(SAFT):
         return w_chain
 
     def get_weighted_densities(self, rho, T, bulk=False, dndrho=False, dndT=False):
+        """Weighted density
+        Compute all neccessary weighted densities for this model.
+
+        Args:
+            rho (list[Profile] or list[float]) : The particle density of each species
+            T (float) : Temperature [K]
+            bulk (bool) : Default False. Set to True if `rho` is `list[float]`
+            dndrho (bool) : Compute derivative (only for `bulk=True`)
+            dndT (bool) : Compute derivative
+
+        Returns:
+            list[Profile] or list[float] : Weighted densities
+            Optional 2d array (float) : dndrho, derivatives of weighted densities, indexed as dndrho[<wt idx>][<comp idx>]
+        """
         if dndrho is True: # Only if bulk is True
             n_fmt_comp, dndrho_fmt_comp = self.hs_model.get_component_weighted_densities(rho, T, bulk=bulk, dndrho=True)
             n_hs, dndrho_hs = self.hs_model.get_weighted_densities(rho, T, bulk=bulk, dndrho=dndrho, n_comp=n_fmt_comp)
@@ -115,7 +144,7 @@ class PC_SAFT(SAFT):
         return n
 
     def get_assoc_weighted_densities(self, rho, T, bulk=False, dndrho=False, dndT=False):
-        """
+        """Weighted density
         Compute the component weighted densities
 
         Args:
@@ -138,6 +167,19 @@ class PC_SAFT(SAFT):
         return [*itertools.chain.from_iterable(n_assoc)]
 
     def get_chain_weighted_densities(self, rho, T, bulk=False, dndrho=False, dndT=False):
+        """Weighted density
+        Compute the weighted densities for the chain contribution
+
+        Args:
+            rho (list[Profile]) : Density profiles [particles / Å^3] indexed as rho_arr[<comp idx>][<grid idx>]
+            T (float) : Temperature [K], used to get radii and weights (in case of temp. dependent radii)
+            bulk (bool) : If true, take a list[float] for rho_arr, and return a list[float]
+            dndrho (bool) : If true, also return derivative (only for bulk)
+            dndT (bool) : If true, also return derivative
+        Returns:
+            list[Profile] : weighted densities [particles / Å^3], indexed as wts[<comp idx>][<grid idx>]
+            Optional 2d array (float) : dndrho, derivatives of weighted densities, indexed as dndrho[<wt idx>][<comp idx>]
+        """
         w_chain = self.get_chain_weights(T, dwdT=False)
 
         if bulk is True:
@@ -177,6 +219,21 @@ class PC_SAFT(SAFT):
         return n_chain
 
     def association_helmholtz_energy_density(self, rho, T, bulk=False, dphidn=False, dphidT=False, dphidrho=False, n_assoc=None):
+        """Helmholtz contribution
+        Compute the association contribution to the reduced Helmholtz energy density.
+
+        Args:
+            rho (list[Profile] or list[float]) : Particle density for each species
+            T (float) : Temperature [K]
+            bulk (bool) : Default False. Set to True if `rho` is `list[float]`
+            dphidn (bool) : Compute derivative
+            dphidT (bool) : Compute derivative
+            dphidrho (bool) : Compute derivative
+            n_assoc (list[Profile], optional) : Pre-computed weighted densities.
+
+        Returns:
+            Profile or float : The (reduced) association helmholtz energy density [-]
+        """
         if self.__association_active__ is False:
             if (dphidn is True) or (dphidT is True):
                 return (0, np.zeros(6 * self.ncomps)) if (bulk is True) else (Profile.zeros_like(rho), Profile.zeros(rho[0].grid, 6 * self.ncomps))
@@ -273,6 +330,21 @@ class PC_SAFT(SAFT):
         return phi_assoc
 
     def chain_helmholtz_energy_density(self, rho, T, dphidrho=False, dphidn=False, dphidT=False, bulk=False, n_chain=None):
+        """Helmholtz contribution
+        Compute the chain contribution to the reduced Helmholtz energy density
+
+        Args:
+            rho (list[Profile] or list[float]) : Particle density for each species
+            T (float) : Temperature [K]
+            bulk (bool) : Default False. Set to True if `rho` is `list[float]`
+            dphidn (bool) : Compute derivative
+            dphidT (bool) : Compute derivative
+            dphidrho (bool) : Compute derivative
+            n_chain (list[Profile], optional) : Pre-computed weighted densities.
+
+        Returns:
+            Profile or float : The (reduced) chain helmholtz energy density [-]
+        """
         if (self.__chain_active__ is False) or all(self.ms == 1):
             if (dphidn is True) or (dphidT is True):
                 return (0, np.zeros(3 * self.ncomps)) if (bulk is True) else (Profile.zeros_like(rho), Profile.zeros(rho[0].grid, 3 * self.ncomps))
@@ -366,7 +438,21 @@ class PC_SAFT(SAFT):
         return phi
 
     def reduced_helmholtz_energy_density(self, rho, T, dphidn=False, bulk=False, asarray=False, dphidT=False, dphidrho=False):
+        """Profile Property
+        Compute the the reduced Helmholtz energy density
 
+        Args:
+            rho (list[Profile] or list[float]) : Particle density for each species
+            T (float) : Temperature [K]
+            bulk (bool) : Default False. Set to True if `rho` is `list[float]`
+            dphidn (bool) : Compute derivative
+            dphidT (bool) : Compute derivative
+            dphidrho (bool) : Compute derivative
+            n_chain (list[Profile], optional) : Pre-computed weighted densities.
+
+        Returns:
+            Profile or float : The (reduced) chain helmholtz energy density [-]
+        """
         if dphidrho is True:
             phi, dphidn = self.reduced_helmholtz_energy_density(rho, T, bulk=bulk, dphidn=True)
             w = self.get_weights(T)
@@ -425,4 +511,10 @@ class PC_SAFT(SAFT):
         return phi_hs + phi_disp + phi_assoc + phi_chain
 
     def get_characteristic_lengths(self):
+        """Utility
+        Compute a characteristic length for the system.
+
+        Returns:
+            float : The sigma-parameter of the first component.
+        """
         return self.eos.get_pure_params(1)[1] * 1e10
