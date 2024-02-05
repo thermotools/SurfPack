@@ -656,7 +656,7 @@ class Functional(metaclass=abc.ABCMeta):
         if rho0 is None:
             d, _ = self.eos.hard_sphere_diameters(T)
             d *= 1e10
-            w = [abs(di / (2.4728 - 2.3625 * self.reduce_temperature(T, i))) for i, di in enumerate(d)]
+            w = [abs((di / mi) / (2.4728 - 2.3625 * self.reduce_temperature(T, i))) for i, (di, mi) in enumerate(zip(d, self.ms))]
             grid = Grid.tanh_grid(200, Geometry.PLANAR, w, eps=5e-4)
         else:
             grid = rho0[0].grid

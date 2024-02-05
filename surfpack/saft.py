@@ -119,7 +119,7 @@ class SAFT(Functional):
         """
         self.eos.set_pure_assoc_param(ic + 1, eps, beta)
 
-    def set_pure_param(self, ic, m, sigma, eps_div_k, *other):
+    def set_pure_fluid_param(self, ic, m, sigma, eps_div_k, *assoc_param):
         """Utility
         Set all pure component parameters
 
@@ -132,6 +132,8 @@ class SAFT(Functional):
         self.set_sigma(ic, sigma)
         self.set_segment_number(ic, m)
         self.set_eps_div_k(ic, eps_div_k)
+        if len(assoc_param) > 0:
+            self.set_pure_assoc_param(ic, *assoc_param)
 
     def set_segment_number(self, ic, m):
         """Utility
@@ -367,7 +369,10 @@ class SAFT(Functional):
             float : Temperature in LJ units
         """
         _, _, eps_div_k, _, _ = self.eos.get_pure_fluid_param(c + 1)
-        return T / eps_div_k
+        z = np.zeros(self.ncomps) + 1e-3
+        z[c] = 1 - (self.ncomps - 1) * 1e-3
+        Tc = self.eos.critical(z)[0]
+        return T / Tc
 
     def dispersion_helmholtz_energy_density(self, rho, T, bulk=False, dphidn=False, dphidT=False, dphidrho=False, n_disp=None):
         """Helmholtz contribution
