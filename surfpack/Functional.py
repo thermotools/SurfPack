@@ -84,7 +84,21 @@ class Functional(metaclass=abc.ABCMeta):
         if not os.path.isdir(self.__load_dir__):
             raise NotADirectoryError(f"Load directory {self.__load_dir__} does not exist.")
 
-    def clear_profile_dir(self, clear_dir):
+    def set_cache_dir(self, cache_dir):
+        """Utility
+        Forwards call to `self.set_load_dir` and `self.set_save_dir`.
+
+        Args:
+            cache_dir (str) : Name of directory save and load files in.
+
+        Raises:
+            FileExistsError : If cache_dir is the name of an existing file that is not a directory.
+            NotADirectoryError : If cache_dir does not exist after successfull call to `self.set_save_dir`
+        """
+        self.set_save_dir(cache_dir)
+        self.set_load_dir(cache_dir)
+
+    def clear_cache_dir(self, clear_dir):
         """Utility
         Clear the directory `surfpack/saved_profiles/clear_dir`, after prompting for confirmation.
 
@@ -642,7 +656,7 @@ class Functional(metaclass=abc.ABCMeta):
             dividing_surface (str, optional) : 't' or 'tension' for surface of tension, 'e' or 'equimolar' for equimolar surface
             solver (SequentialSolver, optional) : Custom solver object to use
             rho0 (list[Profile], optional) : Initial guess for denisty profile at x = [0, 1]
-            calc_lve (bool, optional) : If true, return a BinaryXY object with pressure, liquid and vapour composition. If false, return only liquid composition.
+            calc_lve (bool, optional) : If true, return a tuple (x, y, p) with pressure (p), liquid (x) and vapour (y) composition. If false, return only liquid composition.
             verbose (int, optional) : Print progress information, higher number gives more output, default 0
 
         Returns
@@ -744,6 +758,7 @@ class Functional(metaclass=abc.ABCMeta):
             1D array : The adsobtion of each component [1 / Å^2]
         """
         R = self.dividing_surface_position(rho, T, dividing_surface)
+        print(R)
         A = rho[0].grid.area(R)
         V = rho[0].grid.volume()
         V_inner = rho[0].grid.volume(R)
@@ -751,6 +766,82 @@ class Functional(metaclass=abc.ABCMeta):
         N = np.array([r.integrate() for r in rho])
         N_ref = V_inner * np.array([r[0] for r in rho]) + V_outer * np.array([r[-1] for r in rho])
         return (N - N_ref) / A
+
+    def adsorbtion_isotherm(self, T, n_points=30, dividing_surface='t', solver=None, rho0=None, calc_lve=False, verbose=False):
+        """rhoT Property
+        Compute the adsorbtion as a function of molar composition along an isotherm
+
+        Args:
+            T (float) : Temperature [K]
+            n_points (int) : Number of (evenly distriubted) points to compute. If an array is supplied, those points are used instead.
+            dividing_surface (str, optional) : 't' or 'tension' for surface of tension, 'e' or 'equimolar' for equimolar surface
+            solver (SequentialSolver, optional) : Custom solver object to use
+            rho0 (list[Profile], optional) : Initial guess for denisty profile at x = [0, 1]
+            calc_lve (bool, optional) : If true, return a tuple (x, y, p) with pressure (p), liquid (x) and vapour (y) composition. If false, return only liquid composition.
+            verbose (int, optional) : Print progress information, higher number gives more output, default 0
+
+        Returns
+            tuple(gamma, x) or tuple(gamma, lve) : Adsorbtion and composition (of first component)
+        """
+        if isinstance(n_points, Iterable):
+            x_lst = n_points
+        else:
+            x_lst = np.linspace(1e-3, 1 - 1e-3, n_points)
+            # x_lst = np.linspace(-2, 2, n_points)
+            # x_lst = np.tanh(x_lst / 2)
+            # bufx = 1e-3
+            # minx = min(x_lst)
+            # maxx = - minx
+            # dx = (maxx - minx)
+            # x_lst = (x_lst - minx) / dx
+            # x_lst = bufx + x_lst * (1 - bufx)
+
+        x_lst[-1] = 0.99
+        x_lst = np.concatenate((x_lst, [0.999]))
+        x_ekstra = np.linspace(1e-3, x_lst[1], 8)
+        x_lst = np.concatenate((x_ekstra, x_lst))
+        x_lst = np.delete(x_lst, [7, 8])
+        n_points = len(x_lst)
+
+        if rho0 is None:
+            d, _ = self.eos.hard_sphere_diameters(T)
+            d *= 1e10
+            w = [abs((di / mi) / (2.4728 - 2.3625 * self.reduce_temperature(T, i))) for i, (di, mi) in
+                 enumerate(zip(d, self.ms))]
+            grid = Grid.tanh_grid(200, Geometry.PLANAR, w, eps=5e-4)
+        else:
+            grid = rho0[0].grid
+        rho = rho0
+
+        ads_array = np.empty((self.ncomps, n_points))
+        for i, x in enumerate(x_lst):
+            if (self.__load_dir__ is not None) or (self.__save_dir__ is not None):
+                file_repr = f"adsorbtion {T} {x} {self.__repr__()} {repr(grid)}"
+                file_id = bytes(file_repr, 'utf-8')
+                filename = f'{self.__save_dir__}/{hashlib.sha256(file_id).hexdigest()}'
+            try:
+                if self.__load_dir__ is None: raise FileNotFoundError
+                rho = Profile.load_file(filename)
+            except FileNotFoundError:
+                rho = self.density_profile_tz(T, [x, 1 - x], grid=grid, rho_0=rho, solver=solver, verbose=verbose - 1)
+
+            if self.__save_dir__ is not None:
+                Profile.save_list(rho, filename)
+
+            ads_array[:, i] = self.adsorbtion(rho, T, dividing_surface=dividing_surface)
+            if verbose > 0:
+                print(f'Finished x = {x} ({round(100 * (i + 1) / len(x_lst), 2)} %)')
+
+        if calc_lve is True:
+            p_lst = np.empty_like(x_lst)
+            y_lst = np.empty_like(x_lst)
+            for i, x in enumerate(x_lst):
+                p_lst[i], y = self.eos.bubble_pressure(T, [x, 1 - x])
+                y_lst[i] = y[0]
+            lve = (x_lst, y_lst, p_lst)
+            return ads_array, lve
+
+        return ads_array, x_lst
 
     def N_adsorbed(self, rho, T=None, dividing_surface='e'):
         """Profile Property
@@ -1006,11 +1097,11 @@ class Functional(metaclass=abc.ABCMeta):
             rho_vle = rho_0
             grid = rho_vle[0].grid
 
-        for i in range(len(rho_vle)):
-            rho_vle[i][:15] *= 0
-            rho_vle[i][:15] += rho_l[i]
-            rho_vle[i][-15:] *= 0
-            rho_vle[i][-15:] += rho_g[i]
+        # for i in range(len(rho_vle)):
+        #     rho_vle[i][:15] *= 0
+        #     rho_vle[i][:15] += rho_l[i]
+        #     rho_vle[i][-15:] *= 0
+        #     rho_vle[i][-15:] += rho_g[i]
 
         N = grid.volume() * ( beta_V * rho_g + (1 - beta_V) * rho_l)
 

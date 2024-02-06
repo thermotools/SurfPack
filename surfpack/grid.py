@@ -121,19 +121,46 @@ class Grid:
             raise NotImplementedError(f'Grid volume not implemented for geometry {self.geometry}')
 
     def set_center(self, z0):
+        """Utility
+        Shift the start and end of the domain, while maintaining the domain width, such that `z0` is at the center of the domain.
+
+        Args:
+            z0 (float) : New center of domain
+        """
         self.domain_start = z0 - self.L / 2
         self.domain_end = z0 + self.L / 2
         self.z = np.linspace(self.domain_start + self.dz / 2, self.domain_end - self.dz / 2, self.N)
 
     def set_domain_start(self, start):
+        """Utility
+        Set the start of the domain, while maintaining the domain width.
+
+        Args:
+            start (float) : New start of domain.
+        """
         self.domain_start = start
         self.domain_end = start + self.L
         self.z = np.linspace(self.domain_start + self.dz / 2, self.domain_end - self.dz / 2, self.N)
+
+    def reset_zero(self, z0):
+        self.domain_start -= z0
+        self.domain_end -= z0
+        self.z -= z0
 
     def get_center(self):
         return (self.domain_end - self.domain_start) / 2
 
     def __getitem__(self, item):
+        """Utility
+        Grids can be sliced, not accessed by index. Slicing a Grid will return a new Grid with the same geometry, but with
+        the number of points, and domain start/end/width adjusted as if you were slicing the Grid.z attribute. That is:
+        ```
+        all(grid.z[start : stop] == grid[start : stop].z) # True
+        (grid.z[stop - 1] - grid.z[start]) == grid[start : stop].L # True
+        len(grid.z[start : stop]) == grid[start : stop].N # True
+        grid.dz == grid[start : stop].dz # True
+        ```
+        """
         if isinstance(item, slice):
             if item.start is None:
                 start = 0
