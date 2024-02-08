@@ -786,7 +786,7 @@ class Functional(metaclass=abc.ABCMeta):
         rho = rho0
         for i, T in enumerate(T_lst):
             rho = self.density_profile_singlecomp(T, grid, rho, solver=solver, verbose=verbose - 1)
-            gamma_lst[i] = self.surface_tension(rho, T)
+            gamma_lst[i] = self.surface_tension(rho, T, dividing_surface='e')
 
             if verbose > 0:
                 print(f'Finished T = {T} / {tc} ({100 * (i + 1) / len(T_lst):.2f} % of points)')
@@ -817,7 +817,7 @@ class Functional(metaclass=abc.ABCMeta):
         N_ref = V_inner * np.array([r[0] for r in rho]) + V_outer * np.array([r[-1] for r in rho])
         return (N - N_ref) / A
 
-    def adsorbtion_isotherm(self, T, n_points=30, dividing_surface='t', solver=None, rho0=None, calc_lve=False, verbose=False):
+    def adsorbtion_isotherm(self, T, n_points=30, dividing_surface='t', x_min=1e-3, x_max=(1 - 1e-3), solver=None, rho0=None, calc_lve=False, verbose=False):
         """rhoT Property
         Compute the adsorbtion as a function of molar composition along an isotherm
 
@@ -836,22 +836,15 @@ class Functional(metaclass=abc.ABCMeta):
         if isinstance(n_points, Iterable):
             x_lst = n_points
         else:
-            x_lst = np.linspace(1e-3, 1 - 1e-3, n_points)
-            # x_lst = np.linspace(-2, 2, n_points)
-            # x_lst = np.tanh(x_lst / 2)
-            # bufx = 1e-3
-            # minx = min(x_lst)
-            # maxx = - minx
-            # dx = (maxx - minx)
-            # x_lst = (x_lst - minx) / dx
-            # x_lst = bufx + x_lst * (1 - bufx)
-
-        x_lst[-1] = 0.99
-        x_lst = np.concatenate((x_lst, [0.999]))
-        x_ekstra = np.linspace(1e-3, x_lst[1], 8)
-        x_lst = np.concatenate((x_ekstra, x_lst))
-        x_lst = np.delete(x_lst, [7, 8])
-        n_points = len(x_lst)
+            x_lst = np.linspace(x_min, x_max, n_points)
+            x_lst = np.linspace(-2, 2, n_points)
+            x_lst = np.tanh(x_lst / 2)
+            bufx = 1e-3
+            minx = min(x_lst)
+            maxx = - minx
+            dx = (maxx - minx)
+            x_lst = (x_lst - minx) / dx
+            x_lst = bufx + x_lst * (1 - bufx)
 
         if rho0 is None:
             d, _ = self.eos.hard_sphere_diameters(T)
@@ -865,18 +858,7 @@ class Functional(metaclass=abc.ABCMeta):
 
         ads_array = np.empty((self.ncomps, n_points))
         for i, x in enumerate(x_lst):
-            if (self.__load_dir__ is not None) or (self.__save_dir__ is not None):
-                file_repr = f"adsorbtion {T} {x} {self.__repr__()} {repr(grid)}"
-                file_id = bytes(file_repr, 'utf-8')
-                filename = f'{self.__save_dir__}/{hashlib.sha256(file_id).hexdigest()}'
-            try:
-                if self.__load_dir__ is None: raise FileNotFoundError
-                rho = Profile.load_file(filename)
-            except FileNotFoundError:
-                rho = self.density_profile_tz(T, [x, 1 - x], grid=grid, rho_0=rho, solver=solver, verbose=verbose - 1)
-
-            if self.__save_dir__ is not None:
-                Profile.save_list(rho, filename)
+            rho = self.density_profile_tz(T, [x, 1 - x], grid=grid, rho_0=rho, solver=solver, verbose=verbose - 1)
 
             ads_array[:, i] = self.adsorbtion(rho, T, dividing_surface=dividing_surface)
             if verbose > 0:
@@ -1151,25 +1133,19 @@ class Functional(metaclass=abc.ABCMeta):
             rho_vle = rho_0
             grid = rho_vle[0].grid
 
-        # for i in range(len(rho_vle)):
-        #     rho_vle[i][:15] *= 0
-        #     rho_vle[i][:15] += rho_l[i]
-        #     rho_vle[i][-15:] *= 0
-        #     rho_vle[i][-15:] += rho_g[i]
-
         N = grid.volume() * ( beta_V * rho_g + (1 - beta_V) * rho_l)
 
         if solver is None:
             solver = SequentialSolver('muT')
             solver.add_picard(3e-3, mixing_alpha=0.01, max_iter=2000)
-            solver.add_picard(1e-3, mixing_alpha=0.015, max_iter=500)
-            solver.add_picard(3e-4, mixing_alpha=0.02, max_iter=500)
-            solver.add_picard(3e-5, mixing_alpha=0.04, max_iter=500)
-            solver.add_picard(1e-5, mixing_alpha=0.05, max_iter=500)
-            solver.add_anderson(1e-7, beta_mix=0.02, max_iter=200)
-            solver.add_anderson(1e-8, beta_mix=0.03, max_iter=200)
-            solver.add_anderson(1e-9, beta_mix=0.05, max_iter=200)
-            solver.add_anderson(1e-10, beta_mix=0.10, max_iter=200)
+            solver.add_picard(1e-3, mixing_alpha=0.015, max_iter=1000)
+            solver.add_picard(3e-4, mixing_alpha=0.02, max_iter=1000)
+            solver.add_picard(3e-5, mixing_alpha=0.04, max_iter=1000)
+            solver.add_picard(1e-5, mixing_alpha=0.05, max_iter=1000)
+            solver.add_anderson(1e-7, beta_mix=0.02, max_iter=500)
+            solver.add_anderson(1e-8, beta_mix=0.03, max_iter=500)
+            solver.add_anderson(1e-9, beta_mix=0.05, max_iter=500)
+            solver.add_anderson(1e-10, beta_mix=0.10, max_iter=500)
 
         if solver.spec == 'NT':
             solver.set_constraints((N, T))
