@@ -304,6 +304,10 @@ class WhiteBear(FMT_Functional):
     def __init__(self, R, ms=None):
         super().__init__(R, ms)
 
+    def get_caching_id(self):
+        ostr = f'WhiteBear : ms : {self.ms}, R : {self._R}'
+        return ostr
+
     def reduced_helmholtz_energy_density(self, rho, T, dphidn=False, bulk=False, asarray=False, dphidT=False, dphidrho=False, n_fmt=None):
         """
         Compute the reduced helmholtz energy density (i.e. f / k_b T) See method in Functional for explanation

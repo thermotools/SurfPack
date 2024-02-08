@@ -21,6 +21,56 @@ class PropertyFlag(IntEnum):
     residual = 1
     ideal = 2
 
+def profilecaching(func):
+    """Utility
+    Decorator used to save computed density profiles. Used for most or all methods that
+    evaluate density profiles at different conditions. By default, models will not save their
+    output or do lookups, but if a save-directory and/or load-directory have been set on the
+    model using `model.set_save_dir()`, `model.set_load_dir()` or `model.set_cache_dir()` these
+    will automatically be used by methods decorated with this decorator.
+
+    The file names are generated from a SHA-256 hash that guarantees a unique file name for every
+    input and model, so different models can safely use the same save/load directory.
+
+    The procedure automatically generates the file `000_REGISTER.txt` where the information
+    used to generate each hash is stored.
+
+    Note: For a file to successfully load, the input must be *exactly* the same, which means that
+    this is mostly suited for scripts that are run several times with the same values, not so much
+    for extracting parameters later. Some methods to parse `000_REGISTER.txt` in order to extract
+    profiles may be useful, but for now you have to manually manage saving if you want to easily
+    extract computed profiles later.
+    """
+    def density_profile(*args, **kwargs):
+        self = args[0]
+        load_dir = self.get_load_dir()
+        save_dir = self.get_save_dir()
+        if (load_dir) or (save_dir is not None):
+            file_id = f"{self.get_caching_id()}\n" \
+                      f"Func : {func.__name__}\n" \
+                      f"Args : {', '.join([str(a) for a in args[1:]])}\n"
+            if 'Vext' in kwargs.keys(): file_repr += 'Vext = ' + str(Vext)
+            string_bytes = file_id.encode('utf-8')
+            sha256_hash = hashlib.sha256(string_bytes)
+            filename = str(sha256_hash.hexdigest())
+            loadpath = f'{load_dir}/{filename}.json'
+            savepath = f'{save_dir}/{filename}.json'
+        try:
+            if load_dir is None: raise FileNotFoundError
+            rho = Profile.load_file(loadpath)
+        except FileNotFoundError:
+            rho = func(*args, **kwargs)
+
+        if save_dir is not None:
+            Profile.save_list(rho, savepath)
+            with open(f'{save_dir}/000_REGISTER.txt', 'a') as file:
+                file.write(f'{filename}\n')
+                for line in file_id.split('\n'):
+                    file.write(f'\t{line}\n')
+                file.write(('#' * 100) + '\n\n')
+        return rho
+    return density_profile
+
 class Functional(metaclass=abc.ABCMeta):
 
     TWOPH = 0
@@ -50,12 +100,20 @@ class Functional(metaclass=abc.ABCMeta):
         self.__save_dir__ = None
         self.__load_dir__ = None
 
+    @abc.abstractmethod
+    def get_caching_id(self):
+        """Utility
+        Returns a unique ID for an initialized model. Should include information about the model type, components,
+        parameters and mixing parameters (if applicable). Used for caching profiles.
+
+        Returns:
+            str : A model identifier
+        """
+        pass
+
     def set_save_dir(self, save_dir):
         """Utility
-        Sets this model to automatically save computed density profiles in the directory 'surfpack/saved_profiles/save_dir'.
-        The names of the saved files are generated from a hash that is guaranteed to be unique for every
-        model and state. Is used in combination with set_load_dir. Note: The save_dir is generated as a sub-directory of
-        the saved_profiles directory within the surfpack package.
+        Sets this model to automatically save computed density profiles in the directory 'save_dir'.
 
         Args:
             save_dir (str) : Name of directory to save to
@@ -63,16 +121,18 @@ class Functional(metaclass=abc.ABCMeta):
         Raises:
             FileExistsError : If save_dir is the name of an existing file that is not a directory.
         """
-        self.__save_dir__ = f'{os.path.dirname(__file__)}/saved_profiles/{save_dir}'
+        self.__save_dir__ = save_dir
         if os.path.exists(self.__save_dir__) and not os.path.isdir(self.__save_dir__):
             raise FileExistsError(f"The file at {self.__save_dir__} exists, and is not a directory.")
         if not os.path.isdir(self.__save_dir__):
             os.makedirs(self.__save_dir__)
 
+    def get_save_dir(self):
+        return self.__save_dir__
+
     def set_load_dir(self, load_dir):
         """Utility
-        Sets this model to automatically search for computed profiles in `surfpack/saved_profiles/load_dir`. The names of the files are generated
-        by from a hash that ensures a unique file for every model and state.
+        Sets this model to automatically search for computed profiles in `load_dir`.
 
         Args:
             load_dir (str) : Name of directory to load files from.
@@ -80,9 +140,12 @@ class Functional(metaclass=abc.ABCMeta):
         Raises:
             NotADirectoryError : If load_dir does not exist.
         """
-        self.__load_dir__ = f'{os.path.dirname(__file__)}/saved_profiles/{load_dir}'
+        self.__load_dir__ = load_dir
         if not os.path.isdir(self.__load_dir__):
             raise NotADirectoryError(f"Load directory {self.__load_dir__} does not exist.")
+
+    def get_load_dir(self):
+        return self.__load_dir__
 
     def set_cache_dir(self, cache_dir):
         """Utility
@@ -100,7 +163,7 @@ class Functional(metaclass=abc.ABCMeta):
 
     def clear_cache_dir(self, clear_dir):
         """Utility
-        Clear the directory `surfpack/saved_profiles/clear_dir`, after prompting for confirmation.
+        Clear the directory `clear_dir`, after prompting for confirmation.
 
         Args:
             clear_dir (str) : The name of the directory.
@@ -108,7 +171,6 @@ class Functional(metaclass=abc.ABCMeta):
         Raises:
             NotADirectoryError : If clear_dir does not exist or is not a directory.
         """
-        clear_dir = f'{os.path.dirname(__file__)}/saved_profiles/{clear_dir}'
         if not os.path.isdir(clear_dir):
             raise NotADirectoryError(f"Directory {clear_dir} does not exist or is not a directory.")
         confirm = input(f'This action will permanently delete the contents of the directory {clear_dir}, are you sure? (Y/n)')
@@ -646,7 +708,7 @@ class Functional(metaclass=abc.ABCMeta):
         raise KeyError(f"Invalid dividing surface identifier '{dividing_surface}'!\n"
                        f"Valid identifiers are ('e' / 'equimolar') or ('t' / 'tension').")
 
-    def surface_tension_isotherm(self, T, n_points=30, dividing_surface='t', solver=None, rho0=None, calc_lve=False, verbose=False):
+    def surface_tension_isotherm(self, T, n_points=30, dividing_surface='t', solver=None, rho0=None, calc_lve=False, verbose=False, cache_dir=''):
         """rhoT Property
         Compute the surface tension as a function of molar composition along an isotherm
 
@@ -723,19 +785,7 @@ class Functional(metaclass=abc.ABCMeta):
         gamma_lst = np.empty_like(T_lst)
         rho = rho0
         for i, T in enumerate(T_lst):
-            if (self.__load_dir__ is not None) or (self.__save_dir__ is not None):
-                file_repr = f"surface_tension_singlecomp {T} {self.__repr__()} {repr(grid)}"
-                file_id = bytes(file_repr, 'utf-8')
-                filename = f'{self.__save_dir__}/{hashlib.sha256(file_id).hexdigest()}'
-            try:
-                if self.__load_dir__ is None: raise FileNotFoundError
-                rho = Profile.load_file(filename)
-            except FileNotFoundError:
-                rho = self.density_profile_singlecomp(T, grid, rho, solver=solver, verbose=verbose - 1)
-
-            if self.__save_dir__ is not None:
-                Profile.save_list(rho, filename)
-
+            rho = self.density_profile_singlecomp(T, grid, rho, solver=solver, verbose=verbose - 1)
             gamma_lst[i] = self.surface_tension(rho, T)
 
             if verbose > 0:
@@ -913,6 +963,7 @@ class Functional(metaclass=abc.ABCMeta):
         rdf = [Profile(sol.profile[i] / rho_b[i], grid) for i in range(self.ncomps)]
         return rdf
 
+    @profilecaching
     def density_profile_wall(self, rho_b, T, grid, Vext=None, rho_0=None, verbose=False):
         """Density Profile
         Calculate equilibrium density profile for a given external potential
@@ -956,6 +1007,7 @@ class Functional(metaclass=abc.ABCMeta):
             self.computed_density_profiles[(tuple(rho_b), T, grid, tuple(Vext))] = copy.deepcopy(profile)
         return profile
 
+    @profilecaching
     def density_profile_tp(self, T, p, z, grid, rho_0=None, solver=None, verbose=False):
         """Density Profile
         Compute the equilibrium density profile across a gas-liquid interface.
@@ -1001,6 +1053,7 @@ class Functional(metaclass=abc.ABCMeta):
         rho_g = y / vg
         return self.density_profile_twophase(rho_g, rho_l, T, grid, beta_V=0.5, rho_0=rho_0, verbose=verbose, solver=solver)
 
+    @profilecaching
     def density_profile_tz(self, T, z, grid, z_phase=1, rho_0=None, solver=None, verbose=0):
         """Density Profile
         Compute the density profile separating two phases at temperature T, with liquid (or optionally vapour) composition x
@@ -1035,6 +1088,7 @@ class Functional(metaclass=abc.ABCMeta):
         rho_g = (y / vg) * Avogadro / 1e30
         return self.density_profile_twophase(rho_g, rho_l, T, grid, rho_0=rho_0, solver=solver, verbose=verbose)
 
+    @profilecaching
     def density_profile_singlecomp(self, T, grid, rho_0=None, solver=None, verbose=False):
         """Density Profile
         Compute the equilibrium density profile across a gas-liquid interface.
@@ -1060,7 +1114,7 @@ class Functional(metaclass=abc.ABCMeta):
         rho_g = np.array([1 / vg])
         return self.density_profile_twophase(rho_g, rho_l, T, grid, beta_V=0.5, rho_0=rho_0, verbose=verbose, solver=solver)
 
-
+    @profilecaching
     def density_profile_twophase(self, rho_g, rho_l, T, grid, beta_V=0.5, rho_0=None, solver=None, verbose=0):
         """Density Profile
         Compute the density profile separating two phases with denisties rho_g and rho_l

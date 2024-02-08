@@ -25,7 +25,14 @@ class SAFT_WhiteBear(WhiteBear):
     def __repr__(self):
         ostr = f'SAFT-Whitebear model for {self.comps}\n' \
                f'with segment numbers : {self.ms}\n' \
-               f'Underlying eos params : {[self.eos.get_pure_fluid_param(i + 1) for i in range(self.ncomps)]}'
+               f'Underlying eos params : {[self.eos.get_pure_fluid_param(i + 1) for i in range(self.ncomps)]}\n'
+        return ostr
+
+    def get_caching_id(self):
+        ostr = f'SAFT-WhiteBear model : {self.comps} \n' \
+               f'ms : {self.ms}, \n' \
+               f'params : {[self.eos.get_pure_fluid_param(i + 1) for i in range(self.ncomps)]}\n' \
+                + super().get_caching_id()
         return ostr
 
     def get_R(self, T, dRdT=False):

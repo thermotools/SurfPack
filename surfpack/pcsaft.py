@@ -29,6 +29,10 @@ class PC_SAFT(SAFT):
         ostr = f'pc-saft model for {self._comps},\n' + super().__repr__()
         return ostr
 
+    def get_caching_id(self):
+        ostr = f'PC-SAFT {self._comps}\n' + super().get_caching_id()
+        return ostr
+
     def get_weights(self, T, dwdT=False):
         """Weights
         Get all the weights used for weighted densities in a 2D array, indexed as weight[<wt idx>][<comp idx>].

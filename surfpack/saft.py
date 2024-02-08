@@ -51,6 +51,17 @@ class SAFT(Functional):
                f'Hard sphere model : {repr(self.hs_model)}'
         return ostr
 
+    def get_caching_id(self):
+        """Utility
+        See Functional for docs.
+        """
+        ostr = f'SAFT : {self._comps}, \n' \
+               f'params : {[self.eos.get_pure_fluid_param(i + 1) for i in range(self.ncomps)]}\n' \
+               f'kij : {[[self.eos.get_kij(i + 1, j + 1) for i in range(self.ncomps)] for j in range(self.ncomps)]}\n' \
+               f'contribs : {[k + " : " + str(self.__contributions__[k]) for k in sorted(self.__contributions__.keys())]}\n' \
+               f'HS model : \n{self.hs_model.get_caching_id()}\n'
+        return ostr
+
     def refresh_hs_model(self): # Call this when parameters have been changed by set-methods
         """Internal
         Update hard-sphere model such that parameters are in sync.
