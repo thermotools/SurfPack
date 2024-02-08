@@ -1,6 +1,7 @@
 ---
 layout: home
 title: SurfPack
+description: A ThermoTools Project
 ---
 
 SurfPack is a library for computation of interfacial properties of fluids, and the properties of fluids at interfaces

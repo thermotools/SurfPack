@@ -45,10 +45,11 @@ NOTE: The files you see are ´.md´ files, but they are compiled to `.html` when
 link to `some_page.html`, not `some_page.md`.
 
 Use of html-templates:
-    The different templates are quite similar, but
-    * Use `home.html` for "Top-level" pages, such as the homepage for each version. This modifies the title and subtitle a bit.
-    * Use `default` for everything else.
-    * I'm not sure if the `documentation` template is in use.
+
+The different templates are quite similar, but
+* Use `home.html` for "Top-level" pages, such as the homepage for each version. This modifies the title and subtitle a bit.
+* Use `default` for everything else.
+* I'm not sure if the `documentation` template is in use.
 
 ----------------------------------------------
 
