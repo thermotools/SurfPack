@@ -1,9 +1,9 @@
 .page-header {
     color: #ffffff;
     text-align: center;
-    background-image: url('/surfpack/assets/graphics/header.pdf');
+    background-image: url('/surfpack/assets/graphics/header.png');
     background-position: center;
-    background-size: cover; /* You can adjust this property */
+    background-size: cover;
 }
 
 .page-header .project-name {

@@ -6,7 +6,7 @@ permalink: /vcurrent/saft_methods.html
 ---
 
 <!--- 
-Generated at: 2024-02-02T20:19:14.177809
+Generated at: 2024-02-13T11:01:33.596076
 This is an auto-generated file, generated using the script at surfpack/docs/tools/markdown_from_docstrings.py
 The file is created by parsing the docstrings of the methods in the 
 saft class. For instructions on how to use the parser routines, see the
@@ -22,6 +22,7 @@ contributions to the Helmholtz energy density, such as association and chain con
     * [get_characteristic_lengths](#get_characteristic_lengthsself)
   * [Internal methods](#internal-methods)
     * [\_\_repr\_\_](#__repr__self)
+    * [get_caching_id](#get_caching_idself)
   * [Profile property interfaces](#profile-property-interfaces)
     * [reduced_helmholtz_energy_density](#reduced_helmholtz_energy_densityself-rho-t-dphidnfalse-bulkfalse-asarrayfalse-dphidtfalse-dphidrhofalse)
   * [Helmholtz energy contributions](#helmholtz-energy-contributions)
@@ -92,10 +93,22 @@ Internal use, mainly documented for maintainers and developers.
 ### Table of contents
   * [Internal methods](#internal-methods)
     * [\_\_repr\_\_](#__repr__self)
+    * [get_caching_id](#get_caching_idself)
 
 
 ### `__repr__(self)`
 Generates a unique string for this model, containing information about the parameters and hard-sphere model. 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+### `get_caching_id(self)`
+Get id that identifies this model. See `Functional` for more information.
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **str :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Unique id for initialised model.
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 

@@ -4,6 +4,7 @@ import os.path
 import shutil
 import warnings
 import hashlib
+from functools import wraps
 import matplotlib.pyplot as plt
 from surfpack.WeightFunction import get_FMT_weights
 from surfpack.Convolver import convolve_ad
@@ -41,15 +42,16 @@ def profilecaching(func):
     profiles may be useful, but for now you have to manually manage saving if you want to easily
     extract computed profiles later.
     """
+    @wraps(func)
     def density_profile(*args, **kwargs):
         self = args[0]
         load_dir = self.get_load_dir()
         save_dir = self.get_save_dir()
-        if (load_dir) or (save_dir is not None):
+        if (load_dir is not None) or (save_dir is not None):
             file_id = f"{self.get_caching_id()}\n" \
                       f"Func : {func.__name__}\n" \
                       f"Args : {', '.join([str(a) for a in args[1:]])}\n"
-            if 'Vext' in kwargs.keys(): file_repr += 'Vext = ' + str(Vext)
+            if 'Vext' in kwargs.keys(): file_id += 'Vext = ' + str(kwargs['Vext'])
             string_bytes = file_id.encode('utf-8')
             sha256_hash = hashlib.sha256(string_bytes)
             filename = str(sha256_hash.hexdigest())
@@ -128,6 +130,12 @@ class Functional(metaclass=abc.ABCMeta):
             os.makedirs(self.__save_dir__)
 
     def get_save_dir(self):
+        """Utility
+        Get the current directory used to save Profiles
+
+        Returns:
+            str : Path to the current save directory
+        """
         return self.__save_dir__
 
     def set_load_dir(self, load_dir):
@@ -145,6 +153,12 @@ class Functional(metaclass=abc.ABCMeta):
             raise NotADirectoryError(f"Load directory {self.__load_dir__} does not exist.")
 
     def get_load_dir(self):
+        """Utility
+        Get the current directory used to search and load Profiles
+
+        Returns:
+            str : Path to the current load directory
+        """
         return self.__load_dir__
 
     def set_cache_dir(self, cache_dir):
@@ -825,6 +839,8 @@ class Functional(metaclass=abc.ABCMeta):
             T (float) : Temperature [K]
             n_points (int) : Number of (evenly distriubted) points to compute. If an array is supplied, those points are used instead.
             dividing_surface (str, optional) : 't' or 'tension' for surface of tension, 'e' or 'equimolar' for equimolar surface
+            x_min (float, optional) : Minimum liquid mole fraction of the first component.
+            x_max (float, optional) : Maximum liquid mole fraction of the first component.
             solver (SequentialSolver, optional) : Custom solver object to use
             rho0 (list[Profile], optional) : Initial guess for denisty profile at x = [0, 1]
             calc_lve (bool, optional) : If true, return a tuple (x, y, p) with pressure (p), liquid (x) and vapour (y) composition. If false, return only liquid composition.
@@ -988,6 +1004,32 @@ class Functional(metaclass=abc.ABCMeta):
         if (tuple(rho_b), T, grid, tuple(Vext)) not in self.computed_density_profiles.keys():
             self.computed_density_profiles[(tuple(rho_b), T, grid, tuple(Vext))] = copy.deepcopy(profile)
         return profile
+
+    @profilecaching
+    def density_profile_wall_tp(self, T, p, z, grid, Vext, rho0=None, verbose=0):
+        """Density Profile
+        Calculate equilibrium density profile for a given external potential
+
+        Args:
+            T (float) : Temperature [K]
+            p (float) : Pressure [Pa]
+            z (list[float]) : Bulk composition
+            grid (Grid) : Spatial discretization
+            Vext (ExtPotential, optional) : External potential as a function of position (default : Vext(r) = 0)
+                                                    Note: Must be hashable, to use with lazy evaluation
+                                                    Recomended: Use the callable classes inherriting ExtPotential
+            rho0 (list[Profile], optional) : Initial guess for density profiles.
+            verbose (bool) : Print progression information during run
+        Returns:
+            list[Profile] : The equilibrium density profiles
+        """
+        flsh = self.eos.two_phase_tpflash(T, p, z)
+        if flsh.phase == self.eos.TWOPH:
+            raise ValueError('Supplied state is a two phase state')
+
+        Vm, = self.eos.specific_volume(T, p, z, self.eos.MINGIBBSPH)
+        rho = np.array(z) * (1 / Vm) * Avogadro / 1e30
+        return self.density_profile_wall(rho, T, grid, Vext, rho_0=rho0, verbose=verbose)
 
     @profilecaching
     def density_profile_tp(self, T, p, z, grid, rho_0=None, solver=None, verbose=False):

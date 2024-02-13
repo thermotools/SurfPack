@@ -6,7 +6,7 @@ permalink: /vcurrent/Functional_methods.html
 ---
 
 <!--- 
-Generated at: 2024-02-02T22:15:46.314531
+Generated at: 2024-02-13T11:55:48.496894
 This is an auto-generated file, generated using the script at surfpack/docs/tools/markdown_from_docstrings.py
 The file is created by parsing the docstrings of the methods in the 
 Functional class. For instructions on how to use the parser routines, see the
@@ -33,8 +33,17 @@ class.
     * [surface_tension](#surface_tensionself-rho-t-vextnone-dividing_surfaceequimolar)
     * [tolmann_length](#tolmann_lengthself-rho-t)
   * [$\rho - T$ property interfaces](#$\rho---t$-property-interfaces)
+    * [adsorbtion_isotherm](#adsorbtion_isothermself-t-n_points30-dividing_surfacet-x_min0001-x_max0999-solvernone-rho0none-calc_lvefalse-verbosefalse)
     * [radial_distribution_functions](#radial_distribution_functionsself-rho_b-t-comp_idx0-gridnone)
-    * [surface_tension_isotherm](#surface_tension_isothermself-t-n_points30-dividing_surfacet-solvernone-rho0none-calc_lvefalse-verbosefalse)
+    * [surface_tension_isotherm](#surface_tension_isothermself-t-n_points30-dividing_surfacet-solvernone-rho0none-calc_lvefalse-verbosefalse-cache_dir)
+  * [Density profile interfaces](#density-profile-interfaces)
+    * [density_profile_singlecomp](#density_profile_singlecompself-t-grid-rho_0none-solvernone-verbosefalse)
+    * [density_profile_tp](#density_profile_tpself-t-p-z-grid-rho_0none-solvernone-verbosefalse)
+    * [density_profile_twophase](#density_profile_twophaseself-rho_g-rho_l-t-grid-beta_v05-rho_0none-solvernone-verbose0)
+    * [density_profile_tz](#density_profile_tzself-t-z-grid-z_phase1-rho_0none-solvernone-verbose0)
+    * [density_profile_wall](#density_profile_wallself-rho_b-t-grid-vextnone-rho_0none-verbosefalse)
+    * [density_profile_wall_tp](#density_profile_wall_tpself-t-p-z-grid-vext-rho0none-verbose0)
+    * [drubble_profile_rT](#drubble_profile_rtself-rho_i-rho_o-t-r-grid-rho_0none)
   * [Bulk property interfaces](#bulk-property-interfaces)
     * [chemical_potential](#chemical_potentialself-rho-t-bulktrue-property_flagir)
     * [fugacity](#fugacityself-rho-t-vextnone)
@@ -45,19 +54,16 @@ class.
     * [get_weights](#get_weightsself-t)
   * [Weighted density computations](#weighted-density-computations)
     * [get_weighted_densities](#get_weighted_densitiesself-*args-**kwargs)
-  * [Density profile computations](#density-profile-computations)
-    * [density_profile_singlecomp](#density_profile_singlecompself-t-grid-rho_0none-solvernone-verbosefalse)
-    * [density_profile_tp](#density_profile_tpself-t-p-z-grid-rho_0none-solvernone-verbosefalse)
-    * [density_profile_twophase](#density_profile_twophaseself-rho_g-rho_l-t-grid-beta_v05-rho_0none-solvernone-verbose0)
-    * [density_profile_tz](#density_profile_tzself-t-z-grid-z_phase1-rho_0none-solvernone-verbose0)
-    * [density_profile_wall](#density_profile_wallself-rho_b-t-grid-vextnone-rho_0none-verbosefalse)
-    * [drubble_profile_rT](#drubble_profile_rtself-rho_i-rho_o-t-r-grid-rho_0none)
   * [Utility methods](#utility-methods)
-    * [clear_profile_dir](#clear_profile_dirself-clear_dir)
+    * [clear_cache_dir](#clear_cache_dirself-clear_dir)
     * [dividing_surface_position](#dividing_surface_positionself-rho-tnone-dividing_surfacee)
     * [equimolar_surface_position](#equimolar_surface_positionrho)
+    * [get_caching_id](#get_caching_idself)
     * [get_characteristic_lengths](#get_characteristic_lengthsself)
+    * [get_load_dir](#get_load_dirself)
+    * [get_save_dir](#get_save_dirself)
     * [reduce_temperature](#reduce_temperatureself-t-c0)
+    * [set_cache_dir](#set_cache_dirself-cache_dir)
     * [set_load_dir](#set_load_dirself-load_dir)
     * [set_save_dir](#set_save_dirself-save_dir)
     * [surface_of_tension_position](#surface_of_tension_positionself-rho-t)
@@ -395,9 +401,61 @@ Compute properties at a given density and temperature, ususally by first computi
 
 ### Table of contents
   * [$\rho - T$ property interfaces](#$\rho---t$-property-interfaces)
+    * [adsorbtion_isotherm](#adsorbtion_isothermself-t-n_points30-dividing_surfacet-x_min0001-x_max0999-solvernone-rho0none-calc_lvefalse-verbosefalse)
     * [radial_distribution_functions](#radial_distribution_functionsself-rho_b-t-comp_idx0-gridnone)
-    * [surface_tension_isotherm](#surface_tension_isothermself-t-n_points30-dividing_surfacet-solvernone-rho0none-calc_lvefalse-verbosefalse)
+    * [surface_tension_isotherm](#surface_tension_isothermself-t-n_points30-dividing_surfacet-solvernone-rho0none-calc_lvefalse-verbosefalse-cache_dir)
 
+
+### `adsorbtion_isotherm(self, T, n_points=30, dividing_surface='t', x_min=0.001, x_max=0.999, solver=None, rho0=None, calc_lve=False, verbose=False)`
+Compute the adsorbtion as a function of molar composition along an isotherm
+
+#### Args:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **T (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Temperature [K]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **n_points (int) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Number of (evenly distriubted) points to compute. If an array is supplied, those points are used instead.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **dividing_surface (str, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  't' or 'tension' for surface of tension, 'e' or 'equimolar' for equimolar surface
+
+&nbsp;&nbsp;&nbsp;&nbsp; **x_min (float, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Minimum liquid mole fraction of the first component.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **x_max (float, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Maximum liquid mole fraction of the first component.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **solver (SequentialSolver, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Custom solver object to use
+
+&nbsp;&nbsp;&nbsp;&nbsp; **rho0 (list[Profile], optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Initial guess for denisty profile at x = [0, 1]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **calc_lve (bool, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  If true, return a tuple (x, y, p) with pressure (p), liquid (x) and vapour (y) composition. If false, return only liquid composition.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **verbose (int, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Print progress information, higher number gives more output, default 0
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; Returns
+
+&nbsp;&nbsp;&nbsp;&nbsp; **tuple(gamma, x) or tuple(gamma, lve) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Adsorbtion and composition (of first component)
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
 ### `radial_distribution_functions(self, rho_b, T, comp_idx=0, grid=None)`
 Compute the radial distribution functions $g_{i,j}$ for $i =$ `comp_idx` using the "Percus trick". To help convergence: First converge the profile for a planar geometry, exposed to an ExtendedSoft potential with a core radius $5R$, where $R$ is the maximum `characteristic_length` of the mixture. Then, shift that profile to the left, and use it as an initial guess for the spherical case. If that doesn't work, the profile can be shifted in several steps (by gradually reducing the core radius of the ExtendedSoft potential). The latter possibility is not implemented, but is just a matter of putting the "shift and recompute" part of this method in a for-loop, and adding some appropriate kwargs.
@@ -428,7 +486,7 @@ Compute the radial distribution functions $g_{i,j}$ for $i =$ `comp_idx` using t
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
-### `surface_tension_isotherm(self, T, n_points=30, dividing_surface='t', solver=None, rho0=None, calc_lve=False, verbose=False)`
+### `surface_tension_isotherm(self, T, n_points=30, dividing_surface='t', solver=None, rho0=None, calc_lve=False, verbose=False, cache_dir='')`
 Compute the surface tension as a function of molar composition along an isotherm
 
 #### Args:
@@ -455,7 +513,7 @@ Compute the surface tension as a function of molar composition along an isotherm
 
 &nbsp;&nbsp;&nbsp;&nbsp; **calc_lve (bool, optional) :** 
 
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  If true, return a BinaryXY object with pressure, liquid and vapour composition. If false, return only liquid composition.
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  If true, return a tuple (x, y, p) with pressure (p), liquid (x) and vapour (y) composition. If false, return only liquid composition.
 
 &nbsp;&nbsp;&nbsp;&nbsp; **verbose (int, optional) :** 
 
@@ -471,221 +529,18 @@ Compute the surface tension as a function of molar composition along an isotherm
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
-## Bulk property interfaces
-
-Evaluating bulk properties.
-
-### Table of contents
-  * [Bulk property interfaces](#bulk-property-interfaces)
-    * [chemical_potential](#chemical_potentialself-rho-t-bulktrue-property_flagir)
-    * [fugacity](#fugacityself-rho-t-vextnone)
-    * [residual_chemical_potential](#residual_chemical_potentialself-rho-t-bulktrue)
-
-
-### `chemical_potential(self, rho, T, bulk=True, property_flag='IR')`
-Compute the chemical potential [J]
-
-#### Args:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **rho (list[float]) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Density [particles / Å^3]
-
-&nbsp;&nbsp;&nbsp;&nbsp; **T (float) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Temperature [K]
-
-&nbsp;&nbsp;&nbsp;&nbsp; **bulk (bool) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Only True is implemented
-
-&nbsp;&nbsp;&nbsp;&nbsp; **property_flag (str, optional) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  'I' for ideal, 'R' for residual, 'IR' for total.
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-#### Returns:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **1d array (float) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  The chemical potentials [J / particle]
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-### `fugacity(self, rho, T, Vext=None)`
-Compute the fugacity at given density and temperature
-
-#### Args:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **rho (list[float]) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Particle density of each species
-
-&nbsp;&nbsp;&nbsp;&nbsp; **T (flaot) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Temperature [K]
-
-&nbsp;&nbsp;&nbsp;&nbsp; **Vext (ExternalPotential, optional) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  External potential for each particle
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-#### Returns:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **1d array (flaot) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  The fugacity of each species.
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-### `residual_chemical_potential(self, rho, T, bulk=True)`
-Compute the residual chemical potential [J]
-
-#### Args:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **rho (list[float]) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Density [particles / Å^3]
-
-&nbsp;&nbsp;&nbsp;&nbsp; **T (float) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Temperature [K]
-
-&nbsp;&nbsp;&nbsp;&nbsp; **bulk (bool) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Only True is implemented
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-#### Returns:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **1d array (float) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  The chemical potentials [J / particle]
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-## Pure fluid properties
-
-Methods to efficiently and conveninetly compute properties for pure fluids. Contain
-some optimisations, tuning and convenience factors that are only possible for
-pure fluids.
-
-### Table of contents
-  * [Pure fluid properties](#pure-fluid-properties)
-    * [surface_tension_singlecomp](#surface_tension_singlecompself-n_points30-t_min05-t_max099-gridnone-solvernone-rho0none-verbose0)
-
-
-### `surface_tension_singlecomp(self, n_points=30, t_min=0.5, t_max=0.99, grid=None, solver=None, rho0=None, verbose=0)`
-Compute the surface tension of a pure component for a series of temperatures.
-
-#### Args:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **n_points (int) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Number of points to compute
-
-&nbsp;&nbsp;&nbsp;&nbsp; **t_min (float) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Start temperature, if 0 < t_min < 1, start temperature will be t_min * Tc, where Tc is the critical temperature.
-
-&nbsp;&nbsp;&nbsp;&nbsp; **t_max (float) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Stop temperature, if 0 < t_max < 1, stop temperature will be t_max * Tc, where Tc is the critical temperature.
-
-&nbsp;&nbsp;&nbsp;&nbsp; **grid (Grid) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Grid to use for initial calculation.
-
-&nbsp;&nbsp;&nbsp;&nbsp; **solver (Solver) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Solver to use for all calculations
-
-&nbsp;&nbsp;&nbsp;&nbsp; **rho0 (list[Profile]) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Initial guess for first density profile.
-
-&nbsp;&nbsp;&nbsp;&nbsp; **verbose (int) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Larger number gives more output during progress.
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-#### Returns:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **tuple(gamma, T) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Where gamma and T are matching 1d arrays of the surface tension and temperature.
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-## Weight function interfaces
-
-Get-methods for weight functions.
-
-### Table of contents
-  * [Weight function interfaces](#weight-function-interfaces)
-    * [get_weights](#get_weightsself-t)
-
-
-### `get_weights(self, T)`
-Returns the weights for weighted densities in a 2D array, ordered as weight[<weight idx>][<component idx>]. See arrayshapes.md for a description of the ordering of different arrays. 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-## Weighted density computations
-
-Compute weighted densities
-
-### Table of contents
-  * [Weighted density computations](#weighted-density-computations)
-    * [get_weighted_densities](#get_weighted_densitiesself-*args-**kwargs)
-
-
-### `get_weighted_densities(self, *args, **kwargs)`
-Compute the weighted densities, and optionally differentials
-
-#### Args:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **rho (ndarray[Profile]) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  2D array of component densities indexed as rho[<component index>][<position index>]
-
-&nbsp;&nbsp;&nbsp;&nbsp; **bulk (bool) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  If True, use simplified expressions for bulk - not requiring FFT
-
-&nbsp;&nbsp;&nbsp;&nbsp; **dndrho (bool) :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Flag to activate calculation of differential
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-#### Returns:
-
-&nbsp;&nbsp;&nbsp;&nbsp; **ndarray :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  array of weighted densities indexed as n[<weight index>][<position index>]
-
-&nbsp;&nbsp;&nbsp;&nbsp; **ndarray :** 
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  array of differentials
-
-&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
-
-## Density profile computations
+## Density profile interfaces
 
 Methods for converging a density profile given various boundary conditions.
 
 ### Table of contents
-  * [Density profile computations](#density-profile-computations)
+  * [Density profile interfaces](#density-profile-interfaces)
     * [density_profile_singlecomp](#density_profile_singlecompself-t-grid-rho_0none-solvernone-verbosefalse)
     * [density_profile_tp](#density_profile_tpself-t-p-z-grid-rho_0none-solvernone-verbosefalse)
     * [density_profile_twophase](#density_profile_twophaseself-rho_g-rho_l-t-grid-beta_v05-rho_0none-solvernone-verbose0)
     * [density_profile_tz](#density_profile_tzself-t-z-grid-z_phase1-rho_0none-solvernone-verbose0)
     * [density_profile_wall](#density_profile_wallself-rho_b-t-grid-vextnone-rho_0none-verbosefalse)
+    * [density_profile_wall_tp](#density_profile_wall_tpself-t-p-z-grid-vext-rho0none-verbose0)
     * [drubble_profile_rT](#drubble_profile_rtself-rho_i-rho_o-t-r-grid-rho_0none)
 
 
@@ -902,6 +757,55 @@ Calculate equilibrium density profile for a given external potential Note: Uses 
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
+### `density_profile_wall_tp(self, T, p, z, grid, Vext, rho0=None, verbose=0)`
+Calculate equilibrium density profile for a given external potential
+
+#### Args:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **T (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Temperature [K]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **p (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Pressure [Pa]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **z (list[float]) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Bulk composition
+
+&nbsp;&nbsp;&nbsp;&nbsp; **grid (Grid) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Spatial discretization
+
+&nbsp;&nbsp;&nbsp;&nbsp; **Vext (ExtPotential, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  External potential as a function of position (default : Vext(r) = 0)
+
+&nbsp;&nbsp;&nbsp;&nbsp; **Note:** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Must be hashable, to use with lazy evaluation
+
+&nbsp;&nbsp;&nbsp;&nbsp; **Recomended:** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Use the callable classes inherriting ExtPotential
+
+&nbsp;&nbsp;&nbsp;&nbsp; **rho0 (list[Profile], optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Initial guess for density profiles.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **verbose (bool) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Print progression information during run
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **list[Profile] :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  The equilibrium density profiles
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
 ### `drubble_profile_rT(self, rho_i, rho_o, T, r, grid, rho_0=None)`
 Compute the density profile across the interface of a droplet or bubble (drubble).
 
@@ -941,24 +845,232 @@ Compute the density profile across the interface of a droplet or bubble (drubble
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
+## Bulk property interfaces
+
+Evaluating bulk properties.
+
+### Table of contents
+  * [Bulk property interfaces](#bulk-property-interfaces)
+    * [chemical_potential](#chemical_potentialself-rho-t-bulktrue-property_flagir)
+    * [fugacity](#fugacityself-rho-t-vextnone)
+    * [residual_chemical_potential](#residual_chemical_potentialself-rho-t-bulktrue)
+
+
+### `chemical_potential(self, rho, T, bulk=True, property_flag='IR')`
+Compute the chemical potential [J]
+
+#### Args:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **rho (list[float]) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Density [particles / Å^3]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **T (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Temperature [K]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **bulk (bool) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Only True is implemented
+
+&nbsp;&nbsp;&nbsp;&nbsp; **property_flag (str, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  'I' for ideal, 'R' for residual, 'IR' for total.
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **1d array (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  The chemical potentials [J / particle]
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+### `fugacity(self, rho, T, Vext=None)`
+Compute the fugacity at given density and temperature
+
+#### Args:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **rho (list[float]) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Particle density of each species
+
+&nbsp;&nbsp;&nbsp;&nbsp; **T (flaot) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Temperature [K]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **Vext (ExternalPotential, optional) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  External potential for each particle
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **1d array (flaot) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  The fugacity of each species.
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+### `residual_chemical_potential(self, rho, T, bulk=True)`
+Compute the residual chemical potential [J]
+
+#### Args:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **rho (list[float]) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Density [particles / Å^3]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **T (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Temperature [K]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **bulk (bool) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Only True is implemented
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **1d array (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  The chemical potentials [J / particle]
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+## Pure fluid properties
+
+Methods to efficiently and conveninetly compute properties for pure fluids. Contain
+some optimisations, tuning and convenience factors that are only possible for
+pure fluids.
+
+### Table of contents
+  * [Pure fluid properties](#pure-fluid-properties)
+    * [surface_tension_singlecomp](#surface_tension_singlecompself-n_points30-t_min05-t_max099-gridnone-solvernone-rho0none-verbose0)
+
+
+### `surface_tension_singlecomp(self, n_points=30, t_min=0.5, t_max=0.99, grid=None, solver=None, rho0=None, verbose=0)`
+Compute the surface tension of a pure component for a series of temperatures.
+
+#### Args:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **n_points (int) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Number of points to compute
+
+&nbsp;&nbsp;&nbsp;&nbsp; **t_min (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Start temperature, if 0 < t_min < 1, start temperature will be t_min * Tc, where Tc is the critical temperature.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **t_max (float) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Stop temperature, if 0 < t_max < 1, stop temperature will be t_max * Tc, where Tc is the critical temperature.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **grid (Grid) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Grid to use for initial calculation.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **solver (Solver) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Solver to use for all calculations
+
+&nbsp;&nbsp;&nbsp;&nbsp; **rho0 (list[Profile]) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Initial guess for first density profile.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **verbose (int) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Larger number gives more output during progress.
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **tuple(gamma, T) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Where gamma and T are matching 1d arrays of the surface tension and temperature.
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+## Weight function interfaces
+
+Get-methods for weight functions.
+
+### Table of contents
+  * [Weight function interfaces](#weight-function-interfaces)
+    * [get_weights](#get_weightsself-t)
+
+
+### `get_weights(self, T)`
+Returns the weights for weighted densities in a 2D array, ordered as weight[<weight idx>][<component idx>]. See arrayshapes.md for a description of the ordering of different arrays. 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+## Weighted density computations
+
+Compute weighted densities
+
+### Table of contents
+  * [Weighted density computations](#weighted-density-computations)
+    * [get_weighted_densities](#get_weighted_densitiesself-*args-**kwargs)
+
+
+### `get_weighted_densities(self, *args, **kwargs)`
+Compute the weighted densities, and optionally differentials
+
+#### Args:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **rho (ndarray[Profile]) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  2D array of component densities indexed as rho[<component index>][<position index>]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **bulk (bool) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  If True, use simplified expressions for bulk - not requiring FFT
+
+&nbsp;&nbsp;&nbsp;&nbsp; **dndrho (bool) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Flag to activate calculation of differential
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **ndarray :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  array of weighted densities indexed as n[<weight index>][<position index>]
+
+&nbsp;&nbsp;&nbsp;&nbsp; **ndarray :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  array of differentials
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
 ## Utility methods
 
 Methods for setting ... and getting ...
 
 ### Table of contents
   * [Utility methods](#utility-methods)
-    * [clear_profile_dir](#clear_profile_dirself-clear_dir)
+    * [clear_cache_dir](#clear_cache_dirself-clear_dir)
     * [dividing_surface_position](#dividing_surface_positionself-rho-tnone-dividing_surfacee)
     * [equimolar_surface_position](#equimolar_surface_positionrho)
+    * [get_caching_id](#get_caching_idself)
     * [get_characteristic_lengths](#get_characteristic_lengthsself)
+    * [get_load_dir](#get_load_dirself)
+    * [get_save_dir](#get_save_dirself)
     * [reduce_temperature](#reduce_temperatureself-t-c0)
+    * [set_cache_dir](#set_cache_dirself-cache_dir)
     * [set_load_dir](#set_load_dirself-load_dir)
     * [set_save_dir](#set_save_dirself-save_dir)
     * [surface_of_tension_position](#surface_of_tension_positionself-rho-t)
 
 
-### `clear_profile_dir(self, clear_dir)`
-Clear the directory `surfpack/saved_profiles/clear_dir`, after prompting for confirmation.
+### `clear_cache_dir(self, clear_dir)`
+Clear the directory `clear_dir`, after prompting for confirmation.
 
 #### Args:
 
@@ -1022,6 +1134,17 @@ Calculate the position of the equimolar surface for a given density profile
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
+### `get_caching_id(self)`
+Returns a unique ID for an initialized model. Should include information about the model type, components, parameters and mixing parameters (if applicable). Used for caching profiles.
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **str :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  A model identifier
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
 ### `get_characteristic_lengths(self)`
 Used to generate initial guesses for density profiles. Should return lengths that give an indication of molecular sizes. For example diameters of hard-spheres, or the Barker-Henderson diameter.
 
@@ -1030,6 +1153,28 @@ Used to generate initial guesses for density profiles. Should return lengths tha
 &nbsp;&nbsp;&nbsp;&nbsp; **ndarray(float) :** 
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  The characteristic length of the molecules.
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+### `get_load_dir(self)`
+Get the current directory used to search and load Profiles
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **str :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Path to the current load directory
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+### `get_save_dir(self)`
+Get the current directory used to save Profiles
+
+#### Returns:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **str :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Path to the current save directory
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
@@ -1054,8 +1199,31 @@ Reduce the temperature in some meaningful manner, using LJ units when possible, 
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
+### `set_cache_dir(self, cache_dir)`
+Forwards call to `self.set_load_dir` and `self.set_save_dir`.
+
+#### Args:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **cache_dir (str) :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  Name of directory save and load files in.
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
+#### Raises:
+
+&nbsp;&nbsp;&nbsp;&nbsp; **FileExistsError :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  If cache_dir is the name of an existing file that is not a directory.
+
+&nbsp;&nbsp;&nbsp;&nbsp; **NotADirectoryError :** 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;  If cache_dir does not exist after successfull call to `self.set_save_dir`
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
+
 ### `set_load_dir(self, load_dir)`
-Sets this model to automatically search for computed profiles in `surfpack/saved_profiles/load_dir`. The names of the files are generated by from a hash that ensures a unique file for every model and state.
+Sets this model to automatically search for computed profiles in `load_dir`.
 
 #### Args:
 
@@ -1074,7 +1242,7 @@ Sets this model to automatically search for computed profiles in `surfpack/saved
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
 ### `set_save_dir(self, save_dir)`
-Sets this model to automatically save computed density profiles in the directory 'surfpack/saved_profiles/save_dir'. The names of the saved files are generated from a hash that is guaranteed to be unique for every model and state. Is used in combination with set_load_dir. Note: The save_dir is generated as a sub-directory of the saved_profiles directory within the surfpack package.
+Sets this model to automatically save computed density profiles in the directory 'save_dir'.
 
 #### Args:
 

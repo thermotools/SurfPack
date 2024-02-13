@@ -30,6 +30,12 @@ class PC_SAFT(SAFT):
         return ostr
 
     def get_caching_id(self):
+        """Internal
+        Get id that identifies this model. See `Functional` for more information.
+
+        Returns:
+            str : Unique id for initialised model.
+        """
         ostr = f'PC-SAFT {self._comps}\n' + super().get_caching_id()
         return ostr
 

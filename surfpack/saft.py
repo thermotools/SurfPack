@@ -523,7 +523,8 @@ class SAFT(Functional):
 
     def reduced_helmholtz_energy_density(self, rho, T, dphidn=False, bulk=False, asarray=False, dphidT=False):
         """Profile Property
-        Compute the reduced helmholtz energy density [1 / Å^3] (see the Functional class for explanation)
+        Compute the reduced helmholtz energy density [1 / Å^3] (see the Functional class for explanation, this is simply
+        an overlaod that puts toghether all the contributions.)
 
         Args:
             rho (list[Profile] or list[float]) : Density profiles [particles / Å^3], indexed as rho[<comp idx>][<grid idx>].

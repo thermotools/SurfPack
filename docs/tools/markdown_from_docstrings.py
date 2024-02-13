@@ -121,7 +121,10 @@ def to_markdown(methods):
     """
     md_text = ''
     for name, meth in methods:
-        docparts = meth.__doc__.split('\n\n')
+        if meth.__doc__ is None:
+            docparts = ['\n']
+        else:
+            docparts = meth.__doc__.split('\n\n')
         header_lines = [line.strip() for line in docparts[0].split('\n')]
         header = ' '.join(header_lines[1:]) # Cutting out the section identifier
         header.replace('\n', ' ')
@@ -175,7 +178,10 @@ def split_methods_by_section(sections, methods):
         # A method can be added to several sections, by giving it the header
         # def myfunc():
         #   """Section1 & Section2 & Section5 ... """
-        method_sections = [m.strip() for m in meth.__doc__.split('\n')[0].lower().split('&')] # extracting the section names as described above
+        if meth.__doc__ is None:
+            method_sections = []
+        else:
+            method_sections = [m.strip() for m in meth.__doc__.split('\n')[0].lower().split('&')] # extracting the section names as described above
         method_has_section = False
         for sec in sections:
             if sec.lower() in method_sections:
@@ -329,11 +335,11 @@ def Functional_to_markdown():
 
     sections = ['Profile Property',
                 'rhoT Property',
+                'Density Profile',
                 'Bulk Property',
                 'Pure Property',
                 'Weights',
                 'Weighted density',
-                'Density Profile',
                 'Helmholtz Contribution',
                 'Utility',
                 'Internal']
@@ -342,11 +348,11 @@ def Functional_to_markdown():
                        'Utility' : 'Utility methods',
                        'Profile Property' : 'Profile property interfaces',
                        'rhoT Property' : r'$\rho - T$ property interfaces',
+                       'Density Profile' : 'Density profile interfaces',
                        'Bulk Property' : 'Bulk property interfaces',
                        'Pure Property' : 'Pure fluid properties',
                        'Weights' : 'Weight function interfaces',
                        'Weighted density' : 'Weighted density computations',
-                       'Density Profile' : 'Density profile computations',
                        'Helmholtz Contribution' : 'Helmholtz Contributions'}
 
     section_intro = {'Internal': 'Methods for handling communication with the Fortran library.',

@@ -6,7 +6,7 @@ permalink: /vcurrent/saft_methods.html
 ---
 
 <!--- 
-Generated at: 2024-02-02T20:14:12.001323
+Generated at: 2024-02-13T10:57:21.953235
 This is an auto-generated file, generated using the script at surfpack/docs/tools/markdown_from_docstrings.py
 The file is created by parsing the docstrings of the methods in the 
 saft class. For instructions on how to use the parser routines, see the
@@ -18,6 +18,7 @@ compute quantities of interest when investigating SAFT-type functionals.
 
 ## Table of contents
   * [Utility methods](#utility-methods)
+    * [get_caching_id](#get_caching_idself)
     * [get_eps_div_k](#get_eps_div_kself-ic)
     * [get_sigma](#get_sigmaself-ic)
     * [pair_potential](#pair_potentialself-i-j-r)
@@ -28,7 +29,7 @@ compute quantities of interest when investigating SAFT-type functionals.
     * [set_eps_div_k](#set_eps_div_kself-ic-eps_div_k)
     * [set_multipole_active](#set_multipole_activeself-active)
     * [set_pure_assoc_param](#set_pure_assoc_paramself-ic-eps-beta)
-    * [set_pure_param](#set_pure_paramself-ic-m-sigma-eps_div_k-*other)
+    * [set_pure_fluid_param](#set_pure_fluid_paramself-ic-m-sigma-eps_div_k-*assoc_param)
     * [set_segment_number](#set_segment_numberself-ic-m)
     * [set_sigma](#set_sigmaself-ic-sigma)
   * [Internal methods](#internal-methods)
@@ -57,6 +58,7 @@ Helmholtz energy for SAFT-type equations of state
 
 ### Table of contents
   * [Utility methods](#utility-methods)
+    * [get_caching_id](#get_caching_idself)
     * [get_eps_div_k](#get_eps_div_kself-ic)
     * [get_sigma](#get_sigmaself-ic)
     * [pair_potential](#pair_potentialself-i-j-r)
@@ -67,10 +69,15 @@ Helmholtz energy for SAFT-type equations of state
     * [set_eps_div_k](#set_eps_div_kself-ic-eps_div_k)
     * [set_multipole_active](#set_multipole_activeself-active)
     * [set_pure_assoc_param](#set_pure_assoc_paramself-ic-eps-beta)
-    * [set_pure_param](#set_pure_paramself-ic-m-sigma-eps_div_k-*other)
+    * [set_pure_fluid_param](#set_pure_fluid_paramself-ic-m-sigma-eps_div_k-*assoc_param)
     * [set_segment_number](#set_segment_numberself-ic-m)
     * [set_sigma](#set_sigmaself-ic-sigma)
 
+
+### `get_caching_id(self)`
+See Functional for docs. 
+
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
 ### `get_eps_div_k(self, ic)`
 Get the epsilon parameter
@@ -236,7 +243,7 @@ Set pure-conponent association parameters
 
 &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; 
 
-### `set_pure_param(self, ic, m, sigma, eps_div_k, *other)`
+### `set_pure_fluid_param(self, ic, m, sigma, eps_div_k, *assoc_param)`
 Set all pure component parameters
 
 #### Args:
@@ -348,7 +355,7 @@ profile to ensure equilibrium.
 
 
 ### `reduced_helmholtz_energy_density(self, rho, T, dphidn=False, bulk=False, asarray=False, dphidT=False)`
-Compute the reduced helmholtz energy density [1 / Å^3] (see the Functional class for explanation)
+Compute the reduced helmholtz energy density [1 / Å^3] (see the Functional class for explanation, this is simply an overlaod that puts toghether all the contributions.)
 
 #### Args:
 
