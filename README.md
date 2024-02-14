@@ -1,33 +1,14 @@
 # SurfPack 
-## Classical density functinal theory for surfaces and interfaces
 
-# Issues
-  * Binary weights and accuracy when not using Fourier weights
-  * plot binary results vs. MC
+SurfPack is a library for computation of interfacial properties of fluids, and the properties of fluids at interfaces
+and in confined systems. The library includes an interface to Classical Density Functional theory, with implementations
+of several SAFT-based functionals. The package is implemented in pure python, building on the
+[ThermoPack](https://thermotools.github.io/thermopack/) python interface.
 
-# List of todos (Remove when accomplished)
-  * Implement Lanczos sigma
-  * Test with a wall potential
-  * Implement postprocessing routine to extract useful variables
-  * The thermopack association term implementation must be revised
-  * Implement association into the DFT code [[2]](#2)
-  * Implement one-dimensional cylindrical geometries
-  * Extract radial distribution function and compare to simulations
-  * Entropy for spherical
-  * Plot inital profile on top of result
-  * Spherical:
-    * Extend and shorten profiles
-    * Step on Ntot?
-    * Droplets correct initial profiles based on dP and sigma0
-    * Test gradient at bulk boundary
-    * Test grid size and width effect
+For documentation, installation- and getting started guides, see the [SurfPack homepage](https://thermotools.github.io/SurfPack).
+
 
 # References
-<a id="1">[1]</a>
-J. Mairhofer, J. Gross, Fluid Phase Equilib., 444, 1-12, 2017.
-
-<a id="2">[2]</a>
-E. Sauer, J. Gross, Ind. Eng. Chem. Res., 56, 4119, 2017.
-
-<a id="3">[3]</a>
-Heier et al., Mol. Phys., 116, 2018. (10.1080/00268976.2018.1447153)
+* J. Mairhofer, J. Gross, Fluid Phase Equilib., 444, 1-12, 2017.
+* E. Sauer, J. Gross, Ind. Eng. Chem. Res., 56, 4119, 2017.
+* Heier et al., Mol. Phys., 116, 2018. (10.1080/00268976.2018.1447153)
