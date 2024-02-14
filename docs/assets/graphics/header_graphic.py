@@ -60,23 +60,24 @@ if __name__ == '__main__':
     znorm = Normalize(-1, 1)
     plt.figure(figsize=(10, 5))
 
-    nz = [50, 100, 50, 50, 100, 100]
+    nz = [75, 150, 75, 75, 150, 150]
     funclist = [h1, h2, f1, f2, g1, g2]
     color_xshift = [0.8, 1, 0.6]
     alpha_list = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
     N = 50
     N_seg = len(xlist) // N
-    for i in range(N):
+    for ni in range(N):
         funclist = np.roll(funclist, -1)
         alpha_list = np.roll(alpha_list, -1)
         nz = np.roll(nz, -1)
-        xl = xlist[i * N_seg : (i + 1) * N_seg + 1]
+        xl = xlist[ni * N_seg : (ni + 1) * N_seg + 1]
         for fi, func in enumerate(funclist):
+            print(f'Finished {fi} / {ni}')
             zl = np.linspace(-1, 1, nz[fi])
             for z in zl:
                 for i in range(len(xl) - 1):
                     plt.plot(xl[i : i + 2], func(xl[i : i + 2], z), color=cmap2d(xnorm(xl[i]), znorm(z))
-                             , alpha=alpha_list[fi])
+                             , alpha=0.03 * (0.5 * xl[i]**2 + 0.5))
 
     # NOTE: Because I couldn't figure out how to completely remove the green background from the header, the background
     #       figure needs to have white backing (not be transparent). Someone that knows more CSS than me can probably
@@ -90,6 +91,7 @@ if __name__ == '__main__':
     ax.get_yaxis().set_ticks([])
     plt.gca().set_facecolor('white')
 
+    plt.ylim(-1.5, 2)
     plt.xlim(min(xlist), max(xlist))
     plt.savefig('header.png', bbox_inches='tight', pad_inches=0, dpi=96)
     plt.show()

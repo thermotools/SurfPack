@@ -40,13 +40,13 @@
 <div class="sidebar">
     {% if page.version == "0.0.0" %}
       {% capture sidebar_content %}{% include sidebar_2.1.0.md %}{% endcapture %}
-      {% assign home_link = "/surfpack/v0.0.0/home.html" %}
+      {% assign home_link = "/SurfPack/v0.0.0/home.html" %}
     {% elsif page.version == "0.1.0" %}
       {% capture sidebar_content %}{% include sidebar_2.2.0.md %}{% endcapture %}
-      {% assign home_link = "/surfpack/v0.1.0/home.html" %}
+      {% assign home_link = "/SurfPack/v0.1.0/home.html" %}
     {% else %}
       {% capture sidebar_content %}{% include sidebar.md %}{% endcapture %}
-      {% assign home_link = "/surfpack/index.html" %}
+      {% assign home_link = "/SurfPack/index.html" %}
     {% endif %}
 
     <div>
@@ -57,7 +57,7 @@
 
     <div class="sidebar-buttons">
         <div class="sidebar-button">
-            <a href="{{ site.github.repository_url }}" class="btn">View on GitHub</a>
+            <a href="{{ site.github.repository }}" class="btn">View on GitHub</a>
         </div>
         <div class="sidebar-button">
             <a href="{{ site.pypi_url }}" class="btn">View on PyPi</a>

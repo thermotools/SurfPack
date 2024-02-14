@@ -17,38 +17,32 @@
 <a id="skip-to-content" href="#content">Skip to the content.</a>
 
 <div class="sidebar">
-    {% if page.version == "2.1.0" %}
+    {% if page.version == "0.0.0" %}
       {% capture sidebar_content %}{% include sidebar_2.1.0.md %}{% endcapture %}
-      {% assign home_link = "/thermopack/v2.1.0/home.html" %}
-      {% assign github_link = "https://github.com/thermotools/thermopack/tree/v2.1.0" %}
-      {% assign zip_url = "https://github.com/thermotools/thermopack/archive/refs/tags/v2.1.0.zip" %}
-    {% elsif page.version == "2.2.0" %}
+      {% assign home_link = "/SurfPack/v0.0.0/home.html" %}
+    {% elsif page.version == "0.1.0" %}
       {% capture sidebar_content %}{% include sidebar_2.2.0.md %}{% endcapture %}
-      {% assign home_link = "/thermopack/v2.2.0/home.html" %}
-      {% assign github_link = site.github.repository_url %}
-      {% assign zip_url = site.github.zip_url %}
+      {% assign home_link = "/SurfPack/v0.1.0/home.html" %}
     {% else %}
       {% capture sidebar_content %}{% include sidebar.md %}{% endcapture %}
-      {% assign home_link = "/thermopack/index.html" %}
-      {% assign github_link = site.github.repository_url %}
-      {% assign zip_url = site.github.zip_url %}
+      {% assign home_link = "/SurfPack/index.html" %}
     {% endif %}
 
     <div>
-        <a href="{{ home_link }}"><h2>ThermoPack {{ page.version }}</h2></a>
+        <a href="{{ home_link }}"><h2>SurfPack {{ page.version }}</h2></a>
     </div>
 
     {{ sidebar_content | markdownify }}
 
     <div class="sidebar-buttons">
         <div class="sidebar-button">
-            <a href="{{ github_link }}" class="btn">View on GitHub</a>
+            <a href="{{ site.github.repository }}" class="btn">View on GitHub</a>
         </div>
         <div class="sidebar-button">
-            <a href="{{ site.pypi.url }}" class="btn">View on PyPi</a>
+            <a href="{{ site.pypi_url }}" class="btn">View on PyPi</a>
         </div>
         <div class="sidebar-button">
-            <a href="{{ zip_url }}" class="btn">Download .zip</a>
+            <a href="{{ site.github.zip_url }}" class="btn">Download .zip</a>
         </div>
     </div>
 </div>
