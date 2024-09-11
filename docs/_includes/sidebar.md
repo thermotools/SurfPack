@@ -10,5 +10,6 @@
       * [`PC_SAFT` - The PC-SAFT DFT](/SurfPack/vcurrent/PC_SAFT_methods.html)
 * [Memos - On The Details](/SurfPack/memo/index.html)
 * [Latest version (beta)](/SurfPack/)
+* [v1.0.x](/SurfPack/v1.0.0)
 * [Citation](/SurfPack/please_cite.html)
 * [Contact](/SurfPack/contact.html)
