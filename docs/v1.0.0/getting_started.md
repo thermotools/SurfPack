@@ -6,7 +6,7 @@ permalink: /v1.0.0/getting_started.html
 ---
 
 Currently, the primary documentation to help you get started using `SurfPack` will be the examples
-found in the [pyExamples directory]().
+found in the [pyExamples directory](https://github.com/thermotools/SurfPack/tree/v1.0.0/pyExamples).
 
 SurfPack is designed much the same way as [`ThermoPack`](/thermopack/index.html) and 
 [`KineticGas`](/KineticGas/index.html): Models are classes, and the primary user-interface to
