@@ -1,8 +1,8 @@
 ---
 layout: default
-version: 
+version: 1.0.0
 title: Installation
-permalink: /vcurrent/installation.html
+permalink: /v1.0.0/installation.html
 ---
 
 SurfPack is a pure python package, and is distributed on the Python Packaging Index (PyPI). To install SurfPack, run
