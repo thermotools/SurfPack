@@ -1,8 +1,8 @@
 ---
 layout: default
 version: 
-title: Methods in the saft class
-permalink: /vcurrent/saft_methods.html
+title: Methods in the PC-SAFT class
+permalink: /vcurrent/PC_SAFT_methods.html
 ---
 
 <!--- 

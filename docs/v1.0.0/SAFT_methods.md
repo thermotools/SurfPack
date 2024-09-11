@@ -1,8 +1,8 @@
 ---
 layout: default
 version: 1.0.0
-title: Methods in the saft class
-permalink: /v1.0.0/saft_methods.html
+title: Methods in the SAFT class
+permalink: /v1.0.0/SAFT_methods.html
 ---
 
 <!--- 
