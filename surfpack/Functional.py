@@ -5,13 +5,12 @@ import shutil
 import warnings
 import hashlib
 from functools import wraps
-import matplotlib.pyplot as plt
-from surfpack.WeightFunction import get_FMT_weights
 from surfpack.Convolver import convolve_ad
 from surfpack.grid import Grid, GridSpec, Geometry
 from surfpack.profile import Profile
-from surfpack.external_potential import ExpandedSoft
-from surfpack.solvers import picard_rhoT, anderson_rhoT, solve_sequential, picard_NT, anderson_NT, picard_muT, anderson_muT, solve_sequential_NT, solve_sequential_muT, solve_sequential_rhoT, SequentialSolver, GridRefiner
+from surfpack.solvers import picard_rhoT, anderson_rhoT, solve_sequential, picard_NT, anderson_NT, picard_muT, \
+    anderson_muT, solve_sequential_NT, solve_sequential_muT, solve_sequential_rhoT, SequentialSolver, GridRefiner, \
+    get_solver
 import numpy as np
 from scipy.constants import Boltzmann, Avogadro, gas_constant
 from collections.abc import Iterable
@@ -50,8 +49,13 @@ def profilecaching(func):
         if (load_dir is not None) or (save_dir is not None):
             file_id = f"{self.get_caching_id()}\n" \
                       f"Func : {func.__name__}\n" \
-                      f"Args : {', '.join([str(a) for a in args[1:]])}\n"
-            if 'Vext' in kwargs.keys(): file_id += 'Vext = ' + str(kwargs['Vext'])
+                      f"Args : {', '.join([str(a) for a in args[1:]])}\n"\
+                      f"Kwargs : "
+            for k, v in kwargs.items():
+                if len(str(v)) < 10:
+                    file_id += str(k) + '=' + str(v) + ', '
+            file_id += '\n'
+
             string_bytes = file_id.encode('utf-8')
             sha256_hash = hashlib.sha256(string_bytes)
             filename = str(sha256_hash.hexdigest())
@@ -85,7 +89,8 @@ class Functional(metaclass=abc.ABCMeta):
 
     def __init__(self, ncomps):
         """Internal
-        Handles initialisation that is common for all functionals
+        Handles initialisation that is common for all functionals. Note: Inheriting functionals should
+        set the _solver_key attribute depending on components.
 
         Args:
             ncomps (int) : Number of components
@@ -101,6 +106,8 @@ class Functional(metaclass=abc.ABCMeta):
         self.computed_density_profiles = {}
         self.__save_dir__ = None
         self.__load_dir__ = None
+
+        self._solver_key = 'default'
 
     @abc.abstractmethod
     def get_caching_id(self):
@@ -276,6 +283,19 @@ class Functional(metaclass=abc.ABCMeta):
         """
         pass
 
+    def pair_potential(self, i, j, r):
+        """Utility
+        Compute the pair potential between species i and j at distance r.
+
+        Args:
+            i (int) : First component index
+            j (int) : Second component index
+            r (float) : Seperation disntance (Å)
+        Returns:
+            float : Interaction potential energy (J)
+        """
+        pass
+
     def find_non_bulk_idx(self, profile, rho_b, tol=0.01, start_idx=-1):
         """Deprecated
         Possibly no longer working, used to find the the first index in a Profile which is no longer considered a point in
@@ -395,7 +415,6 @@ class Functional(metaclass=abc.ABCMeta):
             mu_id = Boltzmann * T * np.log((debroglie ** 3) * rho)
         else:
             mu_id = 0
-
         return mu_id + mu_res
 
     def residual_helmholtz_energy_density(self, rho, T, bulk=False):
@@ -910,7 +929,8 @@ class Functional(metaclass=abc.ABCMeta):
         adsorbtion = self.adsorbtion(rho, T, dividing_surface)
         return adsorbtion * A
 
-    def radial_distribution_functions(self, rho_b, T, comp_idx=0, grid=None):
+    @profilecaching
+    def radial_distribution_functions(self, rho_b, T, comp_idx=0, grid=None, rmax=50, solver=None, rdf_0=None, verbose=0):
         """rhoT Property
         Compute the radial distribution functions $g_{i,j}$ for $i =$ `comp_idx` using the "Percus trick". To help convergence:
         First converge the profile for a planar geometry, exposed to an ExtendedSoft potential with a core radius $5R$, where
@@ -925,37 +945,43 @@ class Functional(metaclass=abc.ABCMeta):
             T (float) : Temperature [K]
             comp_idx (int) : The first component in the pair, defaults to the first component
             grid (Grid) : The spatial discretisation (should have Spherical geometry for results to make sense)
+            rmax (float) : Maximum range for which to compute the RDF.
+            solver (SequentialSolver or GridRefiner) : Optional, The solver to use. A default solver is constructed if
+                                                        none is supplied.
+            rdf_0 (list[Profile]) : Initial guess for the rdf.
+            verbose (int, optional) : Higher number for more output during calculation
         Returns:
             list[Profile] : The radial distribution functions around a particle of type `comp_idx`
         """
-        R = self.get_characteristic_lengths()
-        if grid is None:
-            grid = Grid(2500, Geometry.SPHERICAL, 25 * R)
 
-        tolerances = [1e-4, 1e-8]
-        solvers = [picard_rhoT, anderson_rhoT]
-        solver_kwargs = [{'mixing_alpha': 0.05, 'max_iter': 100},
-                         {'beta_mix' : 0.05, 'max_iter' : 300}]
+        if grid is None:
+            grid = Grid(1000, Geometry.SPHERICAL, rmax)
+
+        solvers = [picard_rhoT, picard_rhoT, anderson_rhoT]
+        tolerances = [1e-3, 1e-5, 1e-9]
+        solver_kwargs = [{'mixing_alpha': 0.01, 'max_iter': 1000},
+                         {'mixing_alpha': 0.05, 'max_iter': 500},
+                         {'beta_mix': 0.05, 'max_iter': 500}]
 
         # First, converge for a planar geometry
         grid_p = Grid(grid.N, Geometry.PLANAR, grid.L)
-        Vext = [ExpandedSoft(R, lambda r: self.pair_potential(comp_idx, i, r)) for i in range(self.ncomps)]
-        rho = Profile.from_potential(rho_b, T, grid_p, Vext=Vext)
-        sol = solve_sequential(self, rho_b, T, rho, solvers, tolerances, solver_kwargs, Vext=Vext)
+        Vext = [lambda r: self.pair_potential(comp_idx, i, r) for i in range(self.ncomps)]
+        if rdf_0 is None:  # Generate initial guess and converge profile with planar potential to improve it.
+            rho = Profile.from_potential(rho_b, T, grid_p, Vext=Vext)
+            sol = solve_sequential_rhoT(self, rho, rho_b, T, solvers=solvers, tolerances=tolerances,
+                                        solver_kwargs=solver_kwargs, Vext=Vext, verbose=verbose)
+            if sol.converged is False:
+                warnings.warn('Initial computation for planar profile did not converge!', RuntimeWarning, stacklevel=2)
+        else:
+            rho = [rho_b[i] * rdf_0[i] for i in range(self.ncomps)]
 
-        if sol.converged is False:
-            warnings.warn('Initial computation for planar profile did not converge!', RuntimeWarning, stacklevel=2)
-
-        # Shift profile by R, convert geometry to spherical, and reconverge profile
-        shift_idx = - int(R / grid.dz)
-        for i in range(self.ncomps):
-            rho[i] = np.roll(np.asarray(sol.profile[i]), shift_idx)
-            rho[i][shift_idx:] = rho_b[i]
         rho = [Profile(rho[i], grid) for i in range(self.ncomps)]
-
-        sol = solve_sequential(self, rho_b, T, rho, solvers, tolerances, solver_kwargs, Vext=Vext)
+        Vext = [lambda r: self.pair_potential(comp_idx, i, r) for i in range(self.ncomps)]
+        sol = solve_sequential_rhoT(self, rho, rho_b, T, solvers=solvers,
+                                    tolerances=tolerances, solver_kwargs=solver_kwargs, Vext=Vext, verbose=verbose)
         if sol.converged is False:
-            warnings.warn('Density profile did not converge after maximum number of iterations', RuntimeWarning, stacklevel=2)
+            warnings.warn('Density profile did not converge after maximum number of iterations', RuntimeWarning,
+                          stacklevel=2)
 
         # Divide by bulk densities to get RDF.
         rdf = [Profile(sol.profile[i] / rho_b[i], grid) for i in range(self.ncomps)]
@@ -1084,10 +1110,10 @@ class Functional(metaclass=abc.ABCMeta):
 
         Args:
             T (float) : Temperature [K]
-            z (ndarray[float]) : Molar composition of liquid phase (unless x_phase=2)
+            z (ndarray[float]) : Molar composition of liquid phase (unless z_phase=2)
             grid (Grid or GridSpec) : The spatial discretization
-            z_phase (int) : ThermoPack Phase flag, indicating which phase has composition `x`. `x_phase=1` for liquid (default)
-                            `x_phase=2` for vapour.
+            z_phase (int) : ThermoPack Phase flag, indicating which phase has composition `z`. `z_phase=1` for liquid (default)
+                            `z_phase=2` for vapour.
             rho_0 (list[Profile], optional) : Initial guess
             solver (SequentialSolver or GridRefiner, optional) : Solver to use
             verbose (int) : Print debugging information (higher number gives more output), default 0
@@ -1178,16 +1204,7 @@ class Functional(metaclass=abc.ABCMeta):
         N = grid.volume() * ( beta_V * rho_g + (1 - beta_V) * rho_l)
 
         if solver is None:
-            solver = SequentialSolver('muT')
-            solver.add_picard(3e-3, mixing_alpha=0.01, max_iter=2000)
-            solver.add_picard(1e-3, mixing_alpha=0.015, max_iter=1000)
-            solver.add_picard(3e-4, mixing_alpha=0.02, max_iter=1000)
-            solver.add_picard(3e-5, mixing_alpha=0.04, max_iter=1000)
-            solver.add_picard(1e-5, mixing_alpha=0.05, max_iter=1000)
-            solver.add_anderson(1e-7, beta_mix=0.02, max_iter=500)
-            solver.add_anderson(1e-8, beta_mix=0.03, max_iter=500)
-            solver.add_anderson(1e-9, beta_mix=0.05, max_iter=500)
-            solver.add_anderson(1e-10, beta_mix=0.10, max_iter=500)
+            solver = get_solver(self._solver_key, spec='muT')
 
         if solver.spec == 'NT':
             solver.set_constraints((N, T))
@@ -1197,7 +1214,6 @@ class Functional(metaclass=abc.ABCMeta):
             solver.set_constraints((mu, N, T))
         else:
             raise KeyError(f"Solver spec must be 'NT' or 'muT' but was {solver.spec}.")
-
 
         sol = solver(self, rho_vle, verbose=verbose - 1)
         # After converging the profile: Check that it extends sufficiently into the

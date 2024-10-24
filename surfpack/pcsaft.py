@@ -36,7 +36,9 @@ class PC_SAFT(SAFT):
         Returns:
             str : Unique id for initialised model.
         """
-        ostr = f'PC-SAFT {self._comps}\n' + super().get_caching_id()
+        ostr = f'PC-SAFT {self._comps}\n' \
+               f'kij : {[[self.eos.get_kij(i + 1, j + 1) for i in range(self.ncomps)] for j in range(self.ncomps)]}\n' \
+               + super().get_caching_id()
         return ostr
 
     def get_weights(self, T, dwdT=False):

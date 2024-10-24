@@ -8,7 +8,7 @@
 
 
 # Implementation structure
-This is how the model in the src2 directory is organised
+This is how the model in the surfpack directory is organised
 
 All DFT models inherit the `Functional` class, which serves a purpose analogous to the `thermo` class in ThermoPack. The inheritance tree at the moment of writing is
 
@@ -87,37 +87,21 @@ been much hassle.
 
 # Solvers
 
-Numerical solvers are found in `solvers.py`. The current state is a little messy, but trust me, there is a plan behind it:
+Numerical solvers are found in `solvers.py`. The current state is a little messy, mostly due to some more-or-less obsolete
+code not being cleaned out yet. The most important point is the following:
 
-In order to obtain a converged density profile, you should be calling one of
+Some pre-tuned solvers can be retrieved using the `get_solver` function. This function accepts several keys, used to 
+specify the type of mixture you are working with, and will return a solver tuned to that mixture. If no tuned solver exists,
+a default solver is returned. If that solver does not work, you will need to tune your own solver.
 
-* `solve_sequential_NT`
-* `solve_sequential_muT`
-* `solve_sequential_rhoT`
+## Tuning a solver
 
-which are differentiated only in what constraints they take as arguments. All the above will just re-package the supplied arguments 
-and forward a call to `solve_sequential`.
+The numerical solver you want to use to converge a density profile is an instance of the `SequentialSolver` class. This
+class is callable, and will iterate through a series of progressively more agressive solvers until the problem is converged,
+with some fallback-mechanisms etc. to handle cases where the solvers are too agressive.
 
-When calling one of the `solve_sequential_*` functions, you must supply a list of solvers, a list of tolerances and optionally a list
-of `kwarg`s for each solver. Each constraint set has an associated pair of solvers
-
-* `solve_sequential_NT` <= `picard_NT` and `anderson_NT`
-* `solve_sequential_muT` <= `picard_muT` and `anderson_muT`
-* `solve_sequential_rhoT` <= `picard_rhoT` and `anderson_rhoT`
-
-The sequential solver will run the first solver in the supplied list of solvers until it reaches the first tolerance in the supplied list of tolerances.
-Then it advances to the second solver, etc. In addition, the sequential solver implements functionality such as falling back to the previous 
-solver if a solver exhibits divergent behaviour, or prompting the user for instructions if a solver reaches the maximum number of iterations
-without converging, but is otherwise well-behaved.
-
-The functions `picard_*` and `anderson_*` are fairly light-weight functions that define an appropriately formatted residual function, and call the
-general `picard` and `anderson` functions. These solvers are at the bottom of the stack, and are more or less completely general numerical solvers
-that simply accept a callable and an initial guess as arguments.
-
-The purpose of this structure is essentially that the user should only have to deal with data structures that make sense (i.e. `Profile`s for the 
-density profiles, `float`s and `ndarray[float]`s for constraints), while we can have general solvers internally that deal with big, messy vectors
-that package all density profiles, fugacities, etc. into one long vector. This way, the user-interface makes sense, and the bottom-level solvers 
-are readable, while intermediate functions handle the un- and re-packaging of the data structures.
+The `SequentialSolver` class implements the methods `add_anderson` and `add_picard` which you can use to build a solver.
+For examples, see: `../pyExamples/solver_setup.py`
 
 # Units
 
@@ -126,8 +110,8 @@ The current implementation uses SI units with the exception of the length unit (
 Thus, the conversion factor `1e30 / Avogadro` turns up some places throughout the code, specifically when converting densities
 to/from SI units.
 
-I've been thinking about using $k_B$ to reduce the energy (i.e. $E' = E / k_B$) because it turns out that using particles / Å / Joule
-often results in energies in the range of `1e-23` (which isn't surprising). I've also been thinking about implementing a `units.py`
+I've been thinking about using $k_B$ to reduce the energy (i.e. $E' = E / k_B$) because using particles / Å / Joule
+often results in energies in the range of `1e-23`. I've also been thinking about implementing a `units.py`
 module to handle generation of conversion factors. The latter would definitely reduce the probability of introducing silly bugs
 when implementing new stuff.
 

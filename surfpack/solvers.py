@@ -763,3 +763,63 @@ class GridRefiner:
             p0 = Profile.lst_on_grid(p0.profile, grid)
             p0 = solver(func, p0, verbose=verbose)
         return p0
+
+
+def get_solver(key, spec='muT'):
+    """Utility
+    This function generates solvers tuned to specific problems. For example, when working with the NH3,H2O mixture,
+    a solver was tuned that worked well for this mixture. This solver is saved here, and can be retrieved with the
+    'NH3,H2O' key. Similarly, when a solver is tuned for some other specific problem, that can be done here, such that
+    we don't mess with the default solver, and can easily get hold of the tuned solver when we need it.
+
+    Valid solver keys are
+        - default : Should in principle be the most robust general-purpose solver, but potentially quite slow
+        - assoc : Tuned for associating systems
+        - NH3,H2O : Tuned specifically for the NH3/H2O mixture
+        - single_segment : Tuned specifically for single-segment Mie fluids
+
+    Args:
+        key (str) : The solver key
+        spec (str) : Either 'muT' or 'NT', specifies the constrained variables of the solver. The values of these must be
+                    specified after retrieving the solver, through the solver.set_constraints method. See Functional.density_profile_twophase
+                    for example.
+
+    Returns:
+        SequentialSolver : A solver tuned for the specific problem
+    """
+    key = key.lower()
+
+    if key == 'default':
+        solver = SequentialSolver(spec)
+        solver.add_picard(3e-3, mixing_alpha=0.01, max_iter=2000)
+        solver.add_picard(1e-3, mixing_alpha=0.015, max_iter=1000)
+        solver.add_picard(3e-4, mixing_alpha=0.02, max_iter=1000)
+        solver.add_picard(3e-5, mixing_alpha=0.04, max_iter=1000)
+        solver.add_picard(1e-5, mixing_alpha=0.05, max_iter=1000)
+        solver.add_anderson(1e-7, beta_mix=0.02, max_iter=500)
+        solver.add_anderson(1e-8, beta_mix=0.03, max_iter=500)
+        solver.add_anderson(1e-9, beta_mix=0.05, max_iter=500)
+        solver.add_anderson(1e-10, beta_mix=0.10, max_iter=500)
+    elif key in ('nh3,h2o', 'assoc'):
+        solver = SequentialSolver(spec)
+        solver.add_picard(3e-3, mixing_alpha=0.01, max_iter=2000)
+        solver.add_picard(1e-3, mixing_alpha=0.015, max_iter=1000)
+        solver.add_picard(3e-4, mixing_alpha=0.02, max_iter=1000)
+        solver.add_picard(3e-5, mixing_alpha=0.04, max_iter=1000)
+        solver.add_picard(1e-5, mixing_alpha=0.05, max_iter=1000)
+        solver.add_anderson(1e-7, beta_mix=0.02, max_iter=500)
+        solver.add_anderson(1e-8, beta_mix=0.03, max_iter=500)
+        solver.add_anderson(1e-9, beta_mix=0.05, max_iter=500)
+        solver.add_anderson(1e-10, beta_mix=0.10, max_iter=500)
+    elif key == 'single_segment':
+        solver = SequentialSolver(spec)
+        solver.add_picard(3e-3, mixing_alpha=0.01, max_iter=2000)
+        solver.add_picard(1e-3, mixing_alpha=0.015, max_iter=1000)
+        solver.add_picard(5e-4, mixing_alpha=0.03, max_iter=1000)
+        solver.add_anderson(1e-6, beta_mix=0.75, max_iter=500)
+        solver.add_anderson(1e-10, beta_mix=0.1, max_iter=500)
+    else:
+        warnings.warn(f'Invalid solver key : {key}, returning default solver.')
+        return get_solver('default', spec=spec)
+
+    return solver

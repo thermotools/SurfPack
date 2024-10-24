@@ -10,13 +10,14 @@ class SAFT_WhiteBear(WhiteBear):
     This is the class used for the hard sphere contribution to the saft models, it overrides the method get_R from
     the class FMT_functional (defined in HardSphere_functional.py) in order to get temperature dependen radii.
     """
-    def __init__(self, comps, eos):
+    def __init__(self, comps, eos, ms=None):
         self.eos = eos
         assert self.eos.test_fmt_compatibility()[0], f'eos : {eos} is not FMT compatible'
         self.comps = comps
         ncomps = len(comps.split(','))
         R = np.zeros(ncomps)
-        ms = np.array([self.eos.get_pure_fluid_param(i + 1)[0] for i in range(ncomps)])
+        if ms is None:
+            ms = np.array([self.eos.get_pure_fluid_param(i + 1)[0] for i in range(ncomps)])
         super().__init__(R, ms)
 
         self.computed_weights = {}  # lazy evaluation in get_weights(T)
@@ -89,17 +90,30 @@ class SAFT_HardSphere(FMT_Functional):
     the class FMT_functional (defined in HardSphere_functional.py) in order to get temperature dependen radii.
     """
     def __init__(self, comps, eos, fmt_model):
-        self.eos = eos(comps)
+        if comps == 'LJs':
+            self.eos = eos()
+        else:
+            self.eos = eos(comps)
         assert self.eos.test_fmt_compatibility()[0], f'eos : {eos} is not FMT compatible'
         self.comps = comps
         self.fmt_model = fmt_model
         ncomps = len(comps.split(','))
         R = np.zeros(ncomps) # get_R is overridden, so this list is never accessed.
-        ms = np.array([self.eos.get_pure_fluid_param(i + 1)[0] for i in range(ncomps)])
+        if self.comps == 'LJs':
+            ms = np.array([1])
+        else:
+            ms = np.array([self.eos.get_pure_fluid_param(i + 1)[0] for i in range(ncomps)])
         super().__init__(R, ms)
 
         self.computed_weights = {}  # lazy evaluation in get_weights(T), contains (T => array[weights]) map
         self.computed_weight_differentials = {}  # lazy evaluation in get_weights(T)
+
+    def get_caching_id(self):
+        ostr = f'HardSphere model of type {self.fmt_model}'
+        return ostr
+
+    def __repr__(self):
+        return self.get_caching_id()
 
     def get_R(self, T, dRdT=False):
         """
@@ -151,10 +165,14 @@ class SAFT_HardSphere(FMT_Functional):
 
         n = self.get_weighted_densities(rho, T, bulk=bulk)
         if dphidn is True:
-            phi, dphidn =  self.eos.fmt_energy_density(n, phi_n=True, fmt_model=self.fmt_model)
-            if bulk is False:
+            if bulk is True:
+                n = np.array([[ni] for ni in n])
+                phi, dphidn = self.eos.fmt_energy_density(n, phi_n=True, fmt_model=self.fmt_model)
+                print(n, phi, dphidn)
+                return phi, dphidn
+            else:
+                phi, dphidn =  self.eos.fmt_energy_density(n, phi_n=True, fmt_model=self.fmt_model)
                 return Profile(phi, rho[0].grid), Profile(dphidn, rho[0].grid)
-            return phi, dphidn
         elif phi_nn is True:
             phi, phi_nn = self.eos.fmt_energy_density(n, phi_nn=True, fmt_model=self.fmt_model)
             if bulk is False:

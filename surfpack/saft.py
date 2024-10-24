@@ -39,6 +39,13 @@ class SAFT(Functional):
         self.__contributions__ = {'dispersion' : self.__dispersion_active__, 'association' : self.__association_active__,
                                   'multipole' : self.__multipole_active__, 'chain' : self.__chain_active__}
 
+        if all(abs(self.ms - 1.) < 1e-10):
+            self._solver_key = 'single_segment'
+        if self.__association_active__ is True:
+            self._solver_key = 'assoc'
+        if ('H2O' in comps) and ('NH3' in comps):
+            self._solver_key = 'NH3,H2O'
+
     def __repr__(self):
         """Internal
         Called from inheriting classes.
@@ -57,7 +64,6 @@ class SAFT(Functional):
         """
         ostr = f'SAFT : {self._comps}, \n' \
                f'params : {[self.eos.get_pure_fluid_param(i + 1) for i in range(self.ncomps)]}\n' \
-               f'kij : {[[self.eos.get_kij(i + 1, j + 1) for i in range(self.ncomps)] for j in range(self.ncomps)]}\n' \
                f'contribs : {[k + " : " + str(self.__contributions__[k]) for k in sorted(self.__contributions__.keys())]}\n' \
                f'HS model : \n{self.hs_model.get_caching_id()}\n'
         return ostr
@@ -166,7 +172,7 @@ class SAFT(Functional):
 
             i (int) : Component index
             j (int) : Component index
-            r (float) : Distance [m]
+            r (float) : Distance [Å]
 
         Returns:
             float : Interaction potential energy [J]
@@ -379,7 +385,6 @@ class SAFT(Functional):
         Return:
             float : Temperature in LJ units
         """
-        _, _, eps_div_k, _, _ = self.eos.get_pure_fluid_param(c + 1)
         z = np.zeros(self.ncomps) + 1e-3
         z[c] = 1 - (self.ncomps - 1) * 1e-3
         Tc = self.eos.critical(z)[0]
